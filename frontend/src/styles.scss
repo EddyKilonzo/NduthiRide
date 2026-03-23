@@ -1,0 +1,80 @@
+// ─── Google Fonts ─────────────────────────────────────────────────
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Syne:wght@400;500;600;700;800&display=swap');
+
+// ─── CSS Custom Properties ────────────────────────────────────────
+:root {
+  // Brand colours (NduthiRide Stunning specification)
+  --primary:        #E84B0E;   // Burnt Orange
+  --primary-light:  #FF6B3D;
+  --primary-dark:   #B83A08;
+  --secondary:      #1A1A2E;   // Deep Navy
+  --secondary-light:#2D2D4F;
+  --accent:         #00C896;   // M-Pesa Green
+  --accent-dark:    #009970;
+  --gold:           #F4B942;   // Warm Gold
+  --surface:        #FAFAF8;   // Off-white
+
+  // Semantic mappings
+  --clr-primary:       var(--primary);
+  --clr-bg:            var(--secondary);
+  --clr-bg-card:       var(--secondary-light);
+  --clr-text:          #FFFFFF;
+  --clr-text-muted:    #9999AA;
+  
+  --font-display:      'Syne', sans-serif;
+  --font-body:         'Plus Jakarta Sans', sans-serif;
+
+  --radius-full:       9999px;
+  --transition:        400ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+// ─── Grain Texture ────────────────────────────────────────────────
+.bg-grain {
+  position: relative;
+}
+.bg-grain::after {
+  content: "";
+  position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 1;
+}
+
+// ─── Reset & Base ─────────────────────────────────────────────────
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--clr-bg);
+  color: var(--clr-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { font-family: var(--font-display); font-weight: 800; text-transform: uppercase; letter-spacing: -0.02em; }
+
+// ─── Stunning Buttons ─────────────────────────────────────────────
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 14px 32px; border-radius: var(--radius-full);
+  font-weight: 700; cursor: pointer; transition: all var(--transition);
+  font-family: var(--font-body); border: none; text-decoration: none;
+  
+  &--primary {
+    background: var(--primary); color: #fff;
+    &:hover { background: var(--primary-light); transform: translateY(-3px); box-shadow: 0 10px 25px rgba(232, 75, 14, 0.4); }
+  }
+  
+  &--ghost {
+    color: #fff; border: 1px solid rgba(255,255,255,0.2);
+    &:hover { background: rgba(255,255,255,0.1); border-color: #fff; }
+  }
+
+  &--lg { padding: 20px 48px; font-size: 18px; }
+}
+
+.text-primary { color: var(--primary); }
+.container { max-width: 1300px; margin: 0 auto; padding: 0 24px; }

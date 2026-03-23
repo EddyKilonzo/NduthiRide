@@ -1,0 +1,56 @@
+### NduthiRide — Payments endpoints
+@baseUrl = http://localhost:3000/api/v1
+@userToken = <paste_user_access_token_here>
+@rideId = <paste_ride_id_here>
+@parcelId = <paste_parcel_id_here>
+@paymentId = <paste_payment_id_here>
+
+### ─── Initiate M-Pesa STK push for a ride ───────────────────
+### This triggers a push notification to the user's phone
+POST {{baseUrl}}/payments/ride/{{rideId}}
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "phone": "0712345678"
+}
+
+### ─── Initiate M-Pesa STK push for a parcel delivery ────────
+POST {{baseUrl}}/payments/parcel/{{parcelId}}
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "phone": "0712345678"
+}
+
+### ─── Poll payment status ────────────────────────────────────
+### Call this every 3–5 seconds while waiting for user to complete STK push
+GET {{baseUrl}}/payments/{{paymentId}}/status
+Authorization: Bearer {{userToken}}
+
+### ─── M-Pesa callback (Safaricom → server) ──────────────────
+### This endpoint is called by Safaricom — NOT by the frontend.
+### Listed here for reference / local testing with ngrok.
+### The callback URL is set in your M-Pesa Daraja app settings.
+POST {{baseUrl}}/payments/mpesa/callback
+Content-Type: application/json
+
+{
+  "Body": {
+    "stkCallback": {
+      "MerchantRequestID": "sample-merchant-id",
+      "CheckoutRequestID": "ws_CO_123456789",
+      "ResultCode": 0,
+      "ResultDesc": "The service request is processed successfully.",
+      "CallbackMetadata": {
+        "Item": [
+          { "Name": "Amount", "Value": 100 },
+          { "Name": "MpesaReceiptNumber", "Value": "QA12BZ3456" },
+          { "Name": "TransactionDate", "Value": 20240101120000 },
+          { "Name": "PhoneNumber", "Value": 254712345678 }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,49 @@
+### NduthiRide — Tracking (WebSocket reference)
+### The Tracking feature is WebSocket-only — no REST endpoints.
+### Use this file as a reference for the events and payloads.
+###
+### ─── Connection ───────────────────────────────────────────────
+### URL:  ws://localhost:3000/tracking
+### Auth: socket.handshake.auth = { token: "<accessToken>" }
+###
+### After connection the server automatically:
+###   - Joins the socket to room "account:<accountId>"
+###   - For riders: also joins "riders" room
+###
+### ─── Client → Server events ───────────────────────────────────
+###
+###   rider:location-update
+###   Payload: { lat: number, lng: number, speed?: number }
+###   Description: Rider sends their GPS position; server persists to
+###                LocationHistory, updates Rider.currentLat/Lng, and
+###                pushes to the active ride's user room.
+###
+###   rider:toggle-availability
+###   Payload: { isAvailable: boolean }
+###   Description: Rider goes online or offline.
+###
+### ─── Server → Client events ───────────────────────────────────
+###
+###   tracking:location
+###   Payload: { riderId, lat, lng, speed?, timestamp }
+###   Sent to: room "account:<userId>" of the active ride's user
+###
+###   ride:new-request
+###   Payload: { rideId, pickupAddress, dropoffAddress, estimatedFare, distanceKm, user: { ... } }
+###   Sent to: room "riders" when a new ride is PENDING
+###
+###   parcel:new-request
+###   Payload: { parcelId, pickupAddress, dropoffAddress, deliveryFee, distanceKm, user: { ... } }
+###   Sent to: room "riders" when a new parcel delivery is PENDING
+###
+###   ride:accepted / parcel:accepted
+###   Payload: { rideId/parcelId, rider: { id, fullName, phone, bikeRegistration, bikeModel, ratingAverage } }
+###   Sent to: room "account:<userId>" when a rider accepts
+
+### ─── REST: Get nearby available riders ───────────────────────
+### (This one is REST, not WebSocket)
+@baseUrl = http://localhost:3000/api/v1
+@userToken = <paste_user_access_token_here>
+
+GET {{baseUrl}}/riders/nearby?lat=-1.2921&lng=36.8219&radiusKm=5
+Authorization: Bearer {{userToken}}

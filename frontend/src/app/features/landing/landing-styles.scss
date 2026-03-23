@@ -1,0 +1,93 @@
+// ─── Google Fonts ─────────────────────────────────────────────────
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap');
+
+// ─── CSS Custom Properties ────────────────────────────────────────
+:root {
+  --primary:        #E84B0E;   
+  --primary-light:  #FF6B3D;
+  --primary-dark:   #B83A08;
+  --secondary:      #1A1A2E;   
+  --secondary-light:#2D2D4F;
+  --accent:         #00C896;   
+  --accent-dark:    #009970;
+  --gold:           #F4B942;   
+  --surface:        #FAFAF8;   
+  --text-primary:   #F0F0F0;
+  --text-secondary: #9999AA;
+  --text-muted:     #6B6B80;
+  --border:         rgba(255,255,255,0.1);
+
+  --font-display:   'Syne', sans-serif;
+  --font-body:      'Plus Jakarta Sans', sans-serif;
+
+  --radius-md:      12px;
+  --radius-lg:      24px;
+  --radius-full:    9999px;
+  --transition:     400ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+html.light {
+  --secondary:      #FAFAF8;
+  --secondary-light:#FFFFFF;
+  --text-primary:   #0F0F1A;
+  --text-secondary: #6B6B80;
+  --text-muted:     #9999AA;
+  --border:         rgba(0,0,0,0.08);
+}
+
+// ─── Reset & Base ─────────────────────────────────────────────────
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--secondary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+// ─── Visual Language ──────────────────────────────────────────────
+.bg-grain {
+  position: relative;
+}
+.bg-grain::after {
+  content: "";
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.02em; }
+
+.container { max-width: 1300px; margin: 0 auto; padding: 0 24px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 12px; padding: 14px 32px; border-radius: var(--radius-full);
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: all var(--transition); border: none; font-family: var(--font-body);
+  
+  &--primary {
+    background: var(--primary); color: #fff;
+    &:hover { background: var(--primary-light); transform: translateY(-3px) scale(1.02); box-shadow: 0 10px 30px rgba(232, 75, 14, 0.4); }
+  }
+  
+  &--ghost {
+    background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1);
+    &:hover { background: rgba(255,255,255,0.1); color: var(--primary-light); }
+  }
+
+  &--lg { padding: 20px 48px; font-size: 18px; }
+}
+
+.text-primary { color: var(--primary); }
+.watermark {
+  position: absolute; font-family: var(--font-display); font-weight: 800;
+  font-size: 20vw; color: white; opacity: 0.03; pointer-events: none; z-index: 0;
+}

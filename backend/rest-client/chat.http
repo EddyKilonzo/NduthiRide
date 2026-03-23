@@ -1,0 +1,76 @@
+### NduthiRide — Chat endpoints (REST fallback)
+### Real-time messaging is via WebSocket (/chat namespace).
+### These REST endpoints serve as fallback for message history and management.
+@baseUrl = http://localhost:3000/api/v1
+@userToken = <paste_user_access_token_here>
+@riderToken = <paste_rider_access_token_here>
+@rideId = <paste_ride_id_here>
+@parcelId = <paste_parcel_id_here>
+@conversationId = <paste_conversation_id_here>
+@messageId = <paste_message_id_here>
+
+### ─── Get conversation for a ride (with last 30 messages) ───
+GET {{baseUrl}}/chat/conversation/ride/{{rideId}}
+Authorization: Bearer {{userToken}}
+
+### ─── Get conversation for a parcel delivery ─────────────────
+GET {{baseUrl}}/chat/conversation/parcel/{{parcelId}}
+Authorization: Bearer {{userToken}}
+
+### ─── Fetch paginated message history (cursor-based) ────────
+### First page — no cursor
+GET {{baseUrl}}/chat/messages?conversationId={{conversationId}}&limit=30
+Authorization: Bearer {{userToken}}
+
+### Load older messages — pass the nextCursor from the previous response
+GET {{baseUrl}}/chat/messages?conversationId={{conversationId}}&cursor={{messageId}}&limit=30
+Authorization: Bearer {{userToken}}
+
+### ─── Send a text message (REST fallback) ────────────────────
+### Prefer WebSocket chat:send event for real-time delivery
+POST {{baseUrl}}/chat/messages?conversationId={{conversationId}}
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "content": "I am 5 minutes away!",
+  "type": "TEXT"
+}
+
+### ─── Send a location pin ─────────────────────────────────────
+POST {{baseUrl}}/chat/messages?conversationId={{conversationId}}
+Authorization: Bearer {{riderToken}}
+Content-Type: application/json
+
+{
+  "content": "My current location",
+  "type": "LOCATION",
+  "locationPin": {
+    "lat": -1.2921,
+    "lng": 36.8219,
+    "address": "Nairobi CBD, Kenyatta Avenue"
+  }
+}
+
+### ─── Soft-delete own message (within 5 minutes of sending) ──
+DELETE {{baseUrl}}/chat/messages/{{messageId}}
+Authorization: Bearer {{userToken}}
+
+###
+### ─── WebSocket events reference ──────────────────────────────
+### Connect to: ws://localhost:3000/chat
+### Auth:        socket.handshake.auth = { token: "<accessToken>" }
+###
+### Client → Server:
+###   chat:join    { conversationId }
+###   chat:leave   { conversationId }
+###   chat:send    { conversationId, content, type?, locationPin? }
+###   chat:typing  { conversationId, isTyping: true|false }
+###   chat:read    { conversationId }
+###
+### Server → Client:
+###   chat:joined       { conversationId }
+###   chat:message      { id, conversationId, content, type, senderRole, senderName, createdAt, ... }
+###   chat:typing       { senderAccountId, isTyping }
+###   chat:read-receipt { readBy, readAt }
+###   chat:closed       { conversationId, closedAt }

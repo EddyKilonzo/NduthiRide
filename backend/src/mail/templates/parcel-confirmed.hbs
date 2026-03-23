@@ -1,0 +1,51 @@
+<h1>Parcel Order Placed! 📦</h1>
+<p>Hi <strong style="color:#F0F0F0;">{{userName}}</strong>,</p>
+<p>
+  Your parcel delivery order has been placed. We're finding a rider to collect it right now.
+</p>
+
+<hr class="divider" />
+
+<h2>Delivery Details</h2>
+<div class="info-row">
+  <span class="info-label">📦 Item</span>
+  <span class="info-value">{{itemDescription}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">⚖️ Weight</span>
+  <span class="info-value">{{weightKg}} kg</span>
+</div>
+<div class="info-row">
+  <span class="info-label">📍 Pickup</span>
+  <span class="info-value">{{pickupAddress}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">🏁 Delivery</span>
+  <span class="info-value">{{dropoffAddress}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">👤 Recipient</span>
+  <span class="info-value">{{recipientName}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">📞 Recipient Phone</span>
+  <span class="info-value">{{recipientPhone}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">📏 Distance</span>
+  <span class="info-value">{{distanceKm}} km</span>
+</div>
+<div class="info-row">
+  <span class="info-label">💰 Delivery Fee</span>
+  <span class="info-value"><strong style="color:#FF6B00;">KES {{deliveryFee}}</strong></span>
+</div>
+
+<hr class="divider" />
+
+<p style="text-align:center;">
+  <a href="{{trackUrl}}" class="btn">Track Delivery</a>
+</p>
+
+<div class="alert">
+  The recipient will be contacted when the rider is approaching with the parcel.
+</div>

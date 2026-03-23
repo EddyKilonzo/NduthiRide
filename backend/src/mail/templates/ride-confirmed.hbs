@@ -1,0 +1,44 @@
+<h1>Ride Booked! 🏍</h1>
+<p>Hi <strong style="color:#F0F0F0;">{{userName}}</strong>,</p>
+<p>
+  Your ride has been booked successfully. We're matching you with a nearby rider right now.
+</p>
+
+<hr class="divider" />
+
+<h2>Ride Details</h2>
+<div class="info-row">
+  <span class="info-label">📍 Pickup</span>
+  <span class="info-value">{{pickupAddress}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">🏁 Drop-off</span>
+  <span class="info-value">{{dropoffAddress}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">📏 Distance</span>
+  <span class="info-value">{{distanceKm}} km</span>
+</div>
+<div class="info-row">
+  <span class="info-label">⏱ Est. Duration</span>
+  <span class="info-value">~{{estimatedMins}} min</span>
+</div>
+<div class="info-row">
+  <span class="info-label">💳 Payment</span>
+  <span class="info-value">{{paymentMethod}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">💰 Estimated Fare</span>
+  <span class="info-value"><strong style="color:#FF6B00;">KES {{estimatedFare}}</strong></span>
+</div>
+
+<hr class="divider" />
+
+<p style="text-align:center;">
+  <a href="{{trackUrl}}" class="btn">Track My Ride</a>
+</p>
+
+<div class="alert">
+  <strong>Tip:</strong> You can track your rider in real time from the app.
+  You can also cancel for free while the ride is still Pending.
+</div>

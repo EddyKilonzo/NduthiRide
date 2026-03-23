@@ -1,0 +1,72 @@
+### NduthiRide — Parcel Delivery endpoints
+@baseUrl = http://localhost:3000/api/v1
+@userToken = <paste_user_access_token_here>
+@riderToken = <paste_rider_access_token_here>
+@parcelId = <paste_parcel_id_here>
+
+### ─── Create a parcel delivery booking (user) ───────────────
+# @name createParcel
+POST {{baseUrl}}/parcels
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "pickupLat": -1.2921,
+  "pickupLng": 36.8219,
+  "pickupAddress": "Nairobi CBD, Moi Avenue",
+  "dropoffLat": -1.2800,
+  "dropoffLng": 36.8100,
+  "dropoffAddress": "Westlands, Nairobi",
+  "itemDescription": "Electronics — fragile laptop",
+  "weightKg": 2.5,
+  "recipientName": "Peter Ochieng",
+  "recipientPhone": "0711223344",
+  "paymentMethod": "MPESA",
+  "mpesaPhone": "0712345678"
+}
+
+@newParcelId = {{createParcel.response.body.data.id}}
+
+### ─── Get my parcels (user — paginated) ─────────────────────
+GET {{baseUrl}}/parcels?page=1&limit=10
+Authorization: Bearer {{userToken}}
+
+### ─── Get a specific parcel ──────────────────────────────────
+GET {{baseUrl}}/parcels/{{parcelId}}
+Authorization: Bearer {{userToken}}
+
+### ─── Accept a parcel delivery (rider) ───────────────────────
+PATCH {{baseUrl}}/parcels/{{parcelId}}/accept
+Authorization: Bearer {{riderToken}}
+
+### ─── Update parcel status (rider) ──────────────────────────
+### Valid transitions: ACCEPTED → PICKED_UP → IN_TRANSIT → DELIVERED
+PATCH {{baseUrl}}/parcels/{{parcelId}}/status
+Authorization: Bearer {{riderToken}}
+Content-Type: application/json
+
+{
+  "status": "PICKED_UP"
+}
+
+### ─── Upload proof of delivery image (rider) ────────────────
+### Use Swagger UI (/api/docs) for multipart file uploads
+### PATCH {{baseUrl}}/parcels/{{parcelId}}/proof
+
+### ─── Cancel a parcel delivery (user or rider) ───────────────
+PATCH {{baseUrl}}/parcels/{{parcelId}}/cancel
+Authorization: Bearer {{userToken}}
+
+### ─── Rate a completed delivery ─────────────────────────────
+POST {{baseUrl}}/parcels/{{parcelId}}/rate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "score": 4,
+  "comment": "Package delivered safely"
+}
+
+### ─── Get delivery fee estimate ──────────────────────────────
+GET {{baseUrl}}/parcels/estimate?pickupLat=-1.2921&pickupLng=36.8219&dropoffLat=-1.2800&dropoffLng=36.8100&weightKg=2.5
+Authorization: Bearer {{userToken}}

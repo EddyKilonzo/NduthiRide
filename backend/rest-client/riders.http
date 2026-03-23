@@ -1,0 +1,36 @@
+### NduthiRide — Riders endpoints
+@baseUrl = http://localhost:3000/api/v1
+@riderAccessToken = <paste_rider_access_token_here>
+
+### ─── Get my rider profile ───────────────────────────────────
+GET {{baseUrl}}/riders/me
+Authorization: Bearer {{riderAccessToken}}
+
+### ─── Update my rider profile ───────────────────────────────
+PATCH {{baseUrl}}/riders/me
+Authorization: Bearer {{riderAccessToken}}
+Content-Type: application/json
+
+{
+  "bikeModel": "Honda CG 125",
+  "bikeRegistration": "KMBN 002B"
+}
+
+### ─── Toggle availability (online/offline) ──────────────────
+### Note: Can also be done via WebSocket rider:toggle-availability event
+PATCH {{baseUrl}}/riders/me/availability
+Authorization: Bearer {{riderAccessToken}}
+Content-Type: application/json
+
+{
+  "isAvailable": true
+}
+
+### ─── Get nearby available riders ───────────────────────────
+### Used by the booking UI to show available riders on the map
+GET {{baseUrl}}/riders/nearby?lat=-1.2921&lng=36.8219&radiusKm=5
+Authorization: Bearer {{riderAccessToken}}
+
+### ─── Get active ride for rider ─────────────────────────────
+GET {{baseUrl}}/riders/me/active-ride
+Authorization: Bearer {{riderAccessToken}}

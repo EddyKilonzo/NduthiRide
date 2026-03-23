@@ -1,0 +1,47 @@
+<h1>Rider Application Received 🏍</h1>
+<p>Hi <strong style="color:#F0F0F0;">{{fullName}}</strong>,</p>
+<p>
+  Thank you for signing up as a NduthiRide rider! Your application has been received
+  and is currently under review.
+</p>
+
+<hr class="divider" />
+
+<h2>Application Summary</h2>
+<div class="info-row">
+  <span class="info-label">License Number</span>
+  <span class="info-value">{{licenseNumber}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">Bike Registration</span>
+  <span class="info-value">{{bikeRegistration}}</span>
+</div>
+{{#if bikeModel}}
+<div class="info-row">
+  <span class="info-label">Bike Model</span>
+  <span class="info-value">{{bikeModel}}</span>
+</div>
+{{/if}}
+<div class="info-row">
+  <span class="info-label">Status</span>
+  <span class="info-value">
+    <span class="badge badge-warning">Pending Verification</span>
+  </span>
+</div>
+
+<hr class="divider" />
+
+<h2>What happens next?</h2>
+<p>
+  Our team will verify your license and bike documents within <strong style="color:#F0F0F0;">24–48 hours</strong>.
+  You will receive an email as soon as your account is approved.
+</p>
+
+<div class="alert">
+  <strong>Tip:</strong> Make sure your license and bike registration are valid and up to date.
+  Applications with expired documents will be rejected.
+</div>
+
+<p style="text-align:center;">
+  <a href="{{appUrl}}" class="btn">Open Rider App</a>
+</p>

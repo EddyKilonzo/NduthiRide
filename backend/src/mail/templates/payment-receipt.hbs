@@ -1,0 +1,40 @@
+<h1>Payment Receipt 🧾</h1>
+<p>Hi <strong style="color:#F0F0F0;">{{userName}}</strong>,</p>
+<p>Your payment has been received. Here is your receipt.</p>
+
+<hr class="divider" />
+
+<div class="info-row">
+  <span class="info-label">Transaction Date</span>
+  <span class="info-value">{{date}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">Method</span>
+  <span class="info-value">{{paymentMethod}}</span>
+</div>
+{{#if mpesaReceipt}}
+<div class="info-row">
+  <span class="info-label">M-Pesa Receipt No.</span>
+  <span class="info-value">{{mpesaReceipt}}</span>
+</div>
+{{/if}}
+<div class="info-row">
+  <span class="info-label">Description</span>
+  <span class="info-value">{{description}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">Status</span>
+  <span class="info-value"><span class="badge badge-success">COMPLETED</span></span>
+</div>
+
+<hr class="divider" />
+
+<p style="text-align:center; color:#888; font-size:14px;">Amount Paid</p>
+<p class="fare-total" style="text-align:center;">KES {{amount}}</p>
+
+<hr class="divider" />
+
+<p style="font-size: 13px; color: #555; text-align: center;">
+  Keep this email as your payment record. For any disputes, contact us at
+  <a href="mailto:support@nduthiride.co.ke">support@nduthiride.co.ke</a>
+</p>

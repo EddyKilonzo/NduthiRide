@@ -1,0 +1,67 @@
+### NduthiRide — Rides endpoints
+@baseUrl = http://localhost:3000/api/v1
+@userToken = <paste_user_access_token_here>
+@riderToken = <paste_rider_access_token_here>
+@rideId = <paste_ride_id_here>
+
+### ─── Create a new ride booking (user) ──────────────────────
+# @name createRide
+POST {{baseUrl}}/rides
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "pickupLat": -1.2921,
+  "pickupLng": 36.8219,
+  "pickupAddress": "Nairobi CBD, Kenyatta Avenue",
+  "dropoffLat": -1.3000,
+  "dropoffLng": 36.8500,
+  "dropoffAddress": "Upper Hill, Nairobi",
+  "paymentMethod": "MPESA",
+  "mpesaPhone": "0712345678"
+}
+
+### Capture ride ID
+@newRideId = {{createRide.response.body.data.id}}
+
+### ─── Get my rides (user — paginated) ───────────────────────
+GET {{baseUrl}}/rides?page=1&limit=10
+Authorization: Bearer {{userToken}}
+
+### ─── Get a specific ride ────────────────────────────────────
+GET {{baseUrl}}/rides/{{rideId}}
+Authorization: Bearer {{userToken}}
+
+### ─── Accept a ride (rider) ──────────────────────────────────
+PATCH {{baseUrl}}/rides/{{rideId}}/accept
+Authorization: Bearer {{riderToken}}
+
+### ─── Update ride status (rider) ────────────────────────────
+### Valid transitions: ACCEPTED → EN_ROUTE_TO_PICKUP → ARRIVED_AT_PICKUP → IN_PROGRESS → COMPLETED
+PATCH {{baseUrl}}/rides/{{rideId}}/status
+Authorization: Bearer {{riderToken}}
+Content-Type: application/json
+
+{
+  "status": "EN_ROUTE_TO_PICKUP"
+}
+
+### ─── Cancel a ride (user or rider) ─────────────────────────
+### Only PENDING or ACCEPTED rides can be cancelled
+PATCH {{baseUrl}}/rides/{{rideId}}/cancel
+Authorization: Bearer {{userToken}}
+
+### ─── Rate a completed ride ──────────────────────────────────
+POST {{baseUrl}}/rides/{{rideId}}/rate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "score": 5,
+  "comment": "Great ride, very professional!"
+}
+
+### ─── Get fare estimate ───────────────────────────────────────
+### Estimate without creating a booking
+GET {{baseUrl}}/rides/estimate?pickupLat=-1.2921&pickupLng=36.8219&dropoffLat=-1.3000&dropoffLng=36.8500
+Authorization: Bearer {{userToken}}

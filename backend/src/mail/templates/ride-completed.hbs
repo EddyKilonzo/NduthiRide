@@ -1,0 +1,45 @@
+<h1>Ride Complete — Here's your receipt 🧾</h1>
+<p>Hi <strong style="color:#F0F0F0;">{{userName}}</strong>,</p>
+<p>Your ride has been completed. Thank you for choosing NduthiRide!</p>
+
+<hr class="divider" />
+
+<h2>Trip Summary</h2>
+<div class="info-row">
+  <span class="info-label">📍 Pickup</span>
+  <span class="info-value">{{pickupAddress}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">🏁 Drop-off</span>
+  <span class="info-value">{{dropoffAddress}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">📏 Distance</span>
+  <span class="info-value">{{distanceKm}} km</span>
+</div>
+<div class="info-row">
+  <span class="info-label">👤 Rider</span>
+  <span class="info-value">{{riderName}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">💳 Payment</span>
+  <span class="info-value">{{paymentMethod}}</span>
+</div>
+{{#if mpesaReceipt}}
+<div class="info-row">
+  <span class="info-label">🧾 M-Pesa Receipt</span>
+  <span class="info-value">{{mpesaReceipt}}</span>
+</div>
+{{/if}}
+
+<hr class="divider" />
+
+<p style="text-align:center; color:#888; font-size:14px;">Total charged</p>
+<p class="fare-total" style="text-align:center;">KES {{finalFare}}</p>
+
+<hr class="divider" />
+
+<p>How was your ride? Rate your rider to help maintain service quality.</p>
+<p style="text-align:center; margin-top:8px;">
+  <a href="{{rateUrl}}" class="btn">Rate {{riderName}}</a>
+</p>

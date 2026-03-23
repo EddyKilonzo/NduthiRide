@@ -1,0 +1,45 @@
+<h1>Your rider is on the way! 🛵</h1>
+<p>Hi <strong style="color:#F0F0F0;">{{userName}}</strong>,</p>
+<p>
+  Great news — a rider has accepted your booking and is heading to your pickup point.
+</p>
+
+<hr class="divider" />
+
+<h2>Your Rider</h2>
+<div class="info-row">
+  <span class="info-label">👤 Name</span>
+  <span class="info-value">{{riderName}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">📞 Phone</span>
+  <span class="info-value">{{riderPhone}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">🏍 Bike</span>
+  <span class="info-value">{{bikeModel}} · {{bikeRegistration}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">⭐ Rating</span>
+  <span class="info-value">{{ratingAverage}} / 5.0</span>
+</div>
+
+<hr class="divider" />
+
+<h2>Ride Details</h2>
+<div class="info-row">
+  <span class="info-label">📍 Pickup</span>
+  <span class="info-value">{{pickupAddress}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">🏁 Drop-off</span>
+  <span class="info-value">{{dropoffAddress}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">💰 Estimated Fare</span>
+  <span class="info-value"><strong style="color:#FF6B00;">KES {{estimatedFare}}</strong></span>
+</div>
+
+<p style="text-align:center; margin-top: 24px;">
+  <a href="{{trackUrl}}" class="btn">Track Live Location</a>
+</p>

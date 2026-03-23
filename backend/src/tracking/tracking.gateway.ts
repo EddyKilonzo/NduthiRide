@@ -1,0 +1,237 @@
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  MessageBody,
+  ConnectedSocket,
+} from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
+import { Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
+import { RidersService } from '../riders/riders.service';
+import type { JwtPayload } from '../auth/strategies/jwt.strategy';
+
+/** Shape of rider location update emitted from the mobile client */
+interface LocationUpdatePayload {
+  lat: number;
+  lng: number;
+  speed?: number;
+}
+
+/** Map of accountId → socketId for directing server-push events */
+const connectedClients = new Map<string, string>();
+
+@WebSocketGateway({
+  cors: {
+    origin: process.env.FRONTEND_URL ?? 'http://localhost:4200',
+    credentials: true,
+  },
+  namespace: '/tracking',
+})
+export class TrackingGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
+  @WebSocketServer()
+  server: Server;
+
+  private readonly logger = new Logger(TrackingGateway.name);
+
+  constructor(
+    private readonly jwt: JwtService,
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+    private readonly ridersService: RidersService,
+  ) {}
+
+  // ─── Connection lifecycle ─────────────────────────────────
+
+  /**
+   * On connection: validate the JWT from the handshake, then:
+   * - Register the client in connectedClients map
+   * - Join their personal room (user:accountId or rider:accountId)
+   * - If RIDER, also join the shared 'riders' room for broadcast requests
+   */
+  async handleConnection(client: Socket): Promise<void> {
+    try {
+      const token =
+        (client.handshake.auth as { token?: string }).token ??
+        (client.handshake.headers.authorization ?? '').replace('Bearer ', '');
+
+      if (!token) {
+        client.disconnect();
+        return;
+      }
+
+      const payload = this.jwt.verify<JwtPayload>(token, {
+        secret: this.config.getOrThrow<string>('jwt.accessSecret'),
+      });
+
+      // Attach identity to the socket for use in message handlers
+      (client.data as { accountId: string; role: string }) = {
+        accountId: payload.sub,
+        role: payload.role,
+      };
+
+      connectedClients.set(payload.sub, client.id);
+
+      // Each user/rider gets a private room for direct server-push events
+      await client.join(`account:${payload.sub}`);
+
+      if (payload.role === 'RIDER') {
+        await client.join('riders'); // Receives new ride/parcel broadcast requests
+      }
+
+      this.logger.log(`Connected: ${payload.sub} (${payload.role})`);
+    } catch {
+      // Invalid JWT — disconnect immediately
+      client.disconnect();
+    }
+  }
+
+  handleDisconnect(client: Socket): void {
+    const data = client.data as { accountId?: string };
+    if (data?.accountId) {
+      connectedClients.delete(data.accountId);
+      this.logger.log(`Disconnected: ${data.accountId}`);
+    }
+  }
+
+  // ─── Rider → Server events ────────────────────────────────
+
+  /**
+   * Rider sends their GPS coordinates.
+   * Updates the database and forwards location to the user who has an active ride with this rider.
+   *
+   * Payload: { lat, lng, speed? }
+   * Debounce is enforced on the client side (every 5 seconds).
+   */
+  @SubscribeMessage('rider:location-update')
+  async handleLocationUpdate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: LocationUpdatePayload,
+  ): Promise<void> {
+    const { accountId } = client.data as { accountId: string };
+
+    // Persist location + history record
+    await this.ridersService.updateLocation(accountId, {
+      lat: payload.lat,
+      lng: payload.lng,
+      speed: payload.speed,
+    });
+
+    // Find the user on the active ride with this rider and forward their ETA
+    const rider = await this.prisma.rider.findUnique({ where: { accountId } });
+    if (!rider) return;
+
+    const activeRide = await this.prisma.ride.findFirst({
+      where: {
+        riderId: rider.id,
+        status: {
+          in: [
+            'ACCEPTED',
+            'EN_ROUTE_TO_PICKUP',
+            'ARRIVED_AT_PICKUP',
+            'IN_PROGRESS',
+          ],
+        },
+      },
+    });
+
+    if (activeRide) {
+      // Push live location to the passenger's room
+      this.server.to(`account:${activeRide.userId}`).emit('tracking:location', {
+        riderId: rider.id,
+        lat: payload.lat,
+        lng: payload.lng,
+        speed: payload.speed,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  /**
+   * Rider toggles their online/offline availability.
+   * Payload: { isAvailable: boolean }
+   */
+  @SubscribeMessage('rider:toggle-availability')
+  async handleToggleAvailability(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { isAvailable: boolean },
+  ): Promise<{ isAvailable: boolean }> {
+    const { accountId } = client.data as { accountId: string };
+    const result = await this.ridersService.updateAvailability(accountId, {
+      isAvailable: payload.isAvailable,
+    });
+    return result;
+  }
+
+  // ─── Server → Client emission helpers ────────────────────
+
+  /**
+   * Emits an event to a specific account's private room.
+   * Used by RidesService, ParcelsService, PaymentsService to push updates.
+   */
+  emitToAccount(accountId: string, event: string, data: unknown): void {
+    this.server.to(`account:${accountId}`).emit(event, data);
+  }
+
+  /**
+   * Broadcasts a new ride request to all connected, available riders.
+   * In production this would be filtered by proximity (nearby riders).
+   */
+  emitNewRideRequest(rideData: unknown): void {
+    this.server.to('riders').emit('ride:new-request', rideData);
+  }
+
+  /**
+   * Broadcasts a new parcel request to all connected riders.
+   */
+  emitNewParcelRequest(parcelData: unknown): void {
+    this.server.to('riders').emit('parcel:new-request', parcelData);
+  }
+
+  /**
+   * Client subscribes to payment status updates for a specific payment.
+   * Client joins a room named `payment:${paymentId}` to receive updates.
+   */
+  @SubscribeMessage('payment:subscribe')
+  handlePaymentSubscribe(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { paymentId: string },
+  ): void {
+    const { paymentId } = payload;
+    client.join(`payment:${paymentId}`);
+    this.logger.log(`Client ${client.id} subscribed to payment ${paymentId}`);
+  }
+
+  /**
+   * Client unsubscribes from payment status updates.
+   */
+  @SubscribeMessage('payment:unsubscribe')
+  handlePaymentUnsubscribe(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { paymentId: string },
+  ): void {
+    const { paymentId } = payload;
+    client.leave(`payment:${paymentId}`);
+    this.logger.log(`Client ${client.id} unsubscribed from payment ${paymentId}`);
+  }
+
+  /**
+   * Emits payment status update to all clients subscribed to a payment.
+   * Called by PaymentsService when webhook arrives.
+   */
+  emitPaymentUpdate(paymentId: string, data: {
+    status: string;
+    amount?: number;
+    mpesaReceiptNumber?: string | null;
+    completedAt?: string;
+  }): void {
+    this.server.to(`payment:${paymentId}`).emit('payment:updated', data);
+    this.logger.log(`Emitted payment update for ${paymentId}: ${data.status}`);
+  }
+}

@@ -1,0 +1,21 @@
+### NduthiRide — Map / Geocoding / Routing endpoints
+@baseUrl = http://localhost:3000/api/v1
+@userToken = <paste_access_token_here>
+
+### ─── Forward geocode (address → coordinates) ───────────────
+GET {{baseUrl}}/map/geocode?q=Westlands%20Nairobi
+Authorization: Bearer {{userToken}}
+
+### ─── Reverse geocode (coordinates → address) ───────────────
+GET {{baseUrl}}/map/reverse-geocode?lat=-1.2634&lng=36.8030
+Authorization: Bearer {{userToken}}
+
+### ─── Get route between two points ──────────────────────────
+### Returns distance (km), duration (mins), and polyline coordinates
+GET {{baseUrl}}/map/directions?originLat=-1.2921&originLng=36.8219&destLat=-1.3000&destLng=36.8500
+Authorization: Bearer {{userToken}}
+
+### ─── Get ETA between two points ────────────────────────────
+### Falls back to Haversine / 25 km/h estimate if Mapbox is unavailable
+GET {{baseUrl}}/map/eta?originLat=-1.2921&originLng=36.8219&destLat=-1.3000&destLng=36.8500
+Authorization: Bearer {{userToken}}

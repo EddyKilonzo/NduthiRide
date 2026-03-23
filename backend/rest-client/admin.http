@@ -1,0 +1,101 @@
+### NduthiRide — Admin endpoints
+### All routes require ADMIN role — get your token by logging in with an admin account.
+@baseUrl = http://localhost:3000/api/v1
+@adminToken = <paste_admin_access_token_here>
+@accountId = <paste_account_id_here>
+@riderId = <paste_rider_account_id_here>
+@rideId = <paste_ride_id_here>
+@parcelId = <paste_parcel_id_here>
+@paymentId = <paste_payment_id_here>
+
+### ─── Dashboard statistics ────────────────────────────────────
+GET {{baseUrl}}/admin/stats
+Authorization: Bearer {{adminToken}}
+
+### ─── List all accounts (paginated + filterable) ─────────────
+GET {{baseUrl}}/admin/accounts?page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### Filter by role
+GET {{baseUrl}}/admin/accounts?role=RIDER&page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### Filter by active status
+GET {{baseUrl}}/admin/accounts?isActive=false&page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### Search by name or phone
+GET {{baseUrl}}/admin/accounts?search=kamau&page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### ─── Suspend an account ──────────────────────────────────────
+PATCH {{baseUrl}}/admin/accounts/{{accountId}}/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "isActive": false
+}
+
+### ─── Reactivate a suspended account ─────────────────────────
+PATCH {{baseUrl}}/admin/accounts/{{accountId}}/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "isActive": true
+}
+
+### ─── Verify a rider (approve documents) ─────────────────────
+PATCH {{baseUrl}}/admin/riders/{{riderId}}/verification
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "isVerified": true
+}
+
+### ─── Reject a rider's verification ──────────────────────────
+PATCH {{baseUrl}}/admin/riders/{{riderId}}/verification
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "isVerified": false
+}
+
+### ─── List all rides (paginated + filterable) ────────────────
+GET {{baseUrl}}/admin/rides?page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### Filter by status
+GET {{baseUrl}}/admin/rides?status=COMPLETED&page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### ─── Get a specific ride ────────────────────────────────────
+GET {{baseUrl}}/admin/rides/{{rideId}}
+Authorization: Bearer {{adminToken}}
+
+### ─── List all parcels (paginated + filterable) ───────────────
+GET {{baseUrl}}/admin/parcels?page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### Filter by status
+GET {{baseUrl}}/admin/parcels?status=IN_TRANSIT&page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### ─── Get a specific parcel ───────────────────────────────────
+GET {{baseUrl}}/admin/parcels/{{parcelId}}
+Authorization: Bearer {{adminToken}}
+
+### ─── List all payments (paginated + filterable) ─────────────
+GET {{baseUrl}}/admin/payments?page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### Filter by status
+GET {{baseUrl}}/admin/payments?status=COMPLETED&page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### Filter by method
+GET {{baseUrl}}/admin/payments?method=MPESA&page=1&limit=20
+Authorization: Bearer {{adminToken}}

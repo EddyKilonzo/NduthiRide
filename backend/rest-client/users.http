@@ -1,0 +1,33 @@
+### NduthiRide — Users endpoints
+@baseUrl = http://localhost:3000/api/v1
+@accessToken = <paste_access_token_here>
+
+### ─── Get my profile ─────────────────────────────────────────
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+
+### ─── Update my profile ──────────────────────────────────────
+PATCH {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "fullName": "Jane Wanjiku Mwangi",
+  "email": "jane@example.com"
+}
+
+### ─── Change password ────────────────────────────────────────
+PATCH {{baseUrl}}/users/me/password
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "SecurePass123!",
+  "newPassword": "NewSecurePass456!"
+}
+
+### ─── Upload avatar (multipart) ─────────────────────────────
+### Use the REST Client File Upload feature or Swagger UI for this
+### POST {{baseUrl}}/users/me/avatar
+### Authorization: Bearer {{accessToken}}
+### Content-Type: multipart/form-data; boundary=----Boundary

@@ -1,0 +1,66 @@
+### NduthiRide — Auth endpoints
+### Base URL and shared variables
+@baseUrl = http://localhost:3000/api/v1
+@contentType = application/json
+
+### ─── Register a regular user ──────────────────────────────
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "phone": "0712345678",
+  "password": "SecurePass123!",
+  "fullName": "Jane Mwangi"
+}
+
+### ─── Register a rider ──────────────────────────────────────
+POST {{baseUrl}}/auth/register/rider
+Content-Type: {{contentType}}
+
+{
+  "phone": "0723456789",
+  "password": "SecurePass123!",
+  "fullName": "John Kamau",
+  "licenseNumber": "DL-2024-001",
+  "bikeRegistration": "KMBN 001A",
+  "bikeModel": "Bajaj Boxer"
+}
+
+### ─── Login ─────────────────────────────────────────────────
+# @name loginResponse
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "phone": "0712345678",
+  "password": "SecurePass123!"
+}
+
+### Capture tokens from the login response
+@accessToken = {{loginResponse.response.body.data.accessToken}}
+@refreshToken = {{loginResponse.response.body.data.refreshToken}}
+
+### ─── Login as rider ─────────────────────────────────────────
+# @name riderLoginResponse
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "phone": "0723456789",
+  "password": "SecurePass123!"
+}
+
+@riderAccessToken = {{riderLoginResponse.response.body.data.accessToken}}
+@riderRefreshToken = {{riderLoginResponse.response.body.data.refreshToken}}
+
+### ─── Refresh tokens ─────────────────────────────────────────
+POST {{baseUrl}}/auth/refresh
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### ─── Logout ──────────────────────────────────────────────────
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{accessToken}}

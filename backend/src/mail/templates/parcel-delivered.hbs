@@ -1,0 +1,55 @@
+<h1>Parcel Delivered! ✅</h1>
+<p>Hi <strong style="color:#F0F0F0;">{{userName}}</strong>,</p>
+<p>
+  Your parcel has been successfully delivered to <strong style="color:#F0F0F0;">{{recipientName}}</strong>.
+</p>
+
+<hr class="divider" />
+
+<h2>Delivery Summary</h2>
+<div class="info-row">
+  <span class="info-label">📦 Item</span>
+  <span class="info-value">{{itemDescription}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">🏁 Delivered to</span>
+  <span class="info-value">{{dropoffAddress}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">👤 Received by</span>
+  <span class="info-value">{{recipientName}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">🛵 Rider</span>
+  <span class="info-value">{{riderName}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">💳 Payment</span>
+  <span class="info-value">{{paymentMethod}}</span>
+</div>
+{{#if mpesaReceipt}}
+<div class="info-row">
+  <span class="info-label">🧾 M-Pesa Receipt</span>
+  <span class="info-value">{{mpesaReceipt}}</span>
+</div>
+{{/if}}
+
+<hr class="divider" />
+
+<p style="text-align:center; color:#888; font-size:14px;">Total charged</p>
+<p class="fare-total" style="text-align:center;">KES {{deliveryFee}}</p>
+
+{{#if proofImageUrl}}
+<hr class="divider" />
+<p>Proof of delivery photo was captured by the rider.</p>
+<p style="text-align:center;">
+  <a href="{{proofImageUrl}}" class="btn">View Proof Photo</a>
+</p>
+{{/if}}
+
+<hr class="divider" />
+
+<p>How was the delivery?</p>
+<p style="text-align:center; margin-top:8px;">
+  <a href="{{rateUrl}}" class="btn">Rate {{riderName}}</a>
+</p>

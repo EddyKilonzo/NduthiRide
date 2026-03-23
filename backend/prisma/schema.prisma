@@ -1,0 +1,374 @@
+// ─────────────────────────────────────────────────────────────
+// NduthiRide — Prisma Schema
+// Database: PostgreSQL
+// Run `npx prisma migrate dev` after editing this file.
+// ─────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────
+
+enum TokenType {
+  EMAIL_VERIFY   // 6-digit OTP sent on registration if email is provided
+  PASSWORD_RESET // Secure token sent via email for password reset
+}
+
+enum Role {
+  USER
+  RIDER
+  ADMIN
+}
+
+enum RideStatus {
+  PENDING            // Waiting for a rider to accept
+  ACCEPTED           // Rider accepted, heading to pickup
+  EN_ROUTE_TO_PICKUP
+  ARRIVED_AT_PICKUP
+  IN_PROGRESS        // Passenger is on the bike
+  COMPLETED
+  CANCELLED
+}
+
+enum ParcelStatus {
+  PENDING
+  ACCEPTED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum PaymentMethod {
+  MPESA
+  CASH
+}
+
+// ─── Models ──────────────────────────────────────────────────
+
+// One account covers both users and riders (role determines access level)
+model Account {
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  phone        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  avatarUrl    String?  @map("avatar_url")
+  role         Role     @default(USER)
+  isActive     Boolean  @default(true) @map("is_active")
+
+  // Hashed refresh token stored for secure rotation-based auth
+  refreshToken String? @map("refresh_token")
+
+  // Email verification — true once the user confirms their OTP
+  isEmailVerified Boolean @default(false) @map("is_email_verified")
+
+  // Push notifications
+  fcmToken        String? @map("fcm_token")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  rider               Rider?
+  rides               Ride[]              @relation("UserRides")
+  parcels             Parcel[]            @relation("UserParcels")
+  ratings             Rating[]            @relation("UserRatings")
+  messages            Message[]
+  verificationTokens  VerificationToken[]
+
+  @@map("accounts")
+}
+
+// Short-lived tokens for email verification (OTP) and password reset
+model VerificationToken {
+  id        String    @id @default(cuid())
+  accountId String    @map("account_id")
+  account   Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // For EMAIL_VERIFY: hashed 6-digit OTP
+  // For PASSWORD_RESET: hashed secure random token
+  tokenHash String    @unique @map("token_hash")
+  type      TokenType
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at") // Set when consumed — prevents replay
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([accountId, type])
+  @@map("verification_tokens")
+}
+
+// Extended profile for riders — linked 1:1 with Account
+model Rider {
+  id               String  @id @default(cuid())
+  accountId        String  @unique @map("account_id")
+  account          Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  licenseNumber    String  @map("license_number")
+  bikeRegistration String  @map("bike_registration")
+  bikeModel        String? @map("bike_model")
+
+  isAvailable Boolean  @default(false) @map("is_available")
+  isVerified  Boolean  @default(false) @map("is_verified")
+
+  // Live GPS position — updated via WebSocket on each location ping
+  currentLat Float?    @map("current_lat")
+  currentLng Float?    @map("current_lng")
+  lastSeenAt DateTime? @map("last_seen_at")
+
+  // Aggregated stats — updated after each completed trip
+  ratingAverage Float @default(0) @map("rating_average")
+  totalRides    Int   @default(0) @map("total_rides")
+  totalEarnings Float @default(0) @map("total_earnings")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  ridesAsRider    Ride[]            @relation("RiderRides")
+  parcelsAsRider  Parcel[]          @relation("RiderParcels")
+  locationHistory LocationHistory[]
+  ratingsReceived Rating[]          @relation("RiderRatings")
+
+  @@map("riders")
+}
+
+// A single motorcycle ride booking
+model Ride {
+  id String @id @default(cuid())
+
+  userId String  @map("user_id")
+  user   Account @relation("UserRides", fields: [userId], references: [id])
+
+  riderId String? @map("rider_id")
+  rider   Rider?  @relation("RiderRides", fields: [riderId], references: [id])
+
+  // Pickup coordinates and human-readable address
+  pickupLat     Float  @map("pickup_lat")
+  pickupLng     Float  @map("pickup_lng")
+  pickupAddress String @map("pickup_address")
+
+  // Dropoff coordinates and human-readable address
+  dropoffLat     Float  @map("dropoff_lat")
+  dropoffLng     Float  @map("dropoff_lng")
+  dropoffAddress String @map("dropoff_address")
+
+  status RideStatus @default(PENDING)
+
+  estimatedFare Float  @map("estimated_fare")
+  finalFare     Float? @map("final_fare") // Set when trip is completed
+  distanceKm    Float  @map("distance_km")
+  estimatedMins Int    @map("estimated_mins")
+
+  paymentMethod PaymentMethod @default(MPESA) @map("payment_method")
+  mpesaPhone    String?       @map("mpesa_phone")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  completedAt DateTime? @map("completed_at")
+
+  // Relations
+  payment      Payment?
+  rating       Rating?
+  conversation Conversation?
+
+  @@map("rides")
+}
+
+// Parcel / package delivery booking
+model Parcel {
+  id String @id @default(cuid())
+
+  userId String  @map("user_id")
+  user   Account @relation("UserParcels", fields: [userId], references: [id])
+
+  riderId String? @map("rider_id")
+  rider   Rider?  @relation("RiderParcels", fields: [riderId], references: [id])
+
+  itemDescription String @map("item_description")
+  weightKg        Float  @map("weight_kg")
+
+  // Pickup coordinates and human-readable address
+  pickupLat     Float  @map("pickup_lat")
+  pickupLng     Float  @map("pickup_lng")
+  pickupAddress String @map("pickup_address")
+
+  // Dropoff coordinates and human-readable address
+  dropoffLat     Float  @map("dropoff_lat")
+  dropoffLng     Float  @map("dropoff_lng")
+  dropoffAddress String @map("dropoff_address")
+
+  recipientName  String @map("recipient_name")
+  recipientPhone String @map("recipient_phone")
+
+  status ParcelStatus @default(PENDING)
+
+  deliveryFee Float @map("delivery_fee")
+  distanceKm  Float @map("distance_km")
+
+  // Proof-of-delivery image URL (uploaded to Cloudinary by the rider)
+  proofImageUrl String? @map("proof_image_url")
+
+  paymentMethod PaymentMethod @default(MPESA) @map("payment_method")
+  mpesaPhone    String?       @map("mpesa_phone")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deliveredAt DateTime? @map("delivered_at")
+
+  // Relations
+  payment      Payment?
+  rating       Rating?
+  conversation Conversation?
+
+  @@map("parcels")
+}
+
+// M-Pesa or cash payment record — linked to exactly one ride OR one parcel
+model Payment {
+  id String @id @default(cuid())
+
+  rideId String? @unique @map("ride_id")
+  ride   Ride?   @relation(fields: [rideId], references: [id])
+
+  parcelId String? @unique @map("parcel_id")
+  parcel   Parcel? @relation(fields: [parcelId], references: [id])
+
+  amount Float
+  status PaymentStatus @default(PENDING)
+  method PaymentMethod @default(MPESA)
+
+  // M-Pesa STK push fields (null for cash payments)
+  mpesaPhone         String?   @map("mpesa_phone")
+  checkoutRequestId  String?   @unique @map("checkout_request_id")
+  mpesaReceiptNumber String?   @map("mpesa_receipt_number")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@map("payments")
+}
+
+// Star rating a user leaves for a rider after a completed trip
+model Rating {
+  id String @id @default(cuid())
+
+  userId String  @map("user_id")
+  user   Account @relation("UserRatings", fields: [userId], references: [id])
+
+  riderId String @map("rider_id")
+  rider   Rider  @relation("RiderRatings", fields: [riderId], references: [id])
+
+  // Exactly one of rideId or parcelId will be set
+  rideId String? @unique @map("ride_id")
+  ride   Ride?   @relation(fields: [rideId], references: [id])
+
+  parcelId String? @unique @map("parcel_id")
+  parcel   Parcel? @relation(fields: [parcelId], references: [id])
+
+  score   Int     // Integer 1–5
+  comment String? // Optional written feedback
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ratings")
+}
+
+// ─── Chat models ─────────────────────────────────────────────
+
+enum ConversationStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum MessageSenderRole {
+  USER
+  RIDER
+  SYSTEM
+}
+
+enum MessageType {
+  TEXT
+  LOCATION
+  SYSTEM
+}
+
+// One conversation per ride or parcel — auto-created when rider accepts, auto-closed on completion
+model Conversation {
+  id       String             @id @default(cuid())
+  rideId   String?            @unique @map("ride_id")
+  ride     Ride?              @relation(fields: [rideId], references: [id])
+  parcelId String?            @unique @map("parcel_id")
+  parcel   Parcel?            @relation(fields: [parcelId], references: [id])
+  status   ConversationStatus @default(ACTIVE)
+  messages Message[]
+  createdAt DateTime          @default(now()) @map("created_at")
+  closedAt  DateTime?         @map("closed_at")
+
+  @@map("conversations")
+}
+
+// Individual chat message within a conversation
+model Message {
+  id             String            @id @default(cuid())
+  conversationId String            @map("conversation_id")
+  conversation   Conversation      @relation(fields: [conversationId], references: [id])
+  senderAccountId String           @map("sender_account_id")
+  senderAccount  Account           @relation(fields: [senderAccountId], references: [id])
+  senderRole     MessageSenderRole
+  content        String            @db.VarChar(1000)
+  type           MessageType       @default(TEXT)
+  locationPin    Json?             // { lat, lng, address } — only for type=LOCATION
+  isRead         Boolean           @default(false) @map("is_read")
+  isDeleted      Boolean           @default(false) @map("is_deleted")
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// GPS trail for a rider — used for live tracking and trip history
+model LocationHistory {
+  id      String @id @default(cuid())
+  riderId String @map("rider_id")
+  rider   Rider  @relation(fields: [riderId], references: [id], onDelete: Cascade)
+
+  lat   Float
+  lng   Float
+  speed Float? // Speed in km/h — null if device did not report it
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([riderId, createdAt])
+  @@map("location_history")
+}
+
+// Audit trail for payment operations — compliance and fraud investigation
+model PaymentAudit {
+  id          String   @id @default(cuid())
+  paymentId   String   @map("payment_id")
+  userId      String   @map("user_id")
+  action      String   // PAYMENT_INITIATED, PAYMENT_COMPLETED, PAYMENT_FAILED, etc.
+  details     Json     // Additional context (amount, method, IP, etc.)
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([paymentId])
+  @@index([userId])
+  @@map("payment_audit")
+}
