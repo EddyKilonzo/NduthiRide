@@ -1,0 +1,56 @@
+/* Gradient is on :host; transparent fill only on the text node span so it doesn’t fight a parent .gradient-text. */
+:host {
+  display: inline-block;
+  max-width: 100%;
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  vertical-align: bottom;
+}
+
+:host.text-type--gradient {
+  background: linear-gradient(130deg, #285a48 5%, #408a71 55%, #6b9b8a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+:host-context(html.dark).text-type--gradient {
+  background: linear-gradient(125deg, #7dd9b8 0%, #b0e4cc 42%, #f4fffa 78%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.text-type__copy {
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.text-type__cursor {
+  -webkit-text-fill-color: currentColor;
+  color: var(--clr-primary, #408a71);
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+:host-context(html.dark) .text-type__cursor {
+  color: #b0e4cc;
+}
+
+.text-type__cursor--blink {
+  animation: text-type-blink steps(1, end) infinite;
+}
+
+@keyframes text-type-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}

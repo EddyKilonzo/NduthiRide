@@ -1,0 +1,28 @@
+<nav class="nav" [class.nav--scrolled]="navScrolled">
+  <div class="nav__container">
+    <a class="nav__logo" routerLink="/">
+      <div class="logo-circle">
+        <lucide-icon name="bike" [size]="24"></lucide-icon>
+      </div>
+      <div class="logo-text">
+        <span class="logo-name">Nduthi</span><span class="logo-accent">Ride</span>
+      </div>
+    </a>
+
+    <div class="nav__links">
+      <a href="/#how-it-works">How It Works</a>
+      <a href="/#features">Features</a>
+      <a href="/#about">About</a>
+      <a href="/#account-types">Accounts</a>
+      <a href="/#faq">FAQ</a>
+    </div>
+
+    <div class="nav__actions">
+      <button class="theme-toggle" type="button" (click)="toggleTheme()" aria-label="Toggle theme">
+        <lucide-icon [name]="isDark() ? 'sun' : 'moon'" [size]="18"></lucide-icon>
+      </button>
+      <a routerLink="/auth/login" class="btn btn--ghost">Sign In</a>
+      <a routerLink="/auth/register" class="btn btn--primary">Get Started</a>
+    </div>
+  </div>
+</nav>

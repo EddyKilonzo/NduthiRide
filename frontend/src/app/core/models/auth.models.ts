@@ -16,7 +16,7 @@ export interface AuthUser {
 }
 
 export interface LoginDto {
-  phone: string;
+  email: string;
   password: string;
 }
 
@@ -28,7 +28,7 @@ export interface RegisterDto {
 }
 
 export interface RegisterRiderDto extends RegisterDto {
-  licenseNumber: string;
-  bikeRegistration: string;
+  licenseNumber?: string;
+  bikeRegistration?: string;
   bikeModel?: string;
 }

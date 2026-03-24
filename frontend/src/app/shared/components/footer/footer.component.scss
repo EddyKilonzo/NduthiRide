@@ -1,0 +1,124 @@
+.footer {
+  background: rgba(10, 10, 10, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 80px 0 40px;
+  margin-top: 100px;
+  
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+  
+  .footer__main {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    gap: 48px;
+    margin-bottom: 60px;
+    
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+    }
+    
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+  }
+  
+  .footer__brand {
+    .logo-text {
+      display: flex;
+      align-items: baseline;
+      margin-bottom: 16px;
+      
+      .logo-name {
+        font-family: var(--font-display);
+        font-size: 24px;
+        font-weight: 800;
+        color: #fff;
+        letter-spacing: -0.5px;
+      }
+      
+      .logo-accent {
+        font-family: var(--font-display);
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--clr-primary);
+        letter-spacing: -0.5px;
+      }
+    }
+    
+    .footer__tagline {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+      max-width: 280px;
+    }
+    
+    .footer__social {
+      display: flex;
+      gap: 12px;
+      
+      a {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.8);
+        transition: all 0.3s ease;
+        
+        &:hover {
+          background: var(--clr-primary);
+          border-color: var(--clr-primary);
+          color: #fff;
+          transform: translateY(-3px);
+        }
+      }
+    }
+  }
+  
+  .footer__col {
+    h5 {
+      font-size: 13px;
+      font-weight: 800;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 24px;
+    }
+    
+    a {
+      display: block;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 14px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      
+      &:hover {
+        color: var(--clr-primary);
+        padding-left: 4px;
+      }
+    }
+  }
+  
+  .footer__bottom {
+    padding-top: 32px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+    
+    .footer__copy {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+  }
+}

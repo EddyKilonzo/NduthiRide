@@ -1,0 +1,354 @@
+<!-- Hero Section -->
+<section class="hero" id="hero">
+  <div class="grid-bg grid-bg--base"></div>
+  <div class="grid-bg grid-bg--reveal" id="gridReveal"></div>
+
+  <div class="orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <div class="hero__vignette"></div>
+
+  <div class="hero__inner">
+    <span class="hero__badge" data-aos="fade-down">
+      <lucide-icon name="bike" [size]="14" class="badge-icon"></lucide-icon>
+      Available in Nairobi & Beyond
+    </span>
+
+    <h1 class="hero__title">
+      <span class="hero__title-line">The Smartest Way to</span>
+      <app-text-type
+        class="hero__typewriter"
+        [texts]="heroTypewriterLines"
+        [typingSpeed]="60"
+        [pauseDuration]="2000"
+        [showCursor]="true"
+        cursorCharacter="_"
+        [deletingSpeed]="40"
+        [variableSpeedEnabled]="false"
+        [cursorBlinkDuration]="0.5"
+      />
+    </h1>
+
+    <p class="hero__subtitle" data-aos="fade-up" data-aos-delay="160">
+      Lightning-fast motorcycle taxis and reliable parcel delivery
+      at the tap of a button — safe, affordable, built for the modern city.
+    </p>
+
+    <div class="hero__actions" data-aos="fade-up" data-aos-delay="240">
+      <a href="/auth/register" class="btn btn--primary btn--lg shadow-custom">
+        <lucide-icon name="bike" [size]="18"></lucide-icon>
+        Book a Ride
+      </a>
+      <a href="/auth/register" class="btn btn--secondary btn--lg glass-button shadow-custom">
+        <lucide-icon name="package" [size]="18"></lucide-icon>
+        Send a Parcel
+      </a>
+    </div>
+  </div>
+
+  <div class="hero__stats" data-aos="fade-up" data-aos-delay="320">
+    <div class="stat-item">
+      <span class="stat-val">500+</span>
+      <span class="stat-lbl">Active Riders</span>
+    </div>
+    <div class="stat-sep"></div>
+    <div class="stat-item">
+      <span class="stat-val">10K+</span>
+      <span class="stat-lbl">Daily Rides</span>
+    </div>
+    <div class="stat-sep"></div>
+    <div class="stat-item">
+      <span class="stat-val">4.9</span>
+      <span class="stat-lbl">Avg. Rating</span>
+    </div>
+    <div class="stat-sep"></div>
+    <div class="stat-item">
+      <span class="stat-val">15+</span>
+      <span class="stat-lbl">Nairobi Routes</span>
+    </div>
+  </div>
+</section>
+
+<!-- Stats Marquee -->
+<section class="stats-marquee" data-aos="fade-up">
+  <div class="stats-marquee__container">
+    <div class="stats-marquee__track">
+      <!-- Set 1 -->
+      <div class="stats-marquee__item" *ngFor="let item of statsItems">
+        <span class="val">{{ item.val }}</span>
+        <span class="lab">{{ item.lab }}</span>
+      </div>
+      <!-- Set 2 (for seamless loop) -->
+      <div class="stats-marquee__item" *ngFor="let item of statsItems">
+        <span class="val">{{ item.val }}</span>
+        <span class="lab">{{ item.lab }}</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How It Works Section -->
+<section id="how-it-works" class="how">
+  <div class="container">
+    <div class="section-header section-header--center" data-aos="fade-up">
+      <span class="section-label">Our Process</span>
+      <h2 class="section-title">How It <span class="gradient-text">Works</span></h2>
+      <p class="section-desc">Experience seamless transport and delivery in just three simple steps.</p>
+    </div>
+
+    <!-- Breadcrumb Process -->
+    <div class="process-breadcrumb">
+      <div class="process-step">
+        <div class="step-card shadow-custom" data-aos="zoom-in" data-aos-delay="0">
+          <div class="step-num">01</div>
+          <div class="step-icon"><lucide-icon name="map-pin" [size]="24"></lucide-icon></div>
+          <h3>Set Destination</h3>
+          <p>Pick your location and destination points.</p>
+        </div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="process-step">
+        <div class="step-card shadow-custom" data-aos="zoom-in" data-aos-delay="120">
+          <div class="step-num">02</div>
+          <div class="step-icon"><lucide-icon name="bike" [size]="24"></lucide-icon></div>
+          <h3>Match Rider</h3>
+          <p>Get paired with a vetted rider instantly.</p>
+        </div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="process-step">
+        <div class="step-card shadow-custom" data-aos="zoom-in" data-aos-delay="240">
+          <div class="step-num">03</div>
+          <div class="step-icon"><lucide-icon name="check-circle" [size]="24"></lucide-icon></div>
+          <h3>Arrive Safe</h3>
+          <p>Pay securely and rate your experience.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features Section -->
+<section id="features" class="features">
+  <div class="container">
+    <div class="section-header section-header--center" data-aos="fade-up">
+      <span class="section-label">Why NduthiRide</span>
+      <h2 class="section-title">Everything you need for <span class="gradient-text">city mobility</span></h2>
+      <p class="section-desc">
+        One platform for fast rides and dependable parcels — designed for how Nairobi actually moves.
+      </p>
+    </div>
+    <div class="features-grid">
+      <article
+        class="feature-card shadow-custom"
+        *ngFor="let f of featureItems; let i = index"
+        data-aos="fade-up"
+        [attr.data-aos-delay]="i * 90"
+      >
+        <div class="feature-card__icon">
+          <lucide-icon [name]="f.icon" [size]="26"></lucide-icon>
+        </div>
+        <h3 class="feature-card__title">{{ f.title }}</h3>
+        <p class="feature-card__desc">{{ f.desc }}</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- About Section -->
+<section id="about" class="about">
+  <div class="container">
+    <div class="about-grid">
+      <div class="about-text" data-aos="fade-right">
+        <span class="section-label">Our Story</span>
+        <h2 class="section-title">
+          Built for Nairobi,<br>
+          <span class="gradient-text">Powered by Community</span>
+        </h2>
+        <p class="body-text">
+          NduthiRide started from a simple idea: moving through the city should feel predictable, fair, and safe.
+          We bring together vetted riders, transparent pricing, and tools for passengers and senders — so whether
+          you are commuting or shipping a parcel, you always know what to expect.
+        </p>
+        <p class="body-text">
+          Our team works closely with operators on the ground to improve routes, response times, and support — because
+          great urban mobility is a partnership, not a one-way service.
+        </p>
+
+        <div class="about-stats">
+          <div class="astat">
+            <span class="astat-val">2024</span>
+            <span class="astat-lbl">Founded</span>
+          </div>
+          <div class="astat-div"></div>
+          <div class="astat">
+            <span class="astat-val">500+</span>
+            <span class="astat-lbl">Active Riders</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-visual" data-aos="fade-left" data-aos-delay="120">
+        <div class="values-card glass-card shadow-custom">
+          <h3 class="values-title">Our Core Values</h3>
+          <div class="values-list">
+            <div class="value-item">
+              <div class="value-icon"><lucide-icon name="shield" [size]="20"></lucide-icon></div>
+              <div>
+                <h4>Safety First</h4>
+                <p>Every rider is manually vetted and held to clear standards.</p>
+              </div>
+            </div>
+            <div class="value-item">
+              <div class="value-icon"><lucide-icon name="zap" [size]="20"></lucide-icon></div>
+              <div>
+                <h4>Speed</h4>
+                <p>Average pickup under five minutes in busy zones.</p>
+              </div>
+            </div>
+            <div class="value-item">
+              <div class="value-icon"><lucide-icon name="users" [size]="20"></lucide-icon></div>
+              <div>
+                <h4>Community</h4>
+                <p>Fair fares for riders and passengers — everyone wins.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="account-types" id="account-types">
+      <div class="account-types__intro" data-aos="fade-up">
+        <span class="section-label section-label--center">Account types</span>
+        <h2 class="section-title section-title--center">
+          Choose your <span class="gradient-text">NduthiRide profile</span>
+        </h2>
+        <p class="section-desc section-desc--center">
+          We keep passenger and rider journeys separate so each experience stays focused — pick the path that matches
+          how you use the platform.
+        </p>
+      </div>
+      <div class="account-types__grid">
+        <article
+          class="account-card shadow-custom"
+          *ngFor="let acc of accountTypes; let i = index"
+          [class.account-card--rider]="acc.variant === 'rider'"
+          data-aos="fade-up"
+          [attr.data-aos-delay]="i * 100"
+        >
+          <div class="account-card__accent"></div>
+          <span class="account-card__badge">{{ acc.badge }}</span>
+          <div class="account-card__head">
+            <div class="account-card__icon" [class.account-card__icon--rider]="acc.variant === 'rider'">
+              <lucide-icon [name]="acc.icon" [size]="28"></lucide-icon>
+            </div>
+            <div>
+              <h3 class="account-card__title">{{ acc.title }}</h3>
+              <p class="account-card__lede">{{ acc.description }}</p>
+            </div>
+          </div>
+          <ul class="account-card__list">
+            <li *ngFor="let pt of acc.points">
+              <lucide-icon name="check" [size]="16" class="account-card__check"></lucide-icon>
+              <span>{{ pt }}</span>
+            </li>
+          </ul>
+          <a [href]="acc.href" class="btn account-card__cta" [class.btn--primary]="acc.variant === 'passenger'" [class.account-card__cta--rider]="acc.variant === 'rider'">
+            {{ acc.cta }}
+            <lucide-icon name="arrow-right" [size]="18"></lucide-icon>
+          </a>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ Section -->
+<section id="faq" class="faq">
+  <div class="container">
+    <div class="section-header section-header--center" data-aos="fade-up">
+      <span class="section-label">FAQ</span>
+      <h2 class="section-title">Common <span class="gradient-text">Questions</span></h2>
+    </div>
+
+    <div class="faq-grid">
+      <div
+        class="faq-item shadow-custom"
+        *ngFor="let f of faqs; let i = index"
+        [class.is-open]="f.open"
+        data-aos="fade-up"
+        [attr.data-aos-delay]="40 + i * 60"
+      >
+        <button class="faq-toggle" (click)="toggleFaq(i)">
+          <span>{{ f.q }}</span>
+          <lucide-icon [name]="f.open ? 'chevron-up' : 'chevron-down'" [size]="18"></lucide-icon>
+        </button>
+        <div class="faq-content" *ngIf="f.open">
+          <p>{{ f.a }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section id="testimonials" class="testimonials">
+  <div class="container">
+    <div class="section-header" data-aos="fade-up">
+      <span class="section-label">Community</span>
+      <h2 class="section-title">Trusted by <span class="gradient-text">Thousands</span></h2>
+    </div>
+  </div>
+
+  <div class="marquee-container" data-aos="fade-in" data-aos-duration="600">
+    <div class="marquee marquee--left">
+      <div class="testimonial-card shadow-custom" *ngFor="let t of testimonialMarqueeItems">
+        <div class="stars">
+          <lucide-icon name="star" [size]="12" *ngFor="let _ of starRow"></lucide-icon>
+        </div>
+        <p class="quote">"{{ t.quote }}"</p>
+        <div class="user">
+          <div class="avatar">{{ t.initial }}</div>
+          <div class="user-meta">
+            <div class="name">{{ t.name }}</div>
+            <div class="role">{{ t.role }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card shadow-custom" *ngFor="let t of testimonialMarqueeItems" aria-hidden="true">
+        <div class="stars">
+          <lucide-icon name="star" [size]="12" *ngFor="let _ of starRow"></lucide-icon>
+        </div>
+        <p class="quote">"{{ t.quote }}"</p>
+        <div class="user">
+          <div class="avatar">{{ t.initial }}</div>
+          <div class="user-meta">
+            <div class="name">{{ t.name }}</div>
+            <div class="role">{{ t.role }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA Banner -->
+<section class="cta">
+  <div class="container" data-aos="zoom-in" data-aos-delay="80">
+    <div class="cta__card primary-button shadow-custom">
+      <div class="cta__content">
+        <h2>Ready to Ride?</h2>
+        <p>Join over 50,000 satisfied users today.</p>
+        <div class="cta__actions">
+          <a href="/auth/register" class="btn btn--secondary btn--lg shadow-custom">Create Account</a>
+          <a href="/auth/register-rider" class="btn btn--ghost btn--lg">Become a Rider</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+

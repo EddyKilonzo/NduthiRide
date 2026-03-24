@@ -109,9 +109,9 @@ export class AuthService {
         await tx.rider.create({
           data: {
             accountId: newAccount.id,
-            licenseNumber: dto.licenseNumber,
-            bikeRegistration: dto.bikeRegistration,
-            bikeModel: dto.bikeModel,
+            licenseNumber: dto.licenseNumber ?? 'To be provided',
+            bikeRegistration: dto.bikeRegistration ?? 'To be provided',
+            bikeModel: dto.bikeModel ?? null,
           },
         });
 
@@ -125,9 +125,9 @@ export class AuthService {
         void this.mailService.sendWelcomeRider({
           to: account.email,
           fullName: account.fullName,
-          licenseNumber: dto.licenseNumber,
-          bikeRegistration: dto.bikeRegistration,
-          bikeModel: dto.bikeModel,
+          licenseNumber: dto.licenseNumber ?? 'To be provided',
+          bikeRegistration: dto.bikeRegistration ?? 'To be provided',
+          bikeModel: dto.bikeModel ?? 'To be provided',
         });
         void this.sendEmailVerificationOtp(
           account.id,
@@ -147,16 +147,18 @@ export class AuthService {
   // ─── Login ────────────────────────────────────────────────
 
   /**
-   * Verifies phone + password and returns a fresh token pair.
-   * Intentionally returns the same error message for both wrong phone and wrong password
-   * to avoid leaking whether a phone number is registered.
+   * Verifies email + password and returns a fresh token pair.
+   * Intentionally returns the same error message for both wrong email and wrong password
+   * to avoid leaking whether an address is registered.
+   * Accounts without an email cannot use this endpoint.
    */
   async login(
     dto: LoginDto,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     try {
+      const email = dto.email.trim().toLowerCase();
       const account = await this.prisma.account.findUnique({
-        where: { phone: dto.phone },
+        where: { email },
       });
 
       if (!account || !account.isActive) {

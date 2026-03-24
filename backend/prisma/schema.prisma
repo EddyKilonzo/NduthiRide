@@ -10,6 +10,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ─── Enums ───────────────────────────────────────────────────
@@ -117,8 +118,8 @@ model Rider {
   accountId        String  @unique @map("account_id")
   account          Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  licenseNumber    String  @map("license_number")
-  bikeRegistration String  @map("bike_registration")
+  licenseNumber    String? @map("license_number")
+  bikeRegistration String? @map("bike_registration")
   bikeModel        String? @map("bike_model")
 
   isAvailable Boolean  @default(false) @map("is_available")

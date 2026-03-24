@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(node -e \"require\\(''@nestjs-modules/mailer''\\); require\\(''nodemailer''\\); require\\(''handlebars''\\); console.log\\(''OK''\\)\")",
+      "Bash(npm test:*)",
+      "Bash(ng build:*)",
+      "Bash(node:*)",
+      "Bash(echo:*)",
+      "Bash(grep -r provideIcons /c/Users/Admin/Documents/Projects/NduthRide/frontend/node_modules/lucide-angular/ --include=*.d.ts)"
+    ]
+  }
+}

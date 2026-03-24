@@ -39,23 +39,23 @@ export class RegisterRiderDto {
   @MinLength(8, { message: 'Password must be at least 8 characters' })
   password: string;
 
-  // Rider-specific fields
+  // Rider-specific fields (Optional during initial registration)
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'DL12345',
     description: "Rider's driving licence number",
   })
   @IsString()
-  @IsNotEmpty()
-  licenseNumber: string;
+  @IsOptional()
+  licenseNumber?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'KDA 123A',
     description: 'Motorcycle registration plate',
   })
   @IsString()
-  @IsNotEmpty()
-  bikeRegistration: string;
+  @IsOptional()
+  bikeRegistration?: string;
 
   @ApiPropertyOptional({
     example: 'Honda CB125F',

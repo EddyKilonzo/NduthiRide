@@ -48,6 +48,10 @@ export class AuthService {
     }
   }
 
+  async verifyEmail(otp: string): Promise<void> {
+    await this.api.verifyEmail(otp);
+  }
+
   async refresh(): Promise<void> {
     try {
       const refreshToken = this.getRefreshToken();

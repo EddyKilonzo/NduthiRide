@@ -1,0 +1,6 @@
+<span class="text-type__copy">{{ visibleText }}<span
+    *ngIf="showCursor"
+    class="text-type__cursor"
+    [class.text-type__cursor--blink]="cursorBlinkDuration > 0"
+    [style.animation-duration]="cursorBlinkDuration + 's'"
+  >{{ cursorCharacter }}</span></span>

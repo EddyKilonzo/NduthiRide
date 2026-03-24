@@ -1,0 +1,31 @@
+# ── Root .gitignore for NduthiRide monorepo ──────────────────
+
+# Dependencies
+node_modules/
+
+# Environment — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Prisma generated client
+generated/
+
+# Test coverage
+coverage/

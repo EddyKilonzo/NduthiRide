@@ -8,11 +8,13 @@ import { AuthService } from './core/services/auth.service';
 
 import { ShellComponent }           from './features/shell/shell.component';
 import { LandingPageComponent }     from './features/landing/landing-page.component';
+import { PublicLayoutComponent }    from './shared/components/layouts/public-layout.component';
 
 // Auth
 import { LoginComponent }           from './features/auth/login/login.component';
 import { RegisterComponent }        from './features/auth/register/register.component';
 import { RegisterRiderComponent }   from './features/auth/register-rider/register-rider.component';
+import { VerifyEmailComponent }    from './features/auth/verify-email/verify-email.component';
 
 // User
 import { UserHomeComponent }        from './features/user/home/user-home.component';
@@ -40,22 +42,27 @@ import { AdminPaymentsComponent }   from './features/admin/payments/admin-paymen
 
 export const routes: Routes = [
 
-  // ── Landing Page (unauthenticated only) ─────────────────────────────────
+  // ── Public pages (landing + auth) — shared nav/footer layout ────────────
   {
     path: '',
-    component: LandingPageComponent,
-    pathMatch: 'full',
-    canActivate: [guestGuard]
-  },
-
-  // ── Auth (unauthenticated only) ─────────────────────────────────────────
-  {
-    path: 'auth',
+    component: PublicLayoutComponent,
     children: [
-      { path: '',               redirectTo: 'login', pathMatch: 'full' },
-      { path: 'login',          component: LoginComponent,        canActivate: [guestGuard] },
-      { path: 'register',       component: RegisterComponent,     canActivate: [guestGuard] },
-      { path: 'register-rider', component: RegisterRiderComponent, canActivate: [guestGuard] },
+      {
+        path: '',
+        component: LandingPageComponent,
+        pathMatch: 'full',
+        canActivate: [guestGuard],
+      },
+      {
+        path: 'auth',
+        children: [
+          { path: '',               redirectTo: 'login', pathMatch: 'full' },
+          { path: 'login',          component: LoginComponent,         canActivate: [guestGuard] },
+          { path: 'register',       component: RegisterComponent,      canActivate: [guestGuard] },
+          { path: 'register-rider', component: RegisterRiderComponent, canActivate: [guestGuard] },
+          { path: 'verify-email',   component: VerifyEmailComponent },
+        ],
+      },
     ],
   },
 

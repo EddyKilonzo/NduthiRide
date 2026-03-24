@@ -162,10 +162,11 @@ describe('AuthService', () => {
   // ─── login ────────────────────────────────────────────────
 
   describe('login', () => {
-    const dto = { phone: '0712345678', password: 'Secret123!' };
+    const dto = { email: 'user@example.com', password: 'Secret123!' };
     const account = {
       id: 'acc-1',
-      phone: dto.phone,
+      email: dto.email,
+      phone: '0712345678',
       role: Role.USER,
       isActive: true,
       passwordHash: 'hashed_pw',
@@ -185,7 +186,7 @@ describe('AuthService', () => {
       expect(result).toHaveProperty('refreshToken');
     });
 
-    it('throws UnauthorizedException for unknown phone', async () => {
+    it('throws UnauthorizedException for unknown email', async () => {
       mockPrisma.account.findUnique.mockResolvedValue(null);
 
       await expect(service.login(dto)).rejects.toThrow(UnauthorizedException);
