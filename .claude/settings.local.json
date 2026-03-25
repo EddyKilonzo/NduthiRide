@@ -9,7 +9,17 @@
       "Bash(ng build:*)",
       "Bash(node:*)",
       "Bash(echo:*)",
-      "Bash(grep -r provideIcons /c/Users/Admin/Documents/Projects/NduthRide/frontend/node_modules/lucide-angular/ --include=*.d.ts)"
+      "Bash(grep -r provideIcons /c/Users/Admin/Documents/Projects/NduthRide/frontend/node_modules/lucide-angular/ --include=*.d.ts)",
+      "Bash(curl:*)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3000\")",
+      "Bash(findstr \":3000 \")",
+      "Bash(findstr LISTEN 2)",
+      "Bash(/dev/null taskkill:*)",
+      "Bash(find C:UsersAdminDocumentsProjectsNduthRidefrontendsrcappfeaturesauth -name *.ts -o -name *.html)",
+      "Bash(find C:/Users/Admin/Documents/Projects/NduthRide/backend/src -name configuration* -o -name config*)"
     ]
   }
 }

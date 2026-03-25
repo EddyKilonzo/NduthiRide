@@ -31,7 +31,7 @@ export class MailService {
   }): Promise<void> {
     await this.send({
       to: opts.to,
-      subject: 'Welcome to NduthiRide! 🏍',
+      subject: 'Welcome to NduthiRide',
       template: 'welcome-user',
       context: {
         fullName: opts.fullName,
@@ -71,8 +71,8 @@ export class MailService {
     fullName: string;
     otp: string;
     expiresMins: number;
-  }): Promise<void> {
-    await this.send({
+  }): Promise<boolean> {
+    return this.send({
       to: opts.to,
       subject: `${opts.otp} is your NduthiRide verification code`,
       template: 'verify-email',
@@ -282,7 +282,7 @@ export class MailService {
   }): Promise<void> {
     await this.send({
       to: opts.to,
-      subject: 'Account approved — Welcome to NduthiRide! 🎉',
+      subject: 'Account Approved — Welcome to NduthiRide',
       template: 'rider-verified',
       context: {
         ...opts,
@@ -317,7 +317,7 @@ export class MailService {
     subject: string;
     template: string;
     context: Record<string, unknown>;
-  }): Promise<void> {
+  }): Promise<boolean> {
     try {
       await this.mailer.sendMail({
         from: `"${this.fromName}" <${this.fromAddress}>`,
@@ -327,12 +327,16 @@ export class MailService {
         context: opts.context,
       });
       this.logger.log(`Email sent [${opts.template}] → ${opts.to}`);
+      return true;
     } catch (error) {
       // Log but don't throw — a failed email should not break the main flow
+      const message =
+        error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Failed to send email [${opts.template}] → ${opts.to}`,
-        error,
+        `Failed to send email [${opts.template}] → ${opts.to}: ${message}`,
+        error instanceof Error ? error.stack : undefined,
       );
+      return false;
     }
   }
 }

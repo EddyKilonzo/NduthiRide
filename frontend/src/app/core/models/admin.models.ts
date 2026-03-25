@@ -1,3 +1,4 @@
+/** Shape returned by GET /admin/stats (see backend AdminService.getDashboardStats). */
 export interface DashboardStats {
   totalUsers: number;
   totalRiders: number;
@@ -5,10 +6,15 @@ export interface DashboardStats {
   totalParcels: number;
   totalRevenue: number;
   activeRides: number;
-  pendingRiders: number;
-  todayRides: number;
-  todayRevenue: number;
-  completionRate: number;
+  verifiedRiders?: number;
+  availableRiders?: number;
+  completedRides?: number;
+  completedParcels?: number;
+  /** Optional legacy fields if API is extended */
+  pendingRiders?: number;
+  todayRides?: number;
+  todayRevenue?: number;
+  completionRate?: number;
 }
 
 export interface PaginatedResult<T> {

@@ -31,14 +31,25 @@ export class AuthApi extends BaseApiService {
   }
 
   async verifyEmail(otp: string): Promise<void> {
-    return this.post(`${this.path}/verify-email`, { otp });
+    return this.post(`${this.path}/email/verify`, { otp });
+  }
+
+  async resendOtp(): Promise<void> {
+    return this.post(`${this.path}/email/resend-otp`, {});
   }
 
   async forgotPassword(email: string): Promise<void> {
-    return this.post(`${this.path}/forgot-password`, { email });
+    return this.post(`${this.path}/password/forgot`, { email });
   }
 
   async resetPassword(token: string, password: string): Promise<void> {
-    return this.post(`${this.path}/reset-password`, { token, password });
+    return this.post(`${this.path}/password/reset`, { token, newPassword: password });
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    return this.post(`${this.path}/password/change`, {
+      currentPassword,
+      newPassword,
+    });
   }
 }

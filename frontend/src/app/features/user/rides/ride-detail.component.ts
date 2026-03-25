@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
 import { RideService } from '../../../core/services/ride.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
@@ -9,9 +10,9 @@ import type { Ride } from '../../../core/models/ride.models';
 @Component({
   selector: 'app-ride-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, SpinnerComponent],
+  imports: [CommonModule, RouterLink, SpinnerComponent, LucideAngularModule],
   template: `
-    <div class="page">
+    <div class="page app-page">
       @if (loading()) {
         <app-spinner [overlay]="true" />
       } @else if (!ride()) {
@@ -78,7 +79,10 @@ import type { Ride } from '../../../core/models/ride.models';
                 <div>
                   <p class="rider-name">{{ ride()!.rider!.account.fullName }}</p>
                   <p class="rider-sub">{{ ride()!.rider!.account.phone }}</p>
-                  <p class="rider-sub">⭐ {{ ride()!.rider!.ratingAverage | number:'1.1-1' }}</p>
+                  <p class="rider-sub rider-rating">
+                    <lucide-icon name="star" [size]="14" class="star-inline"></lucide-icon>
+                    {{ ride()!.rider!.ratingAverage | number:'1.1-1' }}
+                  </p>
                   <p class="rider-sub">{{ ride()!.rider!.bikeModel }} — {{ ride()!.rider!.bikeRegistration }}</p>
                 </div>
               </div>
@@ -99,10 +103,12 @@ import type { Ride } from '../../../core/models/ride.models';
           @if (ride()!.status === 'COMPLETED' && !rated()) {
             <div class="card">
               <h3 class="card-title">Rate Your Ride</h3>
-              <div class="stars">
+              <div class="stars" role="group" aria-label="Rating">
                 @for (star of [1,2,3,4,5]; track star) {
-                  <button class="star" [class.star--active]="selectedRating() >= star"
-                    (click)="selectedRating.set(star)">★</button>
+                  <button type="button" class="star-btn" [class.star-btn--active]="selectedRating() >= star"
+                    (click)="selectedRating.set(star)" [attr.aria-pressed]="selectedRating() >= star">
+                    <lucide-icon name="star" [size]="28"></lucide-icon>
+                  </button>
                 }
               </div>
               <button class="btn btn--primary btn--full" [disabled]="selectedRating() === 0"
@@ -127,8 +133,19 @@ import type { Ride } from '../../../core/models/ride.models';
     .avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--clr-primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; flex-shrink: 0; }
     .rider-name { font-weight: 600; }
     .rider-sub  { font-size: 13px; color: var(--clr-text-muted); }
-    .stars { display: flex; gap: 8px; margin-bottom: 16px; }
-    .star { font-size: 28px; color: var(--clr-border); cursor: pointer; transition: color var(--transition); &--active { color: var(--clr-warning); } }
+    .rider-rating { display: inline-flex; align-items: center; gap: 6px; }
+    .star-inline { color: var(--clr-warning); flex-shrink: 0; }
+    .detail-grid .card { box-shadow: var(--shadow-card); }
+    .stars { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+    .star-btn {
+      padding: 4px; color: var(--clr-text-dim); cursor: pointer; transition: color var(--transition), transform 0.15s ease;
+      border-radius: 8px;
+      &:hover { color: var(--clr-warning); transform: scale(1.06); }
+    }
+    .star-btn--active { color: var(--clr-warning); }
+    @media (max-width: 640px) {
+      .detail-grid { grid-template-columns: 1fr; }
+    }
   `],
 })
 export class RideDetailComponent implements OnInit {

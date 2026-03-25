@@ -1,44 +1,99 @@
-<h1>Welcome to NduthiRide! 🎉</h1>
-<p>Hi <strong style="color:#F0F0F0;">{{fullName}}</strong>,</p>
-<p>
+<!-- Heading -->
+<h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.3;">
+  Welcome to NduthiRide
+</h1>
+
+<p style="margin:0 0 12px;font-size:15px;color:#AAAAAA;line-height:1.7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  Hi <strong style="color:#F0F0F0;font-weight:600;">{{fullName}}</strong>,
+</p>
+
+<p style="margin:0 0 20px;font-size:15px;color:#AAAAAA;line-height:1.7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   Your account has been created successfully. You can now book fast, safe boda boda rides
   and same-day parcel deliveries across Nairobi.
 </p>
 
 {{#if email}}
-<div class="alert">
-  <strong>Verify your email</strong> — we sent a separate OTP to this address to confirm
-  your email. You can still use the app while unverified.
-</div>
+<!-- Alert -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 20px;">
+  <tr>
+    <td style="background-color:rgba(64,138,113,0.08);border:1px solid rgba(64,138,113,0.3);border-radius:10px;padding:14px 18px;">
+      <p style="margin:0;font-size:13px;color:#AAAAAA;line-height:1.6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+        <strong style="color:#408A71;">Verify your email</strong> — we sent a separate code to confirm your address.
+        You can still use the app while unverified.
+      </p>
+    </td>
+  </tr>
+</table>
 {{/if}}
 
-<hr class="divider" />
+<!-- Divider -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:4px 0 20px;">
+  <tr><td style="border-top:1px solid #2A2A2A;font-size:0;line-height:0;">&nbsp;</td></tr>
+</table>
 
-<h2>What you can do</h2>
-<div class="info-row">
-  <span class="info-label">🏍 Book a Ride</span>
-  <span class="info-value">Instant boda pickup</span>
-</div>
-<div class="info-row">
-  <span class="info-label">📦 Send a Parcel</span>
-  <span class="info-value">Same-day delivery</span>
-</div>
-<div class="info-row">
-  <span class="info-label">💬 In-app Chat</span>
-  <span class="info-value">Talk to your rider</span>
-</div>
-<div class="info-row">
-  <span class="info-label">📍 Live Tracking</span>
-  <span class="info-value">See your rider on the map</span>
-</div>
+<h2 style="margin:0 0 14px;font-size:16px;font-weight:600;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">What you can do</h2>
 
-<hr class="divider" />
+<!-- Feature rows -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #2A2A2A;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="font-size:14px;color:#888888;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Book a Ride</td>
+          <td align="right" style="font-size:14px;font-weight:600;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Instant boda pickup</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #2A2A2A;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="font-size:14px;color:#888888;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Send a Parcel</td>
+          <td align="right" style="font-size:14px;font-weight:600;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Same-day delivery</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #2A2A2A;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="font-size:14px;color:#888888;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">In-app Messaging</td>
+          <td align="right" style="font-size:14px;font-weight:600;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Talk to your rider</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:12px 0;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="font-size:14px;color:#888888;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Live Tracking</td>
+          <td align="right" style="font-size:14px;font-weight:600;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">See your rider on the map</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
 
-<p style="text-align:center;">
-  <a href="{{appUrl}}" class="btn">Open NduthiRide</a>
-</p>
+<!-- Divider -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:20px 0;">
+  <tr><td style="border-top:1px solid #2A2A2A;font-size:0;line-height:0;">&nbsp;</td></tr>
+</table>
 
-<p style="font-size:13px; color:#555; text-align:center; margin-top:16px;">
-  Questions? Reply to this email or contact us at
-  <a href="mailto:support@nduthiride.co.ke">support@nduthiride.co.ke</a>
+<!-- CTA button -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 20px;">
+  <tr>
+    <td align="center">
+      <a href="{{appUrl}}" style="display:inline-block;background-color:#408A71;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:10px;font-size:15px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;letter-spacing:0.2px;">
+        Open NduthiRide
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin:0;font-size:13px;color:#555555;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  Questions? Contact us at
+  <a href="mailto:support@nduthiride.co.ke" style="color:#408A71;text-decoration:none;">support@nduthiride.co.ke</a>
 </p>

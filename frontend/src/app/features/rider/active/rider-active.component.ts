@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
 import { RideService }   from '../../../core/services/ride.service';
 import { ParcelService } from '../../../core/services/parcel.service';
 import { ToastService }  from '../../../core/services/toast.service';
@@ -8,180 +9,385 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
 import type { Ride, RideStatus } from '../../../core/models/ride.models';
 import type { Parcel, ParcelStatus } from '../../../core/models/parcel.models';
 
-/** Ride status transitions available to the rider. */
-const RIDE_NEXT: Partial<Record<RideStatus, { status: RideStatus; label: string }>> = {
-  ACCEPTED:           { status: 'EN_ROUTE_TO_PICKUP',  label: '🛵 Head to Pickup' },
-  EN_ROUTE_TO_PICKUP: { status: 'ARRIVED_AT_PICKUP',   label: '📍 I\'ve Arrived'  },
-  ARRIVED_AT_PICKUP:  { status: 'IN_PROGRESS',         label: '▶️ Start Ride'     },
-  IN_PROGRESS:        { status: 'COMPLETED',           label: '✅ Complete Ride'   },
+const RIDE_NEXT: Partial<Record<RideStatus, { status: RideStatus; label: string; icon: string }>> = {
+  ACCEPTED:           { status: 'EN_ROUTE_TO_PICKUP',  label: 'Head to Pickup', icon: 'navigation' },
+  EN_ROUTE_TO_PICKUP: { status: 'ARRIVED_AT_PICKUP',   label: 'I\'ve Arrived',  icon: 'map-pin' },
+  ARRIVED_AT_PICKUP:  { status: 'IN_PROGRESS',         label: 'Start Ride',     icon: 'play' },
+  IN_PROGRESS:        { status: 'COMPLETED',           label: 'Complete Ride',   icon: 'check-circle' },
 };
 
-/** Parcel status transitions available to the rider. */
-const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: string }>> = {
-  ACCEPTED:  { status: 'PICKED_UP',  label: '📦 Parcel Picked Up' },
-  PICKED_UP: { status: 'IN_TRANSIT', label: '🚀 In Transit'       },
-  IN_TRANSIT:{ status: 'DELIVERED',  label: '✅ Mark Delivered'    },
+const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: string; icon: string }>> = {
+  ACCEPTED:  { status: 'PICKED_UP',  label: 'Mark as Picked Up', icon: 'package-check' },
+  PICKED_UP: { status: 'IN_TRANSIT', label: 'Start Delivery',    icon: 'truck' },
+  IN_TRANSIT:{ status: 'DELIVERED',  label: 'Mark Delivered',    icon: 'check-circle' },
 };
 
 @Component({
   selector: 'app-rider-active',
   standalone: true,
-  imports: [CommonModule, RouterLink, SpinnerComponent],
+  imports: [CommonModule, RouterLink, SpinnerComponent, LucideAngularModule],
   template: `
-    <div class="page">
+    <div class="active-trip-page app-page">
       <div class="page-header">
-        <div><h1>Active Trip</h1><p>Manage your current ride or delivery</p></div>
-        <button class="btn btn--ghost btn--sm" (click)="refresh()" [disabled]="loading()">↻ Refresh</button>
+        <div class="header-text">
+          <h1>Active Trip</h1>
+          <p>Real-time management for your current assignment</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn--secondary btn--sm btn--pill" (click)="refresh()" [disabled]="loading()">
+            <lucide-icon name="rotate-cw" [size]="14" [class.spinning]="loading()"></lucide-icon> Refresh
+          </button>
+        </div>
       </div>
 
       @if (loading()) {
-        <app-spinner />
+        <div class="loader-wrap"><app-spinner /></div>
       } @else if (!activeRide() && !activeParcel()) {
-
-        <!-- No active trip -->
-        <div class="empty-state">
-          <div class="empty-icon">🛵</div>
-          <h3>No active trip</h3>
-          <p>Go online from the dashboard to start receiving requests.</p>
-          <a [routerLink]="['/rider']" class="btn btn--primary btn--sm" style="margin-top:16px">Go to Dashboard</a>
+        <div class="card empty-state-card modern-shadow">
+          <div class="empty-icon-wrap">
+            <lucide-icon name="bike" [size]="48"></lucide-icon>
+          </div>
+          <h3>No active trip at the moment</h3>
+          <p>Your current tasks will appear here. Head to the dashboard and go online to receive new requests.</p>
+          <a [routerLink]="['/rider']" class="btn btn--primary btn--pill mt-24">Go to Dashboard</a>
         </div>
-
       } @else {
+        <div class="trip-grid">
+          <!-- Main Trip Card -->
+          <div class="trip-main-content">
+            @if (activeRide(); as ride) {
+              <div class="card trip-card modern-shadow">
+                <div class="card-header">
+                  <div class="trip-badge ride">
+                    <lucide-icon name="bike" [size]="14"></lucide-icon> Ride Request
+                  </div>
+                  <div class="status-pill" [class]="ride.status.toLowerCase()">{{ ride.status | titlecase }}</div>
+                </div>
 
-        <!-- Active RIDE -->
-        @if (activeRide(); as ride) {
-          <div class="card trip-card">
-            <div class="trip-header">
-              <div>
-                <span class="trip-type">🏍 Ride Request</span>
-                <span class="badge badge--{{ rideBadge(ride.status) }} ml-8">{{ ride.status | titlecase }}</span>
+                <div class="trip-body">
+                  <div class="fare-section">
+                    <span class="label">Estimated Fare</span>
+                    <h2 class="fare-value">KES {{ ride.estimatedFare | number:'1.0-0' }}</h2>
+                  </div>
+
+                  <div class="route-display">
+                    <div class="route-stop">
+                      <div class="stop-marker start"></div>
+                      <div class="stop-content">
+                        <label>Pickup Location</label>
+                        <p>{{ ride.pickupAddress }}</p>
+                      </div>
+                    </div>
+                    <div class="route-connector"></div>
+                    <div class="route-stop">
+                      <div class="stop-marker end"></div>
+                      <div class="stop-content">
+                        <label>Drop-off Location</label>
+                        <p>{{ ride.dropoffAddress }}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="details-section">
+                    <div class="detail-item">
+                      <div class="item-icon"><lucide-icon name="user" [size]="18"></lucide-icon></div>
+                      <div class="item-text">
+                        <label>Passenger</label>
+                        <p>{{ ride.user.fullName }}</p>
+                      </div>
+                    </div>
+                    <div class="detail-item">
+                      <div class="item-icon"><lucide-icon name="phone" [size]="18"></lucide-icon></div>
+                      <div class="item-text">
+                        <label>Contact</label>
+                        <a [href]="'tel:' + ride.user.phone" class="contact-link">{{ ride.user.phone }}</a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card-footer">
+                  @if (rideNext(ride.status); as next) {
+                    <button
+                      class="btn btn--primary btn--full btn--lg btn--pill action-btn"
+                      (click)="advanceRide(ride.id, next.status)"
+                      [disabled]="updating()">
+                      <lucide-icon [name]="next.icon" [size]="20" *ngIf="!updating()"></lucide-icon>
+                      <app-spinner *ngIf="updating()"></app-spinner>
+                      <span>{{ updating() ? 'Processing...' : next.label }}</span>
+                    </button>
+                  } @else {
+                    <div class="completion-message">
+                      <lucide-icon name="check-circle" [size]="24"></lucide-icon>
+                      <span>Trip Completed</span>
+                    </div>
+                  }
+                </div>
               </div>
-              <strong class="fare">KES {{ ride.estimatedFare | number:'1.0-0' }}</strong>
-            </div>
+            }
 
-            <div class="route-block">
-              <div class="route-row">
-                <div class="dot dot--pickup"></div>
-                <div><p class="route-label">Pickup</p><p>{{ ride.pickupAddress }}</p></div>
+            @if (activeParcel(); as parcel) {
+              <div class="card trip-card modern-shadow">
+                <div class="card-header">
+                  <div class="trip-badge parcel">
+                    <lucide-icon name="package" [size]="14"></lucide-icon> Parcel Delivery
+                  </div>
+                  <div class="status-pill" [class]="parcel.status.toLowerCase()">{{ parcel.status | titlecase }}</div>
+                </div>
+
+                <div class="trip-body">
+                  <div class="fare-section">
+                    <span class="label">Delivery Fee</span>
+                    <h2 class="fare-value">KES {{ parcel.deliveryFee | number:'1.0-0' }}</h2>
+                  </div>
+
+                  <div class="route-display">
+                    <div class="route-stop">
+                      <div class="stop-marker start"></div>
+                      <div class="stop-content">
+                        <label>Pickup Location</label>
+                        <p>{{ parcel.pickupAddress }}</p>
+                      </div>
+                    </div>
+                    <div class="route-connector"></div>
+                    <div class="route-stop">
+                      <div class="stop-marker end"></div>
+                      <div class="stop-content">
+                        <label>Drop-off Location</label>
+                        <p>{{ parcel.dropoffAddress }}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="details-grid">
+                    <div class="detail-item">
+                      <div class="item-icon"><lucide-icon name="box" [size]="18"></lucide-icon></div>
+                      <div class="item-text">
+                        <label>Item Details</label>
+                        <p>{{ parcel.itemDescription }} ({{ parcel.weightKg }}kg)</p>
+                      </div>
+                    </div>
+                    <div class="detail-item">
+                      <div class="item-icon"><lucide-icon name="user" [size]="18"></lucide-icon></div>
+                      <div class="item-text">
+                        <label>Recipient</label>
+                        <p>{{ parcel.recipientName }}</p>
+                      </div>
+                    </div>
+                    <div class="detail-item">
+                      <div class="item-icon"><lucide-icon name="phone" [size]="18"></lucide-icon></div>
+                      <div class="item-text">
+                        <label>Contact</label>
+                        <a [href]="'tel:' + parcel.recipientPhone" class="contact-link">{{ parcel.recipientPhone }}</a>
+                      </div>
+                    </div>
+                  </div>
+
+                  @if (parcel.status === 'IN_TRANSIT') {
+                    <div class="proof-upload-section mt-24">
+                      <label class="upload-box" [class.uploaded]="proofUploaded()">
+                        <input type="file" accept="image/*" class="hidden" (change)="onProofSelected($event, parcel.id)" />
+                        <lucide-icon [name]="proofUploaded() ? 'check-circle' : 'camera'" [size]="24"></lucide-icon>
+                        <span *ngIf="!proofUploading() && !proofUploaded()">Upload Proof of Delivery</span>
+                        <span *ngIf="proofUploading()">Uploading...</span>
+                        <span *ngIf="proofUploaded()" class="text-success">Proof Uploaded Successfully</span>
+                      </label>
+                    </div>
+                  }
+                </div>
+
+                <div class="card-footer">
+                  @if (parcelNext(parcel.status); as next) {
+                    <button
+                      class="btn btn--primary btn--full btn--lg btn--pill action-btn"
+                      (click)="advanceParcel(parcel.id, next.status, parcel.status)"
+                      [disabled]="updating() || (next.status === 'DELIVERED' && !proofUploaded())">
+                      <lucide-icon [name]="next.icon" [size]="20" *ngIf="!updating()"></lucide-icon>
+                      <app-spinner *ngIf="updating()"></app-spinner>
+                      <span>{{ updating() ? 'Processing...' : next.label }}</span>
+                    </button>
+                    <p class="error-hint" *ngIf="next.status === 'DELIVERED' && !proofUploaded()">
+                      * Please upload proof of delivery to complete
+                    </p>
+                  }
+                </div>
               </div>
-              <div class="route-line"></div>
-              <div class="route-row">
-                <div class="dot dot--drop"></div>
-                <div><p class="route-label">Drop-off</p><p>{{ ride.dropoffAddress }}</p></div>
-              </div>
-            </div>
-
-            <div class="passenger-row">
-              <span class="label">Passenger:</span>
-              <strong>{{ ride.user.fullName }}</strong>
-              <span class="sep">·</span>
-              <a [href]="'tel:' + ride.user.phone" class="phone-link">{{ ride.user.phone }}</a>
-            </div>
-
-            @if (rideNext(ride.status); as next) {
-              <button
-                class="btn btn--primary btn--full status-btn"
-                (click)="advanceRide(ride.id, next.status)"
-                [disabled]="updating()">
-                @if (updating()) { Updating... } @else { {{ next.label }} }
-              </button>
             }
           </div>
-        }
 
-        <!-- Active PARCEL -->
-        @if (activeParcel(); as parcel) {
-          <div class="card trip-card">
-            <div class="trip-header">
-              <div>
-                <span class="trip-type">📦 Parcel Delivery</span>
-                <span class="badge badge--{{ parcelBadge(parcel.status) }} ml-8">{{ parcel.status | titlecase }}</span>
-              </div>
-              <strong class="fare">KES {{ parcel.deliveryFee | number:'1.0-0' }}</strong>
-            </div>
-
-            <div class="route-block">
-              <div class="route-row">
-                <div class="dot dot--pickup"></div>
-                <div><p class="route-label">Pickup</p><p>{{ parcel.pickupAddress }}</p></div>
-              </div>
-              <div class="route-line"></div>
-              <div class="route-row">
-                <div class="dot dot--drop"></div>
-                <div><p class="route-label">Drop-off</p><p>{{ parcel.dropoffAddress }}</p></div>
-              </div>
-            </div>
-
-            <div class="passenger-row">
-              <span class="label">Item:</span>
-              <strong>{{ parcel.itemDescription }}</strong>
-              <span class="sep">·</span>
-              <span>{{ parcel.weightKg }} kg</span>
-            </div>
-
-            <div class="passenger-row">
-              <span class="label">Recipient:</span>
-              <strong>{{ parcel.recipientName }}</strong>
-              <span class="sep">·</span>
-              <a [href]="'tel:' + parcel.recipientPhone" class="phone-link">{{ parcel.recipientPhone }}</a>
-            </div>
-
-            @if (parcel.status === 'IN_TRANSIT') {
-              <!-- Proof of delivery upload for final step -->
-              <div class="proof-section">
-                <label class="proof-label">
-                  <input type="file" accept="image/*" class="proof-input" (change)="onProofSelected($event, parcel.id)" />
-                  📷 Upload Delivery Proof
-                </label>
-                @if (proofUploading()) {
-                  <p class="proof-hint">Uploading...</p>
-                } @else if (proofUploaded()) {
-                  <p class="proof-hint proof-ok">✅ Proof uploaded — tap "Mark Delivered" above</p>
+          <!-- Side Information / Stepper -->
+          <div class="trip-sidebar">
+            <div class="card stepper-card modern-shadow">
+              <h3>Trip Progress</h3>
+              <div class="stepper">
+                @if (activeRide(); as ride) {
+                  <div class="step" [class.active]="ride.status === 'ACCEPTED'" [class.completed]="['EN_ROUTE_TO_PICKUP','ARRIVED_AT_PICKUP','IN_PROGRESS','COMPLETED'].includes(ride.status)">
+                    <div class="step-line"></div>
+                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <span class="step-label">Accepted</span>
+                  </div>
+                  <div class="step" [class.active]="ride.status === 'EN_ROUTE_TO_PICKUP'" [class.completed]="['ARRIVED_AT_PICKUP','IN_PROGRESS','COMPLETED'].includes(ride.status)">
+                    <div class="step-line"></div>
+                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <span class="step-label">En-route</span>
+                  </div>
+                  <div class="step" [class.active]="ride.status === 'ARRIVED_AT_PICKUP'" [class.completed]="['IN_PROGRESS','COMPLETED'].includes(ride.status)">
+                    <div class="step-line"></div>
+                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <span class="step-label">At Pickup</span>
+                  </div>
+                  <div class="step" [class.active]="ride.status === 'IN_PROGRESS'" [class.completed]="ride.status === 'COMPLETED'">
+                    <div class="step-line"></div>
+                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <span class="step-label">In Transit</span>
+                  </div>
+                }
+                @if (activeParcel(); as parcel) {
+                  <div class="step" [class.active]="parcel.status === 'ACCEPTED'" [class.completed]="['PICKED_UP','IN_TRANSIT','DELIVERED'].includes(parcel.status)">
+                    <div class="step-line"></div>
+                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <span class="step-label">Accepted</span>
+                  </div>
+                  <div class="step" [class.active]="parcel.status === 'PICKED_UP'" [class.completed]="['IN_TRANSIT','DELIVERED'].includes(parcel.status)">
+                    <div class="step-line"></div>
+                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <span class="step-label">Picked Up</span>
+                  </div>
+                  <div class="step" [class.active]="parcel.status === 'IN_TRANSIT'" [class.completed]="parcel.status === 'DELIVERED'">
+                    <div class="step-line"></div>
+                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <span class="step-label">In Transit</span>
+                  </div>
                 }
               </div>
-            }
-
-            @if (parcelNext(parcel.status); as next) {
-              <button
-                class="btn btn--primary btn--full status-btn"
-                (click)="advanceParcel(parcel.id, next.status, parcel.status)"
-                [disabled]="updating() || (next.status === 'DELIVERED' && !proofUploaded())">
-                @if (updating()) { Updating... } @else { {{ next.label }} }
-              </button>
-              @if (next.status === 'DELIVERED' && !proofUploaded()) {
-                <p class="hint">Upload delivery proof first</p>
-              }
-            }
+            </div>
+            
+            <div class="support-card modern-shadow">
+              <lucide-icon name="shield-check" [size]="32"></lucide-icon>
+              <h4>Safe Ride Support</h4>
+              <p>Having trouble? Our support team is available 24/7 to assist you.</p>
+              <button class="btn btn--danger btn--sm btn--pill mt-12">Emergency SOS</button>
+            </div>
           </div>
-        }
-
+        </div>
       }
     </div>
   `,
   styles: [`
-    .trip-card { display: flex; flex-direction: column; gap: 16px; max-width: 560px; }
-    .trip-header { display: flex; justify-content: space-between; align-items: center; }
-    .trip-type  { font-weight: 600; font-size: 15px; }
-    .fare       { font-size: 20px; color: var(--clr-primary); }
-    .ml-8       { margin-left: 8px; }
-    .route-block { background: var(--clr-bg-elevated); border-radius: var(--radius-md); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
-    .route-row  { display: flex; align-items: flex-start; gap: 10px; }
-    .route-line { width: 2px; height: 16px; background: var(--clr-border); margin: 2px 4px; }
-    .route-label { font-size: 11px; color: var(--clr-text-muted); text-transform: uppercase; margin-bottom: 2px; }
-    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
-    .dot--pickup { background: var(--clr-primary); }
-    .dot--drop   { background: var(--clr-success); }
-    .passenger-row { display: flex; align-items: center; gap: 6px; font-size: 14px; flex-wrap: wrap; }
-    .label { color: var(--clr-text-muted); }
-    .sep   { color: var(--clr-border); }
-    .phone-link { color: var(--clr-primary); text-decoration: none; }
-    .status-btn { margin-top: 4px; font-size: 16px; padding: 14px; }
-    .hint { font-size: 12px; color: var(--clr-text-muted); text-align: center; }
-    .proof-section { display: flex; flex-direction: column; gap: 6px; }
-    .proof-label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px 14px; border: 2px dashed var(--clr-border); border-radius: var(--radius-md); font-size: 14px; color: var(--clr-text-muted); transition: border-color var(--transition); &:hover { border-color: var(--clr-primary); color: var(--clr-primary); } }
-    .proof-input { display: none; }
-    .proof-hint  { font-size: 13px; color: var(--clr-text-muted); }
-    .proof-ok    { color: var(--clr-success); }
+    .active-trip-page { animation: fadeIn 0.6s ease-out; }
+    .loader-wrap { padding: 100px; display: flex; justify-content: center; }
+    
+    .page-header {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      margin-bottom: 32px;
+      h1 { font-family: var(--font-display); font-size: 28px; font-weight: 800; color: var(--clr-text); }
+      p { color: var(--clr-text-muted); font-size: 15px; margin-top: 4px; }
+    }
+
+    .modern-shadow { box-shadow: var(--shadow-card); }
+    .mt-24 { margin-top: 24px; }
+    .mt-12 { margin-top: 12px; }
+
+    .empty-state-card {
+      padding: 80px 40px; text-align: center; max-width: 600px; margin: 0 auto;
+      .empty-icon-wrap { width: 100px; height: 100px; background: rgba(64, 138, 113, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 32px; color: var(--clr-primary); }
+      h3 { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+      p { color: var(--clr-text-muted); line-height: 1.6; }
+    }
+
+    .trip-grid { display: grid; grid-template-columns: 1fr 300px; gap: 32px; align-items: start; }
+
+    .trip-card { padding: 0; overflow: hidden; }
+    .card-header { padding: 20px 24px; border-bottom: 1px solid var(--clr-border); display: flex; justify-content: space-between; align-items: center; }
+    .trip-badge {
+      display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase;
+      padding: 6px 12px; border-radius: 20px;
+      &.ride { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+      &.parcel { background: rgba(168, 85, 247, 0.12); color: #a855f7; }
+    }
+    .status-pill {
+      font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 6px;
+      background: var(--clr-bg-elevated); color: var(--clr-text-muted);
+      &.accepted { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+      &.in_progress, &.in_transit { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    }
+
+    .trip-body { padding: 24px; }
+    .fare-section { margin-bottom: 32px; .label { font-size: 13px; color: var(--clr-text-muted); font-weight: 600; } .fare-value { font-size: 32px; font-weight: 800; color: var(--clr-primary); font-family: var(--font-display); margin-top: 4px; } }
+
+    .route-display {
+      background: var(--clr-bg-elevated); border-radius: var(--radius-lg); padding: 20px;
+      margin-bottom: 32px; position: relative; border: 1px solid var(--clr-border);
+    }
+    .route-stop { display: flex; gap: 16px; position: relative; z-index: 2; }
+    .stop-marker {
+      width: 14px; height: 14px; border-radius: 50%; border: 3px solid #fff; margin-top: 4px; flex-shrink: 0;
+      &.start { background: var(--clr-primary); }
+      &.end { background: #3b82f6; }
+    }
+    .route-connector {
+      position: absolute; left: 26px; top: 38px; bottom: 38px; width: 2px;
+      background: repeating-linear-gradient(to bottom, var(--clr-border) 0, var(--clr-border) 6px, transparent 6px, transparent 12px);
+    }
+    .stop-content {
+      label { font-size: 11px; font-weight: 700; color: var(--clr-text-muted); text-transform: uppercase; display: block; margin-bottom: 4px; }
+      p { font-size: 15px; font-weight: 500; color: var(--clr-text); line-height: 1.4; }
+    }
+    .route-stop:first-child { margin-bottom: 32px; }
+
+    .details-section, .details-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .detail-item {
+      display: flex; gap: 12px;
+      .item-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--clr-bg-elevated); display: flex; align-items: center; justify-content: center; color: var(--clr-text-muted); flex-shrink: 0; }
+      label { font-size: 11px; font-weight: 700; color: var(--clr-text-muted); text-transform: uppercase; display: block; }
+      p, .contact-link { font-size: 14px; font-weight: 600; color: var(--clr-text); }
+      .contact-link { color: var(--clr-primary); }
+    }
+
+    .upload-box {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+      padding: 32px; border: 2px dashed var(--clr-border); border-radius: var(--radius-lg);
+      cursor: pointer; transition: all 0.3s; color: var(--clr-text-muted);
+      &:hover { border-color: var(--clr-primary); color: var(--clr-primary); background: rgba(64, 138, 113, 0.05); }
+      &.uploaded { border-style: solid; border-color: var(--clr-success); background: rgba(34, 197, 94, 0.05); color: var(--clr-success); }
+      span { font-size: 14px; font-weight: 600; }
+    }
+
+    .card-footer { padding: 24px; border-top: 1px solid var(--clr-border); background: var(--clr-bg-elevated); }
+    .action-btn { gap: 12px; height: 60px; font-size: 18px; }
+    .error-hint { font-size: 12px; color: var(--clr-error); text-align: center; margin-top: 12px; font-weight: 600; }
+    .completion-message { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--clr-success); font-weight: 700; font-size: 18px; }
+
+    .stepper-card { padding: 24px; margin-bottom: 24px; h3 { font-size: 16px; font-weight: 700; margin-bottom: 24px; } }
+    .stepper { display: flex; flex-direction: column; gap: 32px; padding-left: 8px; }
+    .step {
+      display: flex; align-items: center; gap: 16px; position: relative;
+      .step-line { position: absolute; left: 13px; top: 28px; width: 2px; height: 32px; background: var(--clr-border); }
+      &:last-child .step-line { display: none; }
+      .step-circle { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--clr-border); display: flex; align-items: center; justify-content: center; color: transparent; background: var(--clr-bg-card); transition: all 0.3s; z-index: 2; }
+      .step-label { font-size: 13px; font-weight: 600; color: var(--clr-text-muted); transition: all 0.3s; }
+      
+      &.completed { .step-circle { background: var(--clr-primary); border-color: var(--clr-primary); color: #fff; } .step-label { color: var(--clr-text); } .step-line { background: var(--clr-primary); } }
+      &.active { .step-circle { border-color: var(--clr-primary); background: rgba(64, 138, 113, 0.1); } .step-label { color: var(--clr-primary); font-weight: 700; } }
+    }
+
+    .support-card { padding: 24px; background: var(--clr-bg-card); border: 1px solid var(--clr-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); text-align: center; lucide-icon { color: var(--clr-primary); margin-bottom: 16px; } h4 { font-size: 15px; font-weight: 700; margin-bottom: 8px; } p { font-size: 12px; color: var(--clr-text-muted); line-height: 1.5; } }
+
+    .spinning { animation: spin 1s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .hidden { display: none; }
+
+    @media (max-width: 960px) {
+      .trip-grid { grid-template-columns: 1fr; }
+      .page-header { flex-direction: column; align-items: stretch; gap: 16px; }
+      .details-section, .details-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .trip-body { padding: 16px; }
+      .card-header { flex-wrap: wrap; gap: 10px; }
+      .fare-section .fare-value { font-size: 26px; }
+    }
   `],
 })
 export class RiderActiveComponent implements OnInit, OnDestroy {
@@ -196,11 +402,10 @@ export class RiderActiveComponent implements OnInit, OnDestroy {
   protected readonly proofUploading = signal(false);
   protected readonly proofUploaded  = signal(false);
 
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollTimer: any = null;
 
   async ngOnInit(): Promise<void> {
     await this.refresh();
-    // Poll every 30s for new assignments
     this.pollTimer = setInterval(() => void this.refresh(), 30_000);
   }
 
@@ -217,7 +422,6 @@ export class RiderActiveComponent implements OnInit, OnDestroy {
       ]);
       this.activeRide.set(ride);
       this.activeParcel.set(parcel);
-      // Reset proof state when parcel changes
       if (!parcel || parcel.status !== 'IN_TRANSIT') {
         this.proofUploaded.set(false);
       }
@@ -234,7 +438,7 @@ export class RiderActiveComponent implements OnInit, OnDestroy {
       const updated = await this.rideService.updateStatus(rideId, newStatus);
       this.activeRide.set(updated.status === 'COMPLETED' ? null : updated);
       if (updated.status === 'COMPLETED') {
-        this.toast.success('Ride completed! Payment will be processed shortly.');
+        this.toast.success('Ride completed!');
       }
     } catch {
       this.toast.error('Status update failed');
@@ -245,7 +449,7 @@ export class RiderActiveComponent implements OnInit, OnDestroy {
 
   async advanceParcel(parcelId: string, newStatus: ParcelStatus, currentStatus: ParcelStatus): Promise<void> {
     if (newStatus === 'DELIVERED' && !this.proofUploaded()) {
-      this.toast.error('Please upload delivery proof first');
+      this.toast.error('Upload delivery proof first');
       return;
     }
     this.updating.set(true);
@@ -253,7 +457,7 @@ export class RiderActiveComponent implements OnInit, OnDestroy {
       const updated = await this.parcelService.updateStatus(parcelId, newStatus);
       this.activeParcel.set(updated.status === 'DELIVERED' ? null : updated);
       if (updated.status === 'DELIVERED') {
-        this.toast.success('Delivery completed! Payout will be sent to your M-Pesa.');
+        this.toast.success('Delivery completed!');
       }
     } catch {
       this.toast.error('Status update failed');
@@ -266,54 +470,22 @@ export class RiderActiveComponent implements OnInit, OnDestroy {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
 
-    // Validate file type and size (max 5MB)
-    if (!file.type.startsWith('image/')) {
-      this.toast.error('Please select an image file');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      this.toast.error('Image must be smaller than 5MB');
-      return;
-    }
-
     this.proofUploading.set(true);
     try {
-      // Convert to base64 data URL as a simple upload mechanism
-      const dataUrl = await this.fileToDataUrl(file);
-      await this.parcelService.uploadProof(parcelId, dataUrl);
-      this.proofUploaded.set(true);
-      this.toast.success('Proof uploaded — tap "Mark Delivered" to complete');
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async () => {
+        await this.parcelService.uploadProof(parcelId, reader.result as string);
+        this.proofUploaded.set(true);
+        this.proofUploading.set(false);
+        this.toast.success('Proof uploaded!');
+      };
     } catch {
-      this.toast.error('Proof upload failed');
-    } finally {
+      this.toast.error('Upload failed');
       this.proofUploading.set(false);
     }
   }
 
-  protected rideNext(status: RideStatus) {
-    return RIDE_NEXT[status] ?? null;
-  }
-
-  protected parcelNext(status: ParcelStatus) {
-    return PARCEL_NEXT[status] ?? null;
-  }
-
-  protected rideBadge(status: RideStatus): string {
-    const m: Record<string, string> = { IN_PROGRESS: 'active', COMPLETED: 'active', CANCELLED: 'closed' };
-    return m[status] ?? 'pending';
-  }
-
-  protected parcelBadge(status: ParcelStatus): string {
-    const m: Record<string, string> = { DELIVERED: 'active', CANCELLED: 'closed', IN_TRANSIT: 'info' };
-    return m[status] ?? 'pending';
-  }
-
-  private fileToDataUrl(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload  = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('File read failed'));
-      reader.readAsDataURL(file);
-    });
-  }
+  protected rideNext(status: RideStatus) { return RIDE_NEXT[status] ?? null; }
+  protected parcelNext(status: ParcelStatus) { return PARCEL_NEXT[status] ?? null; }
 }

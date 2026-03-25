@@ -2,7 +2,14 @@
  * Centralised app configuration loaded from environment variables.
  * All values are typed and validated at startup via NestJS ConfigModule.
  */
-export default () => ({
+export default () => {
+  const mailPort = parseInt(process.env.MAIL_PORT ?? '587', 10);
+  const mailSecureEnv = process.env.MAIL_SECURE;
+  const mailSecure =
+    mailSecureEnv === 'true' ||
+    (mailSecureEnv !== 'false' && mailPort === 465);
+
+  return {
   app: {
     nodeEnv: process.env.NODE_ENV ?? 'development',
     port: parseInt(process.env.PORT ?? '3000', 10),
@@ -47,12 +54,19 @@ export default () => ({
 
   mail: {
     host: process.env.MAIL_HOST ?? 'smtp.mailtrap.io',
-    port: parseInt(process.env.MAIL_PORT ?? '587', 10),
-    secure: process.env.MAIL_SECURE === 'true',
+    port: mailPort,
+    secure: mailSecure,
+    /** When using plain SMTP (e.g. Mailpit on 1025), set MAIL_REQUIRE_TLS=false */
+    requireTls: process.env.MAIL_REQUIRE_TLS !== 'false',
     user: process.env.MAIL_USER,
     pass: process.env.MAIL_PASS,
     fromName: process.env.MAIL_FROM_NAME ?? 'NduthiRide',
     fromAddress: process.env.MAIL_FROM_ADDRESS ?? 'no-reply@nduthiride.co.ke',
     otpExpiresMins: parseInt(process.env.OTP_EXPIRES_MINS ?? '10', 10),
+    /** Logs OTP to server console in development when MAIL_DEBUG_OTP=true (never in production). */
+    debugLogOtp:
+      process.env.NODE_ENV !== 'production' &&
+      process.env.MAIL_DEBUG_OTP === 'true',
   },
-});
+  };
+};

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -71,14 +72,48 @@ export class UsersService {
         }
       }
 
+      if (dto.email !== undefined && dto.email !== null && dto.email !== '') {
+        const emailTaken = await this.prisma.account.findFirst({
+          where: { email: dto.email, NOT: { id: accountId } },
+        });
+        if (emailTaken) {
+          throw new ConflictException('This email is already in use');
+        }
+      }
+
+      const data: {
+        fullName?: string;
+        phone?: string;
+        email?: string | null;
+        avatarUrl?: string | null;
+      } = {};
+
+      if (dto.fullName !== undefined) {
+        const trimmed = dto.fullName.trim();
+        if (!trimmed) {
+          throw new BadRequestException('Full name cannot be empty');
+        }
+        data.fullName = trimmed;
+      }
+      if (dto.phone !== undefined) {
+        data.phone = dto.phone;
+      }
+      if (dto.email !== undefined) {
+        data.email = dto.email === '' ? null : dto.email;
+      }
+      if (dto.avatarUrl !== undefined) {
+        const v = dto.avatarUrl;
+        data.avatarUrl =
+          v === null || v === ''
+            ? null
+            : typeof v === 'string'
+              ? v.trim() || null
+              : null;
+      }
+
       const updated = await this.prisma.account.update({
         where: { id: accountId },
-        data: {
-          ...(dto.fullName && { fullName: dto.fullName }),
-          ...(dto.phone && { phone: dto.phone }),
-          ...(dto.email !== undefined && { email: dto.email }),
-          ...(dto.avatarUrl !== undefined && { avatarUrl: dto.avatarUrl }),
-        },
+        data,
         select: {
           id: true,
           email: true,

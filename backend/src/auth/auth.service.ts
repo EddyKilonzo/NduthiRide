@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { Role, TokenType } from '@prisma/client';
+import { Role, TokenType, type Account } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
@@ -22,6 +22,17 @@ import type { StringValue } from 'ms';
 
 // Number of bcrypt salt rounds — higher is more secure but slower
 const BCRYPT_ROUNDS = 12;
+
+/** Public session user — matches frontend `AuthUser` (no secrets). */
+export type AuthUserPayload = {
+  id: string;
+  phone: string;
+  email?: string;
+  fullName: string;
+  avatarUrl: string | null;
+  role: Role;
+  isActive: boolean;
+};
 
 @Injectable()
 export class AuthService {
@@ -40,9 +51,11 @@ export class AuthService {
    * Creates a new user account.
    * Throws ConflictException if the phone number is already registered.
    */
-  async registerUser(
-    dto: RegisterUserDto,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  async registerUser(dto: RegisterUserDto): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthUserPayload;
+  }> {
     try {
       await this.assertPhoneIsAvailable(dto.phone);
 
@@ -74,9 +87,17 @@ export class AuthService {
         });
       }
 
-      return this.issueTokens(account.id, account.phone, account.role);
+      const tokens = await this.issueTokens(
+        account.id,
+        account.phone,
+        account.role,
+      );
+      return { ...tokens, user: this.toAuthUserPayload(account) };
     } catch (error) {
       if (error instanceof ConflictException) throw error;
+      if (this.isUniqueConstraintError(error, 'email')) {
+        throw new ConflictException('This email address is already registered');
+      }
       this.logger.error('Failed to register user', error);
       throw error;
     }
@@ -86,9 +107,11 @@ export class AuthService {
    * Creates a new rider account AND the linked Rider profile in one transaction.
    * Throws ConflictException if the phone number is already registered.
    */
-  async registerRider(
-    dto: RegisterRiderDto,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  async registerRider(dto: RegisterRiderDto): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthUserPayload;
+  }> {
     try {
       await this.assertPhoneIsAvailable(dto.phone);
 
@@ -136,9 +159,17 @@ export class AuthService {
         );
       }
 
-      return this.issueTokens(account.id, account.phone, account.role);
+      const tokens = await this.issueTokens(
+        account.id,
+        account.phone,
+        account.role,
+      );
+      return { ...tokens, user: this.toAuthUserPayload(account) };
     } catch (error) {
       if (error instanceof ConflictException) throw error;
+      if (this.isUniqueConstraintError(error, 'email')) {
+        throw new ConflictException('This email address is already registered');
+      }
       this.logger.error('Failed to register rider', error);
       throw error;
     }
@@ -152,9 +183,11 @@ export class AuthService {
    * to avoid leaking whether an address is registered.
    * Accounts without an email cannot use this endpoint.
    */
-  async login(
-    dto: LoginDto,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  async login(dto: LoginDto): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthUserPayload;
+  }> {
     try {
       const email = dto.email.trim().toLowerCase();
       const account = await this.prisma.account.findUnique({
@@ -174,7 +207,12 @@ export class AuthService {
       }
 
       this.logger.log(`Login successful: ${account.id}`);
-      return this.issueTokens(account.id, account.phone, account.role);
+      const tokens = await this.issueTokens(
+        account.id,
+        account.phone,
+        account.role,
+      );
+      return { ...tokens, user: this.toAuthUserPayload(account) };
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
       this.logger.error('Login failed', error);
@@ -233,6 +271,26 @@ export class AuthService {
   }
 
   // ─── Private helpers ──────────────────────────────────────
+
+  private toAuthUserPayload(
+    account: Pick<
+      Account,
+      'id' | 'phone' | 'email' | 'fullName' | 'avatarUrl' | 'role' | 'isActive'
+    >,
+  ): AuthUserPayload {
+    const payload: AuthUserPayload = {
+      id: account.id,
+      phone: account.phone,
+      fullName: account.fullName,
+      avatarUrl: account.avatarUrl,
+      role: account.role,
+      isActive: account.isActive,
+    };
+    if (account.email) {
+      payload.email = account.email;
+    }
+    return payload;
+  }
 
   /**
    * Generates a new access + refresh token pair, stores the hashed refresh token,
@@ -302,12 +360,25 @@ export class AuthService {
         data: { accountId, tokenHash, type: TokenType.EMAIL_VERIFY, expiresAt },
       });
 
-      await this.mailService.sendEmailVerificationOtp({
+      const sent = await this.mailService.sendEmailVerificationOtp({
         to: email,
         fullName,
         otp,
         expiresMins,
       });
+
+      if (!sent) {
+        this.logger.error(`Verification email was not delivered to ${email}`);
+        if (this.configService.get<string>('app.nodeEnv') === 'development') {
+          this.logger.warn(
+            `[development] SMTP failed — use this OTP to verify (check MAIL_* / Brevo sender): ${otp}`,
+          );
+        }
+      } else if (this.configService.get<boolean>('mail.debugLogOtp')) {
+        this.logger.warn(
+          `[MAIL_DEBUG_OTP] Verification code for ${email}: ${otp}`,
+        );
+      }
     } catch (error) {
       this.logger.error(
         `sendEmailVerificationOtp failed for ${accountId}`,
@@ -461,6 +532,55 @@ export class AuthService {
     }
   }
 
+  /**
+   * Authenticated user changes password. Invalidates refresh tokens (other sessions must sign in again).
+   */
+  async changePassword(
+    accountId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    try {
+      const account = await this.prisma.account.findUnique({
+        where: { id: accountId },
+        select: { id: true, passwordHash: true },
+      });
+      if (!account) {
+        throw new NotFoundException('Account not found');
+      }
+
+      const ok = await bcrypt.compare(currentPassword, account.passwordHash);
+      if (!ok) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
+
+      if (currentPassword === newPassword) {
+        throw new BadRequestException(
+          'New password must be different from your current password',
+        );
+      }
+
+      const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+      await this.prisma.account.update({
+        where: { id: accountId },
+        data: { passwordHash, refreshToken: null },
+      });
+
+      this.logger.log(`Password changed for account ${accountId}`);
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof UnauthorizedException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      this.logger.error(`changePassword failed for ${accountId}`, error);
+      throw error;
+    }
+  }
+
   // ─── Re-send OTP (rate-limited by the 10-min expiry window) ──
 
   async resendVerificationOtp(accountId: string): Promise<void> {
@@ -500,5 +620,31 @@ export class AuthService {
     if (existing) {
       throw new ConflictException('This phone number is already registered');
     }
+  }
+
+  /** Returns true when the error is a Prisma unique-constraint violation on the given field. */
+  private isUniqueConstraintError(error: unknown, field: string): boolean {
+    if (typeof error !== 'object' || error === null) return false;
+    const e = error as Record<string, unknown>;
+    if (e['code'] !== 'P2002') return false;
+
+    // Prisma 5 / standard format: meta.target = ['field']
+    const meta = e['meta'] as Record<string, unknown> | undefined;
+    if (Array.isArray(meta?.['target'])) {
+      return (meta['target'] as string[]).includes(field);
+    }
+
+    // Prisma 7 driver-adapter format: meta.driverAdapterError.cause.constraint.fields
+    const cause = (
+      meta?.['driverAdapterError'] as Record<string, unknown> | undefined
+    )?.['cause'] as Record<string, unknown> | undefined;
+    const fields = (
+      cause?.['constraint'] as Record<string, unknown> | undefined
+    )?.['fields'];
+    if (Array.isArray(fields)) {
+      return (fields as string[]).includes(field);
+    }
+
+    return false;
   }
 }

@@ -11,10 +11,12 @@ import { LandingPageComponent }     from './features/landing/landing-page.compon
 import { PublicLayoutComponent }    from './shared/components/layouts/public-layout.component';
 
 // Auth
-import { LoginComponent }           from './features/auth/login/login.component';
-import { RegisterComponent }        from './features/auth/register/register.component';
-import { RegisterRiderComponent }   from './features/auth/register-rider/register-rider.component';
-import { VerifyEmailComponent }    from './features/auth/verify-email/verify-email.component';
+import { LoginComponent }             from './features/auth/login/login.component';
+import { RegisterComponent }          from './features/auth/register/register.component';
+import { RegisterRiderComponent }     from './features/auth/register-rider/register-rider.component';
+import { VerifyEmailComponent }       from './features/auth/verify-email/verify-email.component';
+import { ForgotPasswordComponent }    from './features/auth/forgot-password/forgot-password.component';
+import { ResetPasswordComponent }     from './features/auth/reset-password/reset-password.component';
 
 // User
 import { UserHomeComponent }        from './features/user/home/user-home.component';
@@ -39,6 +41,7 @@ import { AdminAccountsComponent }   from './features/admin/accounts/admin-accoun
 import { AdminRidesComponent }      from './features/admin/rides/admin-rides.component';
 import { AdminParcelsComponent }    from './features/admin/parcels/admin-parcels.component';
 import { AdminPaymentsComponent }   from './features/admin/payments/admin-payments.component';
+import { AdminProfileComponent }      from './features/admin/profile/admin-profile.component';
 
 export const routes: Routes = [
 
@@ -56,11 +59,13 @@ export const routes: Routes = [
       {
         path: 'auth',
         children: [
-          { path: '',               redirectTo: 'login', pathMatch: 'full' },
-          { path: 'login',          component: LoginComponent,         canActivate: [guestGuard] },
-          { path: 'register',       component: RegisterComponent,      canActivate: [guestGuard] },
-          { path: 'register-rider', component: RegisterRiderComponent, canActivate: [guestGuard] },
-          { path: 'verify-email',   component: VerifyEmailComponent },
+          { path: '',                redirectTo: 'login', pathMatch: 'full' },
+          { path: 'login',           component: LoginComponent,           canActivate: [guestGuard] },
+          { path: 'register',        component: RegisterComponent,        canActivate: [guestGuard] },
+          { path: 'register-rider',  component: RegisterRiderComponent,   canActivate: [guestGuard] },
+          { path: 'verify-email',    component: VerifyEmailComponent },
+          { path: 'forgot-password', component: ForgotPasswordComponent,  canActivate: [guestGuard] },
+          { path: 'reset-password',  component: ResetPasswordComponent,   canActivate: [guestGuard] },
         ],
       },
     ],
@@ -111,6 +116,7 @@ export const routes: Routes = [
       { path: 'rides',     component: AdminRidesComponent },
       { path: 'parcels',   component: AdminParcelsComponent },
       { path: 'payments',  component: AdminPaymentsComponent },
+      { path: 'profile',   component: AdminProfileComponent },
     ],
   },
 

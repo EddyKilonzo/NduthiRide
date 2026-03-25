@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
 import { ParcelService } from '../../../core/services/parcel.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import type { Parcel } from '../../../core/models/parcel.models';
@@ -8,9 +9,9 @@ import type { Parcel } from '../../../core/models/parcel.models';
 @Component({
   selector: 'app-my-parcels',
   standalone: true,
-  imports: [CommonModule, RouterLink, SpinnerComponent],
+  imports: [CommonModule, RouterLink, SpinnerComponent, LucideAngularModule],
   template: `
-    <div class="page">
+    <div class="page app-page">
       <div class="page-header">
         <div><h1>My Parcels</h1><p>Your delivery history</p></div>
         <a [routerLink]="['/user/book-parcel']" class="btn btn--primary btn--sm">+ Send Parcel</a>
@@ -20,12 +21,12 @@ import type { Parcel } from '../../../core/models/parcel.models';
         <app-spinner />
       } @else if (parcels().length === 0) {
         <div class="empty-state">
-          <div class="empty-icon">📦</div>
+          <div class="empty-illu" aria-hidden="true"><lucide-icon name="package" [size]="44"></lucide-icon></div>
           <h3>No parcels yet</h3>
           <p>Your delivery history will appear here</p>
         </div>
       } @else {
-        <div class="card table-wrapper">
+        <div class="card table-wrapper data-card">
           <table>
             <thead>
               <tr><th>Description</th><th>Recipient</th><th>Status</th><th>Fee</th><th>Date</th><th></th></tr>
@@ -46,15 +47,20 @@ import type { Parcel } from '../../../core/models/parcel.models';
         </div>
         @if (totalPages() > 1) {
           <div class="pagination">
-            <button class="btn btn--secondary btn--sm" (click)="prevPage()" [disabled]="page() === 1">← Prev</button>
+            <button class="btn btn--secondary btn--sm" (click)="prevPage()" [disabled]="page() === 1"><lucide-icon name="chevron-left" [size]="16"></lucide-icon> Prev</button>
             <span class="text-muted">Page {{ page() }} of {{ totalPages() }}</span>
-            <button class="btn btn--secondary btn--sm" (click)="nextPage()" [disabled]="page() === totalPages()">Next →</button>
+            <button class="btn btn--secondary btn--sm" (click)="nextPage()" [disabled]="page() === totalPages()">Next <lucide-icon name="chevron-right" [size]="16"></lucide-icon></button>
           </div>
         }
       }
     </div>
   `,
-  styles: [`.addr { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 20px; }`],
+  styles: [`
+    .data-card { box-shadow: var(--shadow-card); padding: 0; overflow: hidden; }
+    .empty-illu { display: flex; justify-content: center; color: var(--clr-text-dim); opacity: 0.45; margin-bottom: 8px; }
+    .addr { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 20px; flex-wrap: wrap; }
+  `],
 })
 export class MyParcelsComponent implements OnInit {
   private readonly parcelService = inject(ParcelService);

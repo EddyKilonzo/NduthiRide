@@ -117,6 +117,75 @@
   }
 }
 
+.nav__session {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.nav__session-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--clr-text-muted);
+  max-width: 7.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav__session-dashboard {
+  white-space: nowrap;
+}
+
+.nav__session-signout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav__session-signout-icon {
+  flex-shrink: 0;
+}
+
+@media (max-width: 520px) {
+  .nav__session-name {
+    display: none;
+  }
+
+  .nav__session-signout-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .nav__session-signout {
+    position: relative;
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 400px) {
+  .nav__actions {
+    gap: 8px;
+  }
+
+  .nav__session .btn {
+    font-size: 12px;
+    padding-inline: 12px;
+  }
+}
+
 .theme-toggle {
   width: 38px;
   height: 38px;

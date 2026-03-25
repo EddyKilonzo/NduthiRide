@@ -1,167 +1,64 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{subject}}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: #0A0A0A;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      color: #F0F0F0;
-      padding: 40px 16px;
-    }
-    .wrapper { max-width: 580px; margin: 0 auto; }
-    .header {
-      text-align: center;
-      padding: 0 0 32px;
-    }
-    .logo {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      text-decoration: none;
-    }
-    .logo-icon { font-size: 28px; }
-    .logo-text {
-      font-size: 22px;
-      font-weight: 700;
-      color: #FF6B00;
-      letter-spacing: -0.5px;
-    }
-    .card {
-      background: #141414;
-      border: 1px solid #2A2A2A;
-      border-radius: 16px;
-      padding: 40px 36px;
-    }
-    .footer {
-      text-align: center;
-      padding: 28px 0 0;
-      font-size: 12px;
-      color: #555;
-      line-height: 1.7;
-    }
-    .footer a { color: #FF6B00; text-decoration: none; }
-    h1 {
-      font-size: 24px;
-      font-weight: 700;
-      color: #F0F0F0;
-      margin-bottom: 8px;
-    }
-    h2 {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 12px;
-    }
-    p {
-      font-size: 15px;
-      color: #AAAAAA;
-      line-height: 1.7;
-      margin-bottom: 16px;
-    }
-    p:last-child { margin-bottom: 0; }
-    .divider {
-      border: none;
-      border-top: 1px solid #2A2A2A;
-      margin: 28px 0;
-    }
-    .btn {
-      display: inline-block;
-      background: #FF6B00;
-      color: #ffffff !important;
-      text-decoration: none;
-      padding: 14px 32px;
-      border-radius: 10px;
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: 0.2px;
-      margin: 8px 0;
-    }
-    .btn:hover { background: #FF8C33; }
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 12px 0;
-      border-bottom: 1px solid #2A2A2A;
-      font-size: 14px;
-    }
-    .info-row:last-child { border-bottom: none; }
-    .info-label { color: #888888; }
-    .info-value { font-weight: 600; color: #F0F0F0; }
-    .otp-box {
-      background: #1E1E1E;
-      border: 1px solid #FF6B00;
-      border-radius: 12px;
-      text-align: center;
-      padding: 24px;
-      margin: 24px 0;
-    }
-    .otp-code {
-      font-size: 40px;
-      font-weight: 700;
-      letter-spacing: 10px;
-      color: #FF6B00;
-    }
-    .otp-expiry {
-      font-size: 13px;
-      color: #888;
-      margin-top: 8px;
-    }
-    .badge {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .badge-success { background: rgba(34,197,94,.15); color: #22C55E; }
-    .badge-warning { background: rgba(245,158,11,.15); color: #F59E0B; }
-    .badge-info    { background: rgba(59,130,246,.15);  color: #3B82F6; }
-    .alert {
-      background: rgba(255,107,0,.08);
-      border: 1px solid rgba(255,107,0,.25);
-      border-radius: 10px;
-      padding: 14px 18px;
-      font-size: 13px;
-      color: #AAAAAA;
-      margin: 20px 0;
-    }
-    .alert strong { color: #FF6B00; }
-    .fare-total {
-      font-size: 28px;
-      font-weight: 700;
-      color: #FF6B00;
-      margin: 8px 0;
-    }
-  </style>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>NduthiRide</title>
+  <!--[if mso]>
+  <noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+  <![endif]-->
 </head>
-<body>
-  <div class="wrapper">
-    <div class="header">
-      <div class="logo">
-        <span class="logo-icon">🏍</span>
-        <span class="logo-text">NduthiRide</span>
-      </div>
-    </div>
+<body style="margin:0;padding:0;background-color:#0A0A0A;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
 
-    <div class="card">
-      {{{body}}}
-    </div>
+  <!-- Outer wrapper -->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#0A0A0A;min-height:100vh;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
 
-    <div class="footer">
-      <p>
-        © {{year}} NduthiRide · Nairobi, Kenya<br />
-        <a href="#">Unsubscribe</a> &nbsp;·&nbsp; <a href="#">Privacy Policy</a> &nbsp;·&nbsp; <a href="#">Terms of Service</a>
-      </p>
-      <p style="margin-top:12px; color:#333;">
-        This email was sent to <strong style="color:#555;">{{recipientEmail}}</strong>.<br />
-        If you did not create an account, please ignore this email.
-      </p>
-    </div>
-  </div>
+        <!-- Inner container -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="580" style="max-width:580px;width:100%;">
+
+          <!-- Logo header -->
+          <tr>
+            <td align="center" style="padding-bottom:28px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="width:32px;height:32px;background-color:#408A71;border-radius:8px;text-align:center;vertical-align:middle;padding-right:10px;">
+                    <span style="font-size:18px;font-weight:800;color:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:32px;display:block;width:32px;text-align:center;">N</span>
+                  </td>
+                  <td style="font-size:22px;font-weight:700;color:#FFFFFF;letter-spacing:-0.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">NduthiRide</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background-color:#141414;border:1px solid #2A2A2A;border-radius:16px;padding:40px 36px;">
+              {{{body}}}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding-top:28px;">
+              <p style="margin:0 0 6px;font-size:12px;color:#555555;line-height:1.7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+                &copy; {{year}} NduthiRide &nbsp;&middot;&nbsp; Nairobi, Kenya
+              </p>
+              <p style="margin:0 0 6px;font-size:12px;color:#555555;line-height:1.7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+                This email was sent to <span style="color:#777777;font-weight:600;">{{recipientEmail}}</span>.
+              </p>
+              <p style="margin:0;font-size:12px;color:#333333;line-height:1.7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+                If you did not create an account, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
 </body>
 </html>

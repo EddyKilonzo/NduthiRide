@@ -41,10 +41,14 @@
   --radius-lg:   16px;
   --radius-full: 9999px;
 
-  // Shadows
+  // Shadows (dashboard cards — layered depth + subtle inner rim)
   --shadow-sm:  0 1px 3px rgba(0,0,0,.4);
   --shadow-md:  0 4px 16px rgba(0,0,0,.5);
   --shadow-lg:  0 8px 32px rgba(0,0,0,.6);
+  // Layered depth (Stripe-style) + NduthRide forest-green halo
+  --shadow-modern: rgba(50, 50, 93, 0.25) 0px 50px 100px -20px, rgba(0, 0, 0, 0.3) 0px 30px 60px -30px, rgba(10, 37, 64, 0.35) 0px -2px 6px 0px inset;
+  --shadow-brand: 0 22px 56px -12px rgba(64, 138, 113, 0.26), 0 8px 32px -8px rgba(9, 20, 19, 0.55);
+  --shadow-card: var(--shadow-modern), var(--shadow-brand);
 
   // Transitions
   --transition: 200ms ease;
@@ -85,6 +89,9 @@ html.light {
   --shadow-sm: 0 1px 3px rgba(0,0,0,.06);
   --shadow-md: 0 4px 16px rgba(0,0,0,.10);
   --shadow-lg: 0 8px 32px rgba(0,0,0,.14);
+  --shadow-modern: rgba(50, 50, 93, 0.12) 0px 40px 80px -24px, rgba(0, 0, 0, 0.08) 0px 24px 48px -28px, rgba(10, 37, 64, 0.12) 0px -2px 6px 0px inset;
+  --shadow-brand: 0 20px 48px -12px rgba(64, 138, 113, 0.14), 0 8px 28px -6px rgba(9, 20, 19, 0.1);
+  --shadow-card: var(--shadow-modern), var(--shadow-brand);
 }
 
 // ─── Grain Texture ────────────────────────────────────────────────
@@ -184,6 +191,91 @@ button, input, select, textarea { font: inherit; outline: none; border: none; ba
 
 // ─── Cards ────────────────────────────────────────────────────────
 .card { background: var(--clr-bg-card); border: 1px solid var(--clr-border); border-radius: var(--radius-lg); padding: 24px; }
+.card--elevated {
+  background: var(--clr-bg-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+// App content width inside shell (sidebar + main)
+.app-page {
+  width: 100%;
+  max-width: 1320px;
+  margin-inline: auto;
+}
+
+// Centered form flows (booking, etc.)
+.form-page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-bottom: clamp(24px, 5vw, 48px);
+}
+.form-page__header {
+  width: 100%;
+  max-width: 560px;
+  text-align: center;
+  margin-bottom: clamp(20px, 4vw, 28px);
+  h1 {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 4vw, 1.9rem);
+    font-weight: 800;
+    color: var(--clr-text);
+    letter-spacing: -0.02em;
+  }
+  p {
+    color: var(--clr-text-muted);
+    font-size: 14px;
+    margin-top: 8px;
+    line-height: 1.55;
+    max-width: 420px;
+    margin-inline: auto;
+  }
+}
+.form-shell {
+  width: 100%;
+  max-width: 560px;
+  margin-inline: auto;
+  background: var(--clr-bg-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: clamp(22px, 4vw, 36px);
+}
+.form-shell .form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.form-shell .form-section + .form-section {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--clr-border);
+}
+.form-shell .section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--clr-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin: 0 0 4px;
+}
+.form-shell .form-actions-row,
+.form-shell .form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  .btn--full { flex: 1; min-width: min(100%, 200px); }
+}
+.form-shell .form-control:focus {
+  border-color: var(--clr-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(64, 138, 113, 0.14);
+}
 
 // ─── Page layout ──────────────────────────────────────────────────
 .page { min-height: 100vh; display: flex; flex-direction: column; }
@@ -267,3 +359,121 @@ table {
   50%       { transform: translateY(-12px); }
 }
 .float-animation { animation: float-hero 6s ease-in-out infinite; }
+
+// ─── OTP input group (global — overrides the base reset for auth verify page) ──
+.otp-group {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: clamp(6px, 2vw, 10px);
+  width: 100%;
+  max-width: 400px;
+  margin: 28px auto 8px;
+  box-sizing: border-box;
+}
+
+.otp-input {
+  box-sizing: border-box;
+  width: 100% !important;
+  min-width: 0;
+  height: clamp(52px, 14vw, 64px) !important;
+  text-align: center;
+  font-size: clamp(20px, 5vw, 26px) !important;
+  font-weight: 800;
+  font-family: var(--font-display);
+  border: 2px solid var(--clr-border) !important;
+  border-radius: 14px;
+  background: var(--clr-bg-elevated) !important;
+  color: var(--clr-text);
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s, background 0.18s, transform 0.12s;
+  caret-color: transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  appearance: none;
+  -webkit-appearance: none;
+
+  &:focus {
+    border-color: var(--clr-primary) !important;
+    background: rgba(64, 138, 113, 0.08) !important;
+    box-shadow: 0 0 0 3px rgba(64, 138, 113, 0.18), 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+  }
+}
+
+// Verify email only — beats Tailwind preflight + Chrome `one-time-code` single-field merge
+.verify-email-page .otp-group {
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  gap: clamp(6px, 2vw, 10px) !important;
+  width: 100%;
+  max-width: 400px;
+  margin: 28px auto 8px;
+  box-sizing: border-box;
+}
+
+.verify-email-page .otp-cell {
+  display: flex !important;
+  align-items: stretch;
+  justify-content: center;
+  min-width: 0;
+  min-height: 56px;
+}
+
+.verify-email-page .otp-cell .otp-input,
+.verify-email-page input.otp-input[type='text'] {
+  box-sizing: border-box !important;
+  flex: 1 1 auto;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: clamp(52px, 14vw, 64px) !important;
+  margin: 0 !important;
+  padding: 0 4px !important;
+  border: 2px solid var(--clr-border) !important;
+  border-radius: 14px !important;
+  background: var(--clr-bg-elevated) !important;
+  color: var(--clr-text) !important;
+  font-size: clamp(20px, 5vw, 26px) !important;
+  font-weight: 800 !important;
+  font-family: var(--font-display) !important;
+  text-align: center !important;
+  line-height: 1.2 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  caret-color: var(--clr-text);
+}
+
+.verify-email-page .otp-cell .otp-input:focus {
+  border-color: var(--clr-primary) !important;
+  background: rgba(64, 138, 113, 0.08) !important;
+  box-shadow: 0 0 0 3px rgba(64, 138, 113, 0.18), 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  outline: none !important;
+}
+
+/* Verify route — host-scoped backup so six boxes never collapse to one bar */
+app-verify-email .nduth-otp-wrap {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  justify-content: center !important;
+  gap: clamp(6px, 2vw, 10px) !important;
+}
+app-verify-email .nduth-otp-slot {
+  flex: 0 0 auto !important;
+  width: clamp(38px, 12vw, 52px) !important;
+  height: clamp(50px, 14vw, 60px) !important;
+  border: 2px solid var(--clr-border) !important;
+  border-radius: 12px !important;
+  background: var(--clr-bg-elevated) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+app-verify-email .nduth-otp-digit {
+  border: none !important;
+  background: transparent !important;
+  width: 100% !important;
+  height: 100% !important;
+  text-align: center !important;
+  color: var(--clr-text) !important;
+}

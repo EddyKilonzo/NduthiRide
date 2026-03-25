@@ -1,17 +1,25 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { LucideAngularModule } from 'lucide-angular';
 import { ToastService } from '../../../core/services/toast.service';
 
 @Component({
   selector: 'app-toast',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LucideAngularModule],
   template: `
     <div class="toast-container">
       @for (toast of toastSvc.toasts(); track toast.id) {
         <div class="toast toast--{{ toast.type }}" (click)="toastSvc.dismiss(toast.id)">
           <div class="toast__content">
-            <span class="toast__icon">{{ icons[toast.type] }}</span>
+            <span class="toast__icon" aria-hidden="true">
+              @switch (toast.type) {
+                @case ('success') { <lucide-icon name="circle-check" [size]="20"></lucide-icon> }
+                @case ('error') { <lucide-icon name="circle-x" [size]="20"></lucide-icon> }
+                @case ('warning') { <lucide-icon name="triangle-alert" [size]="20"></lucide-icon> }
+                @default { <lucide-icon name="info" [size]="20"></lucide-icon> }
+              }
+            </span>
             <span class="toast__msg">{{ toast.message }}</span>
           </div>
           <div class="toast__timer">
@@ -73,10 +81,9 @@ import { ToastService } from '../../../core/services/toast.service';
       padding: 16px 20px;
     }
     .toast__icon {
-      font-size: 20px;
       display: flex; align-items: center; justify-content: center;
-      width: 24px; height: 24px;
-      background: rgba(0,0,0,0.03);
+      width: 28px; height: 28px; flex-shrink: 0;
+      background: rgba(0,0,0,0.04);
       border-radius: 50%;
     }
     .toast__msg {
@@ -105,5 +112,4 @@ import { ToastService } from '../../../core/services/toast.service';
 })
 export class ToastComponent {
   protected readonly toastSvc = inject(ToastService);
-  protected readonly icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
 }

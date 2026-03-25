@@ -17,6 +17,14 @@ export const authInterceptor: HttpInterceptorFn = (
   return next(authed).pipe(
     catchError((err: unknown) => {
       if (err instanceof HttpErrorResponse && err.status === 401) {
+        // Skip retry for auth endpoints to prevent infinite loops
+        if (
+          req.url.includes('/auth/logout') ||
+          req.url.includes('/auth/refresh') ||
+          req.url.includes('/auth/password/change')
+        ) {
+          return throwError(() => err);
+        }
         // Attempt a token refresh once
         return from(auth.refresh()).pipe(
           switchMap(() => {

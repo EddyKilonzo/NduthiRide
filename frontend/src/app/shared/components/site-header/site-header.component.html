@@ -21,8 +21,26 @@
       <button class="theme-toggle" type="button" (click)="toggleTheme()" aria-label="Toggle theme">
         <lucide-icon [name]="isDark() ? 'sun' : 'moon'" [size]="18"></lucide-icon>
       </button>
-      <a routerLink="/auth/login" class="btn btn--ghost">Sign In</a>
-      <a routerLink="/auth/register" class="btn btn--primary">Get Started</a>
+      @if (auth.isAuth()) {
+        <div class="nav__session">
+          <span class="nav__session-name" [attr.title]="auth.user()?.fullName ?? ''">
+            {{ sessionFirstName() }}
+          </span>
+          <a [routerLink]="dashboardPath()" class="btn btn--primary nav__session-dashboard">Dashboard</a>
+          <button
+            type="button"
+            class="btn btn--ghost nav__session-signout"
+            (click)="logout()"
+            aria-label="Sign out"
+          >
+            <lucide-icon name="log-out" [size]="16" class="nav__session-signout-icon" aria-hidden="true"></lucide-icon>
+            <span class="nav__session-signout-text">Sign out</span>
+          </button>
+        </div>
+      } @else {
+        <a routerLink="/auth/login" class="btn btn--ghost">Sign In</a>
+        <a routerLink="/auth/register" class="btn btn--primary">Get Started</a>
+      }
     </div>
   </div>
 </nav>

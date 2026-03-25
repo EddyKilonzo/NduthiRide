@@ -11,7 +11,7 @@ import type { AuthUser } from '../../../core/models/auth.models';
   standalone: true,
   imports: [CommonModule, FormsModule, SpinnerComponent],
   template: `
-    <div class="page">
+    <div class="page app-page">
       <div class="page-header">
         <div><h1>Accounts</h1><p>Manage users and riders</p></div>
       </div>
@@ -79,8 +79,17 @@ import type { AuthUser } from '../../../core/models/auth.models';
     </div>
   `,
   styles: [`
-    .filters { display: flex; gap: 12px; margin-bottom: 20px; padding: 12px 16px; }
-    .filters select { padding: 8px 12px; border: 1px solid var(--clr-border); border-radius: var(--radius-md); background: var(--clr-bg); color: var(--clr-text); font-size: 14px; }
+    .filters {
+      display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+      margin-bottom: 24px; padding: 18px 22px;
+      box-shadow: var(--shadow-card); border-radius: var(--radius-lg);
+    }
+    .filters select {
+      min-width: 160px; padding: 10px 14px; border: 1px solid var(--clr-border);
+      border-radius: var(--radius-md); background: var(--clr-bg-elevated); color: var(--clr-text);
+      font-size: 14px; cursor: pointer;
+    }
+    .table-wrapper { box-shadow: var(--shadow-card); }
     .pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 20px; }
   `],
 })

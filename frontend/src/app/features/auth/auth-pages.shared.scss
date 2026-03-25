@@ -1,7 +1,5 @@
 /* Shared auth split layout: clean light form column + visual panel */
 
-$custom-input-shadow: rgba(50, 50, 93, 0.25) 0px 50px 100px -20px, rgba(0, 0, 0, 0.3) 0px 30px 60px -30px, rgba(10, 37, 64, 0.35) 0px -2px 6px 0px inset;
-
 @keyframes auth-slide-up-fade {
   from { opacity: 0; transform: translateY(18px); }
   to { opacity: 1; transform: translateY(0); }
@@ -58,8 +56,8 @@ $custom-input-shadow: rgba(50, 50, 93, 0.25) 0px 50px 100px -20px, rgba(0, 0, 0,
 
 .auth-input-pill-wrap:has(input.ng-touched.ng-invalid) {
   border-color: var(--clr-error);
-  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2), $custom-input-shadow;
-  &:focus-within { border-color: var(--clr-error); box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12), $custom-input-shadow; }
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2), var(--shadow-card);
+  &:focus-within { border-color: var(--clr-error); box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12), var(--shadow-card); }
 }
 
 .auth-split-page {
@@ -99,12 +97,20 @@ $custom-input-shadow: rgba(50, 50, 93, 0.25) 0px 50px 100px -20px, rgba(0, 0, 0,
 }
 
 .auth-form-inner {
-  width: 100%; max-width: 400px;
+  width: 100%;
+  max-width: 420px;
+  margin-inline: auto;
+  padding: clamp(22px, 3.5vw, 34px);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--clr-border);
+  background: var(--clr-bg-elevated);
+  box-shadow: var(--shadow-card);
   h1 { font-family: var(--font-display); font-size: clamp(1.75rem, 4vw, 2.25rem); font-weight: 800; color: var(--clr-text); letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 10px; }
 }
 
 .auth-form-inner--compact {
-  max-width: 380px;
+  max-width: 400px;
+  padding: clamp(18px, 3vw, 28px);
   h1 { margin-bottom: 6px; font-size: clamp(1.4rem, 3.5vw, 1.85rem); }
 }
 
@@ -122,9 +128,9 @@ $custom-input-shadow: rgba(50, 50, 93, 0.25) 0px 50px 100px -20px, rgba(0, 0, 0,
 
 .auth-input-pill-wrap {
   position: relative; display: flex; align-items: center; border: 1px solid var(--clr-border);
-  border-radius: 9999px; background: var(--clr-bg-elevated); padding: 0 18px;
-  transition: border-color 0.2s, box-shadow 0.2s; box-shadow: $custom-input-shadow;
-  &:focus-within { border-color: var(--clr-primary); box-shadow: 0 0 0 3px rgba(64, 138, 113, 0.15), $custom-input-shadow; }
+  border-radius: 9999px; background: var(--clr-bg-card); padding: 0 18px;
+  transition: border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-card);
+  &:focus-within { border-color: var(--clr-primary); box-shadow: 0 0 0 3px rgba(64, 138, 113, 0.15), var(--shadow-card); }
   .auth-input-icon { color: var(--clr-text-dim); flex-shrink: 0; margin-right: 10px; }
   input { flex: 1; min-width: 0; padding: 10px 0; border: none; background: transparent; font-size: 15px; color: var(--clr-text); &::placeholder { color: var(--clr-text-dim); } }
   .auth-pw-toggle { flex-shrink: 0; padding: 8px; margin-right: -6px; color: var(--clr-text-dim); cursor: pointer; border-radius: 9999px; transition: color 0.15s, background 0.15s; &:hover { color: var(--clr-text); background: var(--clr-bg-hover); } }
@@ -226,7 +232,7 @@ $custom-input-shadow: rgba(50, 50, 93, 0.25) 0px 50px 100px -20px, rgba(0, 0, 0,
 
 .auth-visual-panel {
   position: relative; width: 100%; max-width: 520px; height: min(calc(100vh - 90px - clamp(32px, 5vw, 64px)), 720px);
-  border-radius: 28px; overflow: hidden; box-shadow: 0 24px 56px rgba(9, 20, 19, 0.18);
+  border-radius: 28px; overflow: hidden; box-shadow: var(--shadow-card);
   background: linear-gradient(145deg, var(--clr-primary-dark) 0%, var(--clr-primary) 45%, var(--clr-primary-light) 100%);
 }
 
@@ -241,3 +247,78 @@ $custom-input-shadow: rgba(50, 50, 93, 0.25) 0px 50px 100px -20px, rgba(0, 0, 0,
 .auth-glass--tagline { margin: 0; padding: 12px 16px; text-align: center; font-size: 14px; line-height: 1.45; color: rgba(255, 255, 255, 0.94); strong { font-weight: 800; color: #fff; } }
 
 .auth-carousel-dots--on-image { justify-content: center; margin: 4px 0 0; span { background: rgba(255, 255, 255, 0.35); &.is-active { background: #fff; } } }
+
+// ─── OTP input group ────────────────────────────────────────────────────────
+
+.otp-group {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: clamp(6px, 2vw, 10px);
+  width: 100%;
+  max-width: 400px;
+  margin: 28px auto 8px;
+  box-sizing: border-box;
+}
+
+.otp-cell {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  min-width: 0;
+  min-height: 56px;
+}
+
+// Use !important to override the global reset: input { border: none; background: none; }
+.otp-input {
+  box-sizing: border-box;
+  width: 100% !important;
+  min-width: 0;
+  height: clamp(52px, 14vw, 64px) !important;
+  text-align: center;
+  font-size: clamp(20px, 5vw, 26px) !important;
+  font-weight: 800;
+  font-family: var(--font-display);
+  border: 2px solid var(--clr-border) !important;
+  border-radius: 14px;
+  background: var(--clr-bg-elevated) !important;
+  color: var(--clr-text);
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s, background 0.18s, transform 0.12s;
+  caret-color: transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  appearance: none;
+  -webkit-appearance: none;
+
+  &:focus {
+    border-color: var(--clr-primary) !important;
+    background: rgba(64, 138, 113, 0.08) !important;
+    box-shadow: 0 0 0 3px rgba(64, 138, 113, 0.18), 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+  }
+}
+
+.otp-error {
+  text-align: center;
+  padding-left: 0;
+  margin-bottom: 6px;
+}
+
+.otp-resend {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--clr-text-muted);
+
+  button {
+    color: var(--clr-primary);
+    font-weight: 700;
+    font-size: 14px;
+    background: none !important;
+    border: none !important;
+    cursor: pointer;
+    margin-left: 4px;
+    padding: 0;
+
+    &:hover { text-decoration: underline; }
+  }
+}

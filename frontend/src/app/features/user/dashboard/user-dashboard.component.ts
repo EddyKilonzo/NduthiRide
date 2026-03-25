@@ -1,6 +1,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../../../core/services/auth.service';
 import { RideService } from '../../../core/services/ride.service';
 import { ParcelService } from '../../../core/services/parcel.service';
@@ -11,9 +12,9 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
 @Component({
   selector: 'app-user-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, SpinnerComponent],
+  imports: [CommonModule, RouterLink, SpinnerComponent, LucideAngularModule],
   template: `
-    <div class="page">
+    <div class="page app-page">
       <header class="page-header">
         <div>
           <h1>Hello, {{ auth.user()?.fullName }}!</h1>
@@ -23,14 +24,14 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
 
       <div class="quick-actions">
         <a [routerLink]="['/user/book-ride']" class="action-card action-card--primary">
-          <span class="action-icon">🏍</span>
+          <span class="action-icon" aria-hidden="true"><lucide-icon name="bike" [size]="26"></lucide-icon></span>
           <div class="action-text">
             <h3>Book a Ride</h3>
             <p>Fast boda boda at your doorstep</p>
           </div>
         </a>
         <a [routerLink]="['/user/book-parcel']" class="action-card action-card--secondary">
-          <span class="action-icon">📦</span>
+          <span class="action-icon" aria-hidden="true"><lucide-icon name="package" [size]="26"></lucide-icon></span>
           <div class="action-text">
             <h3>Send a Parcel</h3>
             <p>Reliable delivery across the city</p>
@@ -50,7 +51,7 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
             <div class="section-loader"><app-spinner /></div>
           } @else if (activeRides().length === 0) {
             <div class="empty-card">
-              <span class="empty-icon">🏍</span>
+              <span class="empty-icon" aria-hidden="true"><lucide-icon name="bike" [size]="36"></lucide-icon></span>
               <p>No active rides at the moment</p>
             </div>
           } @else {
@@ -85,7 +86,7 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
             <div class="section-loader"><app-spinner /></div>
           } @else if (activeParcels().length === 0) {
             <div class="empty-card">
-              <span class="empty-icon">📦</span>
+              <span class="empty-icon" aria-hidden="true"><lucide-icon name="package" [size]="36"></lucide-icon></span>
               <p>No active deliveries at the moment</p>
             </div>
           } @else {
@@ -119,44 +120,46 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
     .action-card {
       display: flex; align-items: center; gap: 20px; padding: 24px;
       border-radius: var(--radius-lg); border: 1px solid var(--clr-border);
-      transition: all var(--transition); text-decoration: none;
-      &:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: var(--clr-primary); }
+      transition: all var(--transition); text-decoration: none; box-shadow: var(--shadow-card);
+      &:hover { transform: translateY(-4px); border-color: var(--clr-primary); }
       
       &--primary { background: linear-gradient(135deg, rgba(255,107,0,.1) 0%, rgba(255,107,0,.05) 100%); }
       &--secondary { background: linear-gradient(135deg, rgba(59,130,246,.1) 0%, rgba(59,130,246,.05) 100%); }
     }
     .action-icon {
-      font-size: 40px; width: 64px; height: 64px;
+      width: 64px; height: 64px; flex-shrink: 0;
       background: var(--clr-bg-card); border-radius: var(--radius-md);
       display: flex; align-items: center; justify-content: center;
-      box-shadow: var(--shadow-sm);
+      color: var(--clr-primary);
     }
     .action-text {
       h3 { font-size: 18px; font-weight: 700; margin-bottom: 4px; color: var(--clr-text); }
       p { font-size: 14px; color: var(--clr-text-muted); }
     }
 
-    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 32px; }
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 32px; }
     .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; h2 { font-size: 18px; font-weight: 600; } }
     
     .card-list { display: flex; flex-direction: column; gap: 12px; }
     .job-card {
       background: var(--clr-bg-card); border: 1px solid var(--clr-border);
       border-radius: var(--radius-md); padding: 16px; cursor: pointer;
-      transition: background var(--transition);
-      &:hover { background: var(--clr-bg-elevated); }
+      transition: background var(--transition), transform 0.2s ease;
+      box-shadow: var(--shadow-card);
+      &:hover { background: var(--clr-bg-elevated); transform: translateY(-2px); }
     }
     .job-info { margin: 12px 0; }
     .address { font-size: 13px; color: var(--clr-text); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .item { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-    .job-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--clr-border); pt: 12px; mt: 12px; }
+    .job-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--clr-border); padding-top: 12px; margin-top: 12px; }
     .price { font-weight: 700; color: var(--clr-primary); }
     .date { font-size: 12px; color: var(--clr-text-muted); }
 
     .empty-card {
       background: var(--clr-bg-card); border: 1px dashed var(--clr-border);
       border-radius: var(--radius-md); padding: 40px; text-align: center; color: var(--clr-text-muted);
-      .empty-icon { font-size: 32px; margin-bottom: 12px; opacity: .3; display: block; }
+      box-shadow: var(--shadow-card);
+      .empty-icon { margin-bottom: 12px; opacity: .35; display: flex; justify-content: center; color: var(--clr-text-dim); }
     }
     .section-loader { padding: 40px; display: flex; justify-content: center; }
   `],

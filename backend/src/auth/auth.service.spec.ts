@@ -46,7 +46,7 @@ const mockConfig = {
 const mockMail = {
   sendWelcomeUser: jest.fn(),
   sendWelcomeRider: jest.fn(),
-  sendEmailVerificationOtp: jest.fn(),
+  sendEmailVerificationOtp: jest.fn().mockResolvedValue(true),
   sendPasswordReset: jest.fn(),
 };
 
@@ -86,7 +86,9 @@ describe('AuthService', () => {
         phone: dto.phone,
         email: dto.email,
         fullName: dto.fullName,
+        avatarUrl: null,
         role: Role.USER,
+        isActive: true,
       });
       mockConfig.getOrThrow.mockReturnValue('15m');
       mockJwt.signAsync.mockResolvedValue('token');
@@ -98,6 +100,14 @@ describe('AuthService', () => {
       expect(mockPrisma.account.create).toHaveBeenCalledTimes(1);
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
+      expect(result).toHaveProperty('user');
+      expect(result.user).toMatchObject({
+        id: 'acc-1',
+        phone: dto.phone,
+        email: dto.email,
+        fullName: dto.fullName,
+        role: Role.USER,
+      });
     });
 
     it('throws ConflictException when phone is already registered', async () => {
@@ -131,7 +141,9 @@ describe('AuthService', () => {
         phone: dto.phone,
         email: dto.email,
         fullName: dto.fullName,
+        avatarUrl: null,
         role: Role.RIDER,
+        isActive: true,
       };
       mockPrisma.$transaction.mockImplementation(
         async (fn: (tx: typeof mockPrisma) => Promise<unknown>) => {
@@ -148,6 +160,8 @@ describe('AuthService', () => {
 
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('user');
+      expect(result.user.role).toBe(Role.RIDER);
     });
 
     it('throws ConflictException when phone is already registered', async () => {
@@ -167,6 +181,8 @@ describe('AuthService', () => {
       id: 'acc-1',
       email: dto.email,
       phone: '0712345678',
+      fullName: 'Test User',
+      avatarUrl: null,
       role: Role.USER,
       isActive: true,
       passwordHash: 'hashed_pw',
@@ -184,6 +200,9 @@ describe('AuthService', () => {
 
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
+      expect(result).toHaveProperty('user');
+      expect(result.user.id).toBe('acc-1');
+      expect(result.user.role).toBe(Role.USER);
     });
 
     it('throws UnauthorizedException for unknown email', async () => {
@@ -361,6 +380,52 @@ describe('AuthService', () => {
       await expect(
         service.resetPassword('bad_token', 'NewPass123!'),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // ─── changePassword ───────────────────────────────────────
+
+  describe('changePassword', () => {
+    it('throws UnauthorizedException when current password is wrong', async () => {
+      mockPrisma.account.findUnique.mockResolvedValue({
+        id: 'acc-1',
+        passwordHash: 'stored_hash',
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        service.changePassword('acc-1', 'wrong', 'NewPass123!'),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(mockPrisma.account.update).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when new password equals current', async () => {
+      mockPrisma.account.findUnique.mockResolvedValue({
+        id: 'acc-1',
+        passwordHash: 'stored_hash',
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await expect(
+        service.changePassword('acc-1', 'SamePass1!', 'SamePass1!'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('updates password and clears refresh token when current is valid', async () => {
+      mockPrisma.account.findUnique.mockResolvedValue({
+        id: 'acc-1',
+        passwordHash: 'stored_hash',
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new_hashed_pw');
+      mockPrisma.account.update.mockResolvedValue({});
+
+      await service.changePassword('acc-1', 'OldPass123!', 'NewPass123!');
+
+      expect(mockPrisma.account.update).toHaveBeenCalledWith({
+        where: { id: 'acc-1' },
+        data: { passwordHash: 'new_hashed_pw', refreshToken: null },
+      });
     });
   });
 

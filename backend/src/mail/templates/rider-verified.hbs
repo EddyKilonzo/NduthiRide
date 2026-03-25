@@ -1,42 +1,104 @@
-<h1>Account Approved — Start Riding! 🎉</h1>
-<p>Hi <strong style="color:#F0F0F0;">{{fullName}}</strong>,</p>
-<p>
-  Congratulations! Your NduthiRide rider account has been <strong style="color:#22C55E;">verified</strong>.
+<!-- Heading -->
+<h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.3;">
+  Account Approved — Start Riding
+</h1>
+
+<p style="margin:0 0 12px;font-size:15px;color:#AAAAAA;line-height:1.7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  Hi <strong style="color:#F0F0F0;font-weight:600;">{{fullName}}</strong>,
+</p>
+
+<p style="margin:0 0 20px;font-size:15px;color:#AAAAAA;line-height:1.7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  Congratulations! Your NduthiRide rider account has been <strong style="color:#408A71;">verified</strong>.
   You can now go online and start accepting rides and parcel deliveries.
 </p>
 
-<hr class="divider" />
+<!-- Divider -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 20px;">
+  <tr><td style="border-top:1px solid #2A2A2A;font-size:0;line-height:0;">&nbsp;</td></tr>
+</table>
 
-<h2>Your Account</h2>
-<div class="info-row">
-  <span class="info-label">Status</span>
-  <span class="info-value"><span class="badge badge-success">Verified</span></span>
-</div>
-<div class="info-row">
-  <span class="info-label">License</span>
-  <span class="info-value">{{licenseNumber}}</span>
-</div>
-<div class="info-row">
-  <span class="info-label">Bike</span>
-  <span class="info-value">{{bikeModel}} · {{bikeRegistration}}</span>
-</div>
+<h2 style="margin:0 0 14px;font-size:16px;font-weight:600;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Your Account</h2>
 
-<hr class="divider" />
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #2A2A2A;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="font-size:14px;color:#888888;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Status</td>
+          <td align="right"><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;background:rgba(64,138,113,0.15);color:#408A71;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Verified</span></td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #2A2A2A;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="font-size:14px;color:#888888;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">License</td>
+          <td align="right" style="font-size:14px;font-weight:600;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{{licenseNumber}}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:12px 0;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="font-size:14px;color:#888888;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Bike</td>
+          <td align="right" style="font-size:14px;font-weight:600;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{{bikeModel}} &middot; {{bikeRegistration}}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
 
-<h2>Getting started</h2>
-<div class="info-row">
-  <span class="info-label">1. Go Online</span>
-  <span class="info-value">Toggle availability in the app</span>
-</div>
-<div class="info-row">
-  <span class="info-label">2. Accept Requests</span>
-  <span class="info-value">Ride and parcel requests appear instantly</span>
-</div>
-<div class="info-row">
-  <span class="info-label">3. Get Paid</span>
-  <span class="info-value">Earnings tracked in your dashboard</span>
-</div>
+<!-- Divider -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:20px 0;">
+  <tr><td style="border-top:1px solid #2A2A2A;font-size:0;line-height:0;">&nbsp;</td></tr>
+</table>
 
-<p style="text-align:center; margin-top: 32px;">
-  <a href="{{appUrl}}" class="btn">Open Rider App</a>
-</p>
+<h2 style="margin:0 0 14px;font-size:16px;font-weight:600;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Getting started</h2>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 28px;">
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #2A2A2A;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="font-size:14px;color:#888888;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">1. Go Online</td>
+          <td align="right" style="font-size:14px;font-weight:600;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Toggle availability in the app</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #2A2A2A;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="font-size:14px;color:#888888;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">2. Accept Requests</td>
+          <td align="right" style="font-size:14px;font-weight:600;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Ride and parcel requests appear instantly</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:12px 0;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="font-size:14px;color:#888888;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">3. Get Paid</td>
+          <td align="right" style="font-size:14px;font-weight:600;color:#F0F0F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Earnings tracked in your dashboard</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<!-- CTA button -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+  <tr>
+    <td align="center">
+      <a href="{{appUrl}}" style="display:inline-block;background-color:#408A71;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:10px;font-size:15px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;letter-spacing:0.2px;">
+        Open Rider App
+      </a>
+    </td>
+  </tr>
+</table>

@@ -279,7 +279,7 @@ export class RidesService {
           riderName: riderAccount.fullName,
           riderPhone: riderAccount.phone,
           bikeModel: rider.bikeModel ?? 'Motorcycle',
-          bikeRegistration: rider.bikeRegistration,
+          bikeRegistration: rider.bikeRegistration ?? 'Not provided',
           ratingAverage: rider.ratingAverage,
         });
       }

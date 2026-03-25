@@ -1,7 +1,8 @@
-import { Component, HostListener, AfterViewInit, inject } from '@angular/core';
+import { Component, HostListener, AfterViewInit, inject, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { ThemeService } from '../../../core/services/theme.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-site-header',
@@ -12,8 +13,22 @@ import { ThemeService } from '../../../core/services/theme.service';
 })
 export class SiteHeaderComponent implements AfterViewInit {
   private readonly themeSvc = inject(ThemeService);
+  protected readonly auth = inject(AuthService);
 
   readonly isDark = this.themeSvc.theme;
+
+  /** Home route for the signed-in role (shell + public pages with a session). */
+  protected readonly dashboardPath = computed(() => {
+    const r = this.auth.role();
+    if (r === 'ADMIN') return '/admin';
+    if (r === 'RIDER') return '/rider';
+    return '/user';
+  });
+
+  protected readonly sessionFirstName = computed(() => {
+    const n = this.auth.user()?.fullName?.split(' ')?.[0];
+    return n?.length ? n : 'Account';
+  });
 
   navScrolled = false;
 
@@ -35,5 +50,9 @@ export class SiteHeaderComponent implements AfterViewInit {
 
   toggleTheme(): void {
     this.themeSvc.toggle();
+  }
+
+  protected logout(): void {
+    void this.auth.logout();
   }
 }

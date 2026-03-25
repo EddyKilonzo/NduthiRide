@@ -9,3 +9,14 @@
     transform: translateY(-10px);
   }
 }
+
+/* After Tailwind: verify-email OTP must stay 6 cells (preflight / autofill) */
+.verify-email-page .otp-group {
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+}
+.verify-email-page .otp-cell .otp-input {
+  border: 2px solid var(--clr-border) !important;
+  background: var(--clr-bg-elevated) !important;
+  color: var(--clr-text) !important;
+}

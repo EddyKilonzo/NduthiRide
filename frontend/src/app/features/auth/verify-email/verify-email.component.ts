@@ -18,14 +18,13 @@ import { LucideAngularModule } from 'lucide-angular';
   standalone: true,
   imports: [LucideAngularModule, RouterLink],
   template: `
-    <div class="auth-split-page auth-page-animate">
+    <div class="auth-split-page auth-page-animate verify-email-page">
 
-      <!-- Form side -->
       <div class="auth-split-page__form">
         <div class="auth-form-inner">
 
           <div class="verify-icon">
-            <lucide-icon name="mail-check" [size]="28"></lucide-icon>
+            <lucide-icon name="mail" [size]="28"></lucide-icon>
           </div>
 
           <h1>Verify your email</h1>
@@ -33,20 +32,28 @@ import { LucideAngularModule } from 'lucide-angular';
             We sent a 6-digit code to your email. Enter it below to activate your account.
           </p>
 
-          <div class="otp-group" (paste)="onPaste($event)">
+          <p class="nduth-otp-label">One digit per box — six separate boxes below.</p>
+
+          <div class="nduth-otp-wrap" (paste)="onPaste($event)">
             @for (i of indices; track i) {
-              <input
-                #otpInput
-                class="otp-input"
-                type="text"
-                inputmode="numeric"
-                maxlength="1"
-                pattern="[0-9]"
-                autocomplete="one-time-code"
-                [attr.aria-label]="'Digit ' + (i + 1) + ' of 6'"
-                (input)="onInput($event, i)"
-                (keydown)="onKeydown($event, i)"
-              />
+              <div class="nduth-otp-slot">
+                <input
+                  #otpInput
+                  class="nduth-otp-digit"
+                  type="tel"
+                  inputmode="numeric"
+                  maxlength="1"
+                  pattern="[0-9]*"
+                  [attr.name]="'otp-' + i"
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="off"
+                  spellcheck="false"
+                  [attr.aria-label]="'Digit ' + (i + 1) + ' of 6'"
+                  (input)="onInput($event, i)"
+                  (keydown)="onKeydown($event, i)"
+                />
+              </div>
             }
           </div>
 
@@ -54,19 +61,38 @@ import { LucideAngularModule } from 'lucide-angular';
             <p class="auth-error otp-error">{{ error() }}</p>
           }
 
-          <button
-            type="button"
-            class="auth-btn-black"
-            [disabled]="loading() || !isComplete()"
-            (click)="verify()"
-          >
-            @if (loading()) {
-              <span class="auth-btn-spinner"></span>
-              <span>Verifying...</span>
-            } @else {
-              <span>Verify account</span>
-            }
-          </button>
+          <div class="nduth-verify-actions">
+            <button
+              type="button"
+              class="auth-btn-black"
+              [disabled]="loading() || !isComplete()"
+              (click)="verify()"
+              aria-describedby="verify-email-hint"
+            >
+              @if (loading()) {
+                <span class="auth-btn-spinner"></span>
+                <span>Checking your code…</span>
+              } @else if (!isComplete()) {
+                <span>Enter all 6 digits above to unlock this button</span>
+              } @else {
+                <span>Verify email and continue</span>
+              }
+            </button>
+            <p
+              id="verify-email-hint"
+              class="nduth-verify-hint"
+              [class.nduth-verify-hint--muted]="isComplete() && !loading()"
+              aria-live="polite"
+            >
+              @if (loading()) {
+                Please wait while we confirm your code.
+              } @else if (!isComplete()) {
+                Fill each box with one number (or paste the full code). The button stays off until all six are filled.
+              } @else {
+                Ready — tap the button to verify your email and open your account.
+              }
+            </p>
+          </div>
 
           <div class="otp-resend">
             @if (resendCooldown() > 0) {
@@ -84,9 +110,57 @@ import { LucideAngularModule } from 'lucide-angular';
         </div>
       </div>
 
-      <!-- Visual side -->
       <aside class="auth-split-page__aside" aria-label="Brand">
-        <div class="auth-visual-panel verify-panel">
+        <div class="auth-visual-panel">
+          <div class="auth-visual-panel__media" aria-hidden="true">
+            <!-- Inline SVG so the hero always paints (no CDN / public path issues) -->
+            <svg
+              class="verify-email-hero-svg"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 1200 800"
+              preserveAspectRatio="xMidYMid slice"
+              focusable="false"
+            >
+              <defs>
+                <linearGradient id="vhero-g" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:#142e26" />
+                  <stop offset="55%" style="stop-color:#285a48" />
+                  <stop offset="100%" style="stop-color:#408a71" />
+                </linearGradient>
+                <linearGradient id="vhero-road" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" style="stop-color:#0d1f18;stop-opacity:0.9" />
+                  <stop offset="100%" style="stop-color:#091413" />
+                </linearGradient>
+                <filter id="vhero-soft" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="2" result="b" />
+                  <feMerge>
+                    <feMergeNode in="b" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <rect width="1200" height="800" fill="url(#vhero-g)" />
+              <ellipse cx="600" cy="720" rx="520" ry="120" fill="#091413" opacity="0.45" />
+              <path d="M0 520 L1200 420 L1200 800 L0 800 Z" fill="url(#vhero-road)" />
+              <path d="M600 420 L1180 360 L1200 380 L620 460 Z" fill="#1c3d2e" opacity="0.6" />
+              <g fill="#b0e4cc" opacity="0.35" filter="url(#vhero-soft)">
+                <circle cx="200" cy="140" r="3" />
+                <circle cx="320" cy="100" r="2" />
+                <circle cx="900" cy="120" r="2.5" />
+                <circle cx="1020" cy="180" r="2" />
+                <circle cx="150" cy="280" r="2" />
+              </g>
+              <g transform="translate(420 300) scale(1.15)" fill="#091413" opacity="0.88">
+                <ellipse cx="180" cy="310" rx="52" ry="52" />
+                <ellipse cx="380" cy="310" rx="52" ry="52" />
+                <path d="M120 310 L200 310 L260 180 L340 160 L420 200 L380 280 L320 280 L280 200 Z" />
+                <path d="M260 180 L340 90 L400 100 L420 200 L340 160 Z" fill="#142e26" />
+                <rect x="330" y="75" width="8" height="55" rx="2" transform="rotate(-15 334 100)" fill="#285a48" />
+              </g>
+              <rect width="1200" height="800" fill="url(#vhero-g)" opacity="0.12" style="mix-blend-mode:overlay" />
+            </svg>
+          </div>
+          <div class="auth-visual-panel__overlay" aria-hidden="true"></div>
           <div class="auth-visual-panel__content">
             <div class="auth-glass auth-glass--badge">Almost there</div>
             <div class="auth-glass auth-glass--title">One step away from your first ride.</div>
@@ -97,48 +171,13 @@ import { LucideAngularModule } from 'lucide-angular';
 
     </div>
   `,
-  styleUrls: ['../auth-pages.shared.scss'],
+  styleUrls: ['../auth-pages.shared.scss', './verify-email.component.scss'],
   styles: [`
     .verify-icon {
       width: 52px; height: 52px; border-radius: 14px;
       background: rgba(64, 138, 113, 0.1); border: 1px solid rgba(64, 138, 113, 0.25);
       display: flex; align-items: center; justify-content: center;
       color: var(--clr-primary); margin-bottom: 16px;
-    }
-
-    .otp-group {
-      display: flex; gap: 8px; justify-content: center; margin: 20px 0 6px;
-    }
-
-    .otp-input {
-      width: 46px; height: 54px; text-align: center; font-size: 22px; font-weight: 700;
-      font-family: var(--font-display);
-      border: 1.5px solid var(--clr-border); border-radius: 12px;
-      background: var(--clr-bg-elevated); color: var(--clr-text);
-      outline: none; transition: border-color 0.2s, box-shadow 0.2s;
-      caret-color: transparent;
-    }
-    .otp-input:focus {
-      border-color: var(--clr-primary);
-      box-shadow: 0 0 0 3px rgba(64, 138, 113, 0.15);
-    }
-    .otp-input:not(:placeholder-shown) {
-      border-color: color-mix(in srgb, var(--clr-primary) 60%, transparent);
-    }
-
-    .otp-error { text-align: center; padding-left: 0; margin-bottom: 6px; }
-
-    .otp-resend {
-      text-align: center; margin-top: 14px; font-size: 14px; color: var(--clr-text-muted);
-      button {
-        color: var(--clr-primary); font-weight: 700; font-size: 14px;
-        background: none; border: none; cursor: pointer; margin-left: 4px; padding: 0;
-        &:hover { text-decoration: underline; }
-      }
-    }
-
-    .verify-panel {
-      background: linear-gradient(145deg, var(--clr-primary-dark) 0%, var(--clr-primary) 55%, var(--clr-primary-light) 100%);
     }
   `],
 })
@@ -215,9 +254,12 @@ export class VerifyEmailComponent implements AfterViewInit, OnDestroy {
     this.error.set('');
     try {
       await this.auth.verifyEmail(this.digits.join(''));
-      this.toast.success('Email verified! Welcome to NduthiRide.');
       const role = this.auth.role();
-      void this.router.navigate([role === 'RIDER' ? '/rider' : '/user']);
+      const dest = role === 'RIDER' ? '/rider' : '/user';
+      // Navigate first so the shell + dashboard can load immediately; toast after avoids blocking the transition.
+      void this.router.navigateByUrl(dest).then(() => {
+        this.toast.success('Email verified! Welcome to NduthiRide.');
+      });
     } catch {
       this.error.set('Invalid or expired code. Please try again.');
       this.loading.set(false);
@@ -225,8 +267,12 @@ export class VerifyEmailComponent implements AfterViewInit, OnDestroy {
   }
 
   protected resend(): void {
-    this.toast.info('A new verification code has been sent to your email.');
-    this.startCooldown();
+    void this.auth.resendOtp().then(() => {
+      this.toast.success('A new code has been sent to your email.');
+      this.startCooldown();
+    }).catch(() => {
+      this.toast.error('Could not resend code. Please try again.');
+    });
   }
 
   private startCooldown(): void {

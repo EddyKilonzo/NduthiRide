@@ -190,8 +190,12 @@ export class LoginComponent {
         password,
       });
       const role = this.auth.role();
-      void this.router.navigate([role === 'ADMIN' ? '/admin' : role === 'RIDER' ? '/rider' : '/user']);
+      const dest =
+        role === 'ADMIN' ? '/admin' : role === 'RIDER' ? '/rider' : '/user';
+      await this.router.navigateByUrl(dest);
     } catch {
+      // Error toast usually comes from the HTTP interceptor
+    } finally {
       this.loading.set(false);
     }
   }

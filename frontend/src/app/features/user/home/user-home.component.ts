@@ -1,35 +1,62 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../../../core/services/auth.service';
 import { RideService } from '../../../core/services/ride.service';
 import { ParcelService } from '../../../core/services/parcel.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
+import { DashboardActivityChartsComponent } from '../../../shared/components/dashboard-activity-charts/dashboard-activity-charts.component';
+import {
+  buildWeeklyChartBuckets,
+  ridesAndParcelsToActivityPoints,
+  type DayBucket,
+} from '../../../shared/utils/activity-buckets.util';
 import type { Ride } from '../../../core/models/ride.models';
 import type { Parcel } from '../../../core/models/parcel.models';
+
+const USER_CHART_COPY = {
+  amount7d: '7-day spend',
+  jobsLabel: 'Bookings completed',
+  avgLabel: 'Avg. per booking',
+  rideShareLabel: 'Ride share',
+  dailyAmountTitle: 'Daily spend',
+} as const;
 
 @Component({
   selector: 'app-user-home',
   standalone: true,
-  imports: [CommonModule, RouterLink, SpinnerComponent],
+  imports: [CommonModule, RouterLink, SpinnerComponent, LucideAngularModule, DashboardActivityChartsComponent],
   template: `
-    <div class="page">
+    <div class="page app-page">
       <div class="page-header">
         <div>
-          <h1>Welcome back, {{ firstName() }} 👋</h1>
+          <h1 class="welcome-title">
+            Welcome back, {{ firstName() }}
+            <lucide-icon name="sun" [size]="22" class="welcome-icon" aria-hidden="true"></lucide-icon>
+          </h1>
           <p>Where do you want to go today?</p>
         </div>
       </div>
 
-      <!-- Quick action cards -->
+      <app-dashboard-activity-charts
+        class="user-home-charts"
+        [chartSeries]="chartSeries()"
+        [chartsLoading]="chartsLoading()"
+        gradientId="userSpendArea"
+        sectionTitle="Your activity and spend"
+        [copy]="userChartCopy"
+      />
+
+      <!-- Quick actions — below charts -->
       <div class="action-grid">
         <a [routerLink]="['/user/book-ride']" class="action-card">
-          <div class="action-icon">🏍</div>
+          <div class="action-icon" aria-hidden="true"><lucide-icon name="bike" [size]="28"></lucide-icon></div>
           <h3>Book a Ride</h3>
           <p>Fast, affordable boda boda rides</p>
         </a>
         <a [routerLink]="['/user/book-parcel']" class="action-card">
-          <div class="action-icon">📦</div>
+          <div class="action-icon" aria-hidden="true"><lucide-icon name="package" [size]="28"></lucide-icon></div>
           <h3>Send a Parcel</h3>
           <p>Reliable same-day delivery</p>
         </a>
@@ -46,7 +73,7 @@ import type { Parcel } from '../../../core/models/parcel.models';
           <app-spinner />
         } @else if (recentRides().length === 0) {
           <div class="empty-state">
-            <div class="empty-icon">🏍</div>
+            <div class="empty-icon" aria-hidden="true"><lucide-icon name="bike" [size]="40"></lucide-icon></div>
             <h3>No rides yet</h3>
             <p>Book your first ride to get started</p>
           </div>
@@ -83,7 +110,7 @@ import type { Parcel } from '../../../core/models/parcel.models';
           <app-spinner />
         } @else if (recentParcels().length === 0) {
           <div class="empty-state">
-            <div class="empty-icon">📦</div>
+            <div class="empty-icon" aria-hidden="true"><lucide-icon name="package" [size]="40"></lucide-icon></div>
             <h3>No deliveries yet</h3>
             <p>Send your first parcel to get started</p>
           </div>
@@ -104,14 +131,20 @@ import type { Parcel } from '../../../core/models/parcel.models';
     </div>
   `,
   styles: [`
-    .action-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; margin-bottom: 32px; }
+    .welcome-title { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .welcome-icon { color: var(--clr-primary); flex-shrink: 0; }
+    .action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 32px; }
+    @media (max-width: 560px) { .action-grid { grid-template-columns: 1fr; } }
     .action-card {
       background: var(--clr-bg-card); border: 1px solid var(--clr-border); border-radius: var(--radius-lg);
       padding: 28px 24px; text-decoration: none; transition: all var(--transition);
-      display: flex; flex-direction: column; gap: 8px;
-      &:hover { border-color: var(--clr-primary); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+      display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-card);
+      &:hover { border-color: var(--clr-primary); transform: translateY(-2px); }
     }
-    .action-icon { font-size: 36px; }
+    .action-icon {
+      width: 52px; height: 52px; border-radius: var(--radius-md); background: var(--clr-bg-elevated);
+      display: flex; align-items: center; justify-content: center; color: var(--clr-primary);
+    }
     .action-card h3 { font-size: 17px; font-weight: 700; }
     .action-card p  { font-size: 13px; color: var(--clr-text-muted); }
     .section { margin-bottom: 32px; }
@@ -130,6 +163,8 @@ import type { Parcel } from '../../../core/models/parcel.models';
     .ride-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
     .fare { font-size: 14px; font-weight: 600; }
     .parcel-desc { font-size: 13px; font-weight: 500; }
+    .empty-icon { display: flex; justify-content: center; color: var(--clr-text-dim); opacity: 0.5; margin-bottom: 8px; }
+    .user-home-charts { display: block; margin-bottom: 32px; }
   `],
 })
 export class UserHomeComponent implements OnInit {
@@ -137,10 +172,13 @@ export class UserHomeComponent implements OnInit {
   private readonly rideService  = inject(RideService);
   private readonly parcelService = inject(ParcelService);
 
+  protected readonly userChartCopy = USER_CHART_COPY;
   protected readonly recentRides   = signal<Ride[]>([]);
   protected readonly recentParcels = signal<Parcel[]>([]);
   protected readonly loadingRides   = signal(true);
   protected readonly loadingParcels = signal(true);
+  protected readonly chartSeries = signal<DayBucket[]>([]);
+  protected readonly chartsLoading = signal(true);
 
   protected firstName(): string {
     return this.auth.user()?.fullName?.split(' ')[0] ?? 'there';
@@ -154,6 +192,19 @@ export class UserHomeComponent implements OnInit {
     void this.parcelService.getMyParcels(1, 3).then(
       (res) => { this.recentParcels.set(res.data); this.loadingParcels.set(false); },
     ).catch(() => this.loadingParcels.set(false));
+
+    this.chartsLoading.set(true);
+    void Promise.all([
+      this.rideService.getMyRides(1, 250, 'COMPLETED'),
+      this.parcelService.getMyParcels(1, 250, 'DELIVERED'),
+    ])
+      .then(([rideRes, parcelRes]) => {
+        const points = ridesAndParcelsToActivityPoints(rideRes.data, parcelRes.data);
+        const { current } = buildWeeklyChartBuckets(points);
+        this.chartSeries.set(current);
+      })
+      .catch(() => { /* silent */ })
+      .finally(() => this.chartsLoading.set(false));
   }
 
   protected statusBadge(status: string): string {
