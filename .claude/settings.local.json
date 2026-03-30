@@ -19,7 +19,8 @@
       "Bash(findstr LISTEN 2)",
       "Bash(/dev/null taskkill:*)",
       "Bash(find C:UsersAdminDocumentsProjectsNduthRidefrontendsrcappfeaturesauth -name *.ts -o -name *.html)",
-      "Bash(find C:/Users/Admin/Documents/Projects/NduthRide/backend/src -name configuration* -o -name config*)"
+      "Bash(find C:/Users/Admin/Documents/Projects/NduthRide/backend/src -name configuration* -o -name config*)",
+      "Bash(git status:*)"
     ]
   }
 }
