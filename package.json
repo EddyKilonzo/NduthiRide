@@ -3,9 +3,10 @@
   "private": true,
   "scripts": {
     "install:backend": "npm install --prefix backend",
+    "prisma:generate": "npm run prisma:generate --prefix backend",
     "build:backend": "npm run build --prefix backend",
     "start:backend": "npm run start:prod --prefix backend",
-    "build": "npm run install:backend && npm run build:backend",
+    "build": "npm run install:backend && npm run prisma:generate && npm run build:backend",
     "start:prod": "npm run start:backend"
   }
 }
