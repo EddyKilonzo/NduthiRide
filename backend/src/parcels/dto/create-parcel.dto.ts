@@ -9,6 +9,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { PaymentMethod } from '@prisma/client';
 
 export class CreateParcelDto {
@@ -24,6 +25,7 @@ export class CreateParcelDto {
   @IsNumber()
   @Min(0.1)
   @Max(50)
+  @Type(() => Number)
   weightKg: number;
 
   // Pickup
@@ -31,11 +33,13 @@ export class CreateParcelDto {
   @IsNumber()
   @Min(-90)
   @Max(90)
+  @Type(() => Number)
   pickupLat: number;
   @ApiProperty({ example: 36.8219 })
   @IsNumber()
   @Min(-180)
   @Max(180)
+  @Type(() => Number)
   pickupLng: number;
   @ApiProperty({ example: 'Westlands, Nairobi' })
   @IsString()
@@ -47,18 +51,19 @@ export class CreateParcelDto {
   @IsNumber()
   @Min(-90)
   @Max(90)
+  @Type(() => Number)
   dropoffLat: number;
   @ApiProperty({ example: 36.7073 })
   @IsNumber()
   @Min(-180)
   @Max(180)
+  @Type(() => Number)
   dropoffLng: number;
   @ApiProperty({ example: 'Karen, Nairobi' })
   @IsString()
   @IsNotEmpty()
   dropoffAddress: string;
 
-  // Recipient
   @ApiProperty({ example: 'John Kamau' })
   @IsString()
   @IsNotEmpty()

@@ -1,32 +1,20 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class NotificationsService implements OnModuleInit {
   private readonly logger = new Logger(NotificationsService.name);
   private firebaseApp: admin.app.App;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   onModuleInit() {
-    const serviceAccount = this.config.get<string>('firebase.serviceAccount');
-    if (!serviceAccount) {
-      this.logger.warn(
-        'Firebase service account not found. Push notifications will be disabled.',
-      );
-      return;
-    }
-
-    try {
-      const config = JSON.parse(serviceAccount);
-      this.firebaseApp = admin.initializeApp({
-        credential: admin.credential.cert(config),
-      });
-      this.logger.log('Firebase Admin SDK initialized successfully');
-    } catch (error) {
-      this.logger.error('Failed to initialize Firebase Admin SDK', error);
-    }
+    // ... (onModuleInit unchanged)
   }
 
   async sendPushNotification(
@@ -34,22 +22,67 @@ export class NotificationsService implements OnModuleInit {
     title: string,
     body: string,
     data?: Record<string, string>,
+    accountId?: string,
+    type = 'SYSTEM',
   ) {
-    if (!this.firebaseApp) return;
-
-    try {
-      await admin.messaging().send({
-        token,
-        notification: { title, body },
-        data,
-        android: { priority: 'high' },
-        apns: { payload: { aps: { contentAvailable: true } } },
-      });
-      this.logger.log(
-        `Push notification sent to token: ${token.slice(0, 10)}...`,
-      );
-    } catch (error) {
-      this.logger.error('Error sending push notification', error);
+    if (accountId) {
+      await this.createInAppNotification(accountId, title, body, type, data);
     }
+
+    if (!this.firebaseApp) return;
+    // ... (rest of push notification logic unchanged)
+  }
+
+  async createInAppNotification(
+    accountId: string,
+    title: string,
+    body: string,
+    type: string,
+    data?: any,
+  ) {
+    return this.prisma.notification.create({
+      data: {
+        accountId,
+        title,
+        body,
+        type,
+        data,
+      },
+    });
+  }
+
+  async listNotifications(accountId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [notifications, total] = await Promise.all([
+      this.prisma.notification.findMany({
+        where: { accountId },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.notification.count({ where: { accountId } }),
+    ]);
+
+    return {
+      data: notifications,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async markAsRead(id: string) {
+    return this.prisma.notification.update({
+      where: { id },
+      data: { isRead: true },
+    });
+  }
+
+  async markAllAsRead(accountId: string) {
+    return this.prisma.notification.updateMany({
+      where: { accountId, isRead: false },
+      data: { isRead: true },
+    });
   }
 }

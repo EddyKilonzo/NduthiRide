@@ -144,6 +144,42 @@ export class RidersService {
         where: { accountId },
         data: {
           ...(dto.bikeModel !== undefined && { bikeModel: dto.bikeModel }),
+          ...(dto.bikeRegistration !== undefined && {
+            bikeRegistration: dto.bikeRegistration,
+          }),
+          ...(dto.licenseNumber !== undefined && {
+            licenseNumber: dto.licenseNumber,
+          }),
+          ...(dto.licenseImageUrl !== undefined && {
+            licenseImageUrl: dto.licenseImageUrl,
+          }),
+          ...(dto.idFrontImageUrl !== undefined && {
+            idFrontImageUrl: dto.idFrontImageUrl,
+          }),
+          ...(dto.idBackImageUrl !== undefined && {
+            idBackImageUrl: dto.idBackImageUrl,
+          }),
+          ...(dto.logbookImageUrl !== undefined && {
+            logbookImageUrl: dto.logbookImageUrl,
+          }),
+          // Update the avatarUrl in the linked Account table
+          account: {
+            update: {
+              ...(dto.avatarUrl !== undefined && { avatarUrl: dto.avatarUrl }),
+            },
+          },
+        },
+        include: {
+          account: {
+            select: {
+              id: true,
+              fullName: true,
+              phone: true,
+              avatarUrl: true,
+              email: true,
+              isActive: true,
+            },
+          },
         },
       });
     } catch (error) {
@@ -151,6 +187,66 @@ export class RidersService {
       this.logger.error(`updateProfile failed for account ${accountId}`, error);
       throw error;
     }
+  }
+
+  /**
+   * Returns paginated payout history for the rider.
+   */
+  async getPayouts(accountId: string, page = 1, limit = 10): Promise<any> {
+    const rider = await this.prisma.rider.findUnique({ where: { accountId } });
+    if (!rider) throw new NotFoundException('Rider not found');
+
+    const skip = (page - 1) * limit;
+    const [payouts, total] = await Promise.all([
+      this.prisma.payout.findMany({
+        where: { riderId: rider.id },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.payout.count({ where: { riderId: rider.id } }),
+    ]);
+
+    return {
+      data: payouts,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Requests a payout from earnings.
+   */
+  async requestPayout(accountId: string, amount: number, method: string, details: string): Promise<any> {
+    const rider = await this.prisma.rider.findUnique({ where: { accountId } });
+    if (!rider) throw new NotFoundException('Rider not found');
+
+    if (rider.totalEarnings < amount) {
+      throw new Error('Insufficient earnings for payout');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Create payout record
+      const payout = await tx.payout.create({
+        data: {
+          riderId: rider.id,
+          amount,
+          status: 'PENDING',
+          method,
+          accountDetails: details,
+        },
+      });
+
+      // Deduct from rider's earnings (In production, you'd likely keep a separate balance field)
+      await tx.rider.update({
+        where: { id: rider.id },
+        data: { totalEarnings: { decrement: amount } },
+      });
+
+      return payout;
+    });
   }
 
   /**

@@ -65,7 +65,7 @@ export class AuthService {
         data: {
           fullName: dto.fullName,
           phone: dto.phone,
-          email: dto.email,
+          email: dto.email?.toLowerCase(),
           passwordHash,
           role: Role.USER,
         },
@@ -123,7 +123,7 @@ export class AuthService {
           data: {
             fullName: dto.fullName,
             phone: dto.phone,
-            email: dto.email,
+            email: dto.email?.toLowerCase(),
             passwordHash,
             role: Role.RIDER,
           },
@@ -132,8 +132,8 @@ export class AuthService {
         await tx.rider.create({
           data: {
             accountId: newAccount.id,
-            licenseNumber: dto.licenseNumber ?? 'To be provided',
-            bikeRegistration: dto.bikeRegistration ?? 'To be provided',
+            licenseNumber: dto.licenseNumber ?? null,
+            bikeRegistration: dto.bikeRegistration ?? null,
             bikeModel: dto.bikeModel ?? null,
           },
         });
@@ -178,10 +178,9 @@ export class AuthService {
   // ─── Login ────────────────────────────────────────────────
 
   /**
-   * Verifies email + password and returns a fresh token pair.
-   * Intentionally returns the same error message for both wrong email and wrong password
-   * to avoid leaking whether an address is registered.
-   * Accounts without an email cannot use this endpoint.
+   * Verifies email/phone + password and returns a fresh token pair.
+   * Intentionally returns the same error message for both unknown account and wrong password
+   * to avoid leaking whether an identity is registered.
    */
   async login(dto: LoginDto): Promise<{
     accessToken: string;
@@ -189,10 +188,29 @@ export class AuthService {
     user: AuthUserPayload;
   }> {
     try {
-      const email = dto.email.trim().toLowerCase();
-      const account = await this.prisma.account.findUnique({
-        where: { email },
+      const credentialInput =
+        (dto as { credential?: unknown; email?: unknown }).credential ??
+        (dto as { email?: unknown }).email;
+      const rawCredential =
+        typeof credentialInput === 'string' ? credentialInput.trim() : '';
+      const isEmailCredential = rawCredential.includes('@');
+      const email = rawCredential.toLowerCase();
+      const phoneCandidates = this.toPhoneCandidates(rawCredential);
+      this.logger.debug(
+        `Login — raw: "${rawCredential}", isEmail: ${isEmailCredential}, emailNorm: "${email}", phones: ${JSON.stringify(phoneCandidates)}`,
+      );
+
+      const account = await this.prisma.account.findFirst({
+        where: isEmailCredential
+          ? { email: { equals: email, mode: 'insensitive' } }
+          : {
+              OR: phoneCandidates.map((phone) => ({ phone })),
+            },
       });
+
+      this.logger.debug(
+        `Account — found: ${!!account}, id: ${account?.id}, isActive: ${account?.isActive}, role: ${account?.role}`,
+      );
 
       if (!account || !account.isActive) {
         throw new UnauthorizedException('Invalid credentials');
@@ -202,6 +220,7 @@ export class AuthService {
         dto.password,
         account.passwordHash,
       );
+      this.logger.debug(`Password — matches: ${passwordMatches}`);
       if (!passwordMatches) {
         throw new UnauthorizedException('Invalid credentials');
       }
@@ -646,5 +665,26 @@ export class AuthService {
     }
 
     return false;
+  }
+
+  /**
+   * Returns possible local/international Kenyan phone representations for lookup.
+   * We store phone as provided at registration, so login checks multiple valid forms.
+   */
+  private toPhoneCandidates(input: string): string[] {
+    const raw = input.replace(/\s+/g, '');
+    const set = new Set<string>([raw]);
+
+    if (raw.startsWith('+254') && raw.length === 13) {
+      set.add(`0${raw.slice(4)}`);
+    } else if (raw.startsWith('254') && raw.length === 12) {
+      set.add(`+${raw}`);
+      set.add(`0${raw.slice(3)}`);
+    } else if (raw.startsWith('0') && raw.length === 10) {
+      set.add(`+254${raw.slice(1)}`);
+      set.add(`254${raw.slice(1)}`);
+    }
+
+    return Array.from(set);
   }
 }

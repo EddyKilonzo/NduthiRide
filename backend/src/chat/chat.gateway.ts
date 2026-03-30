@@ -123,6 +123,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         .emit('chat:message', {
           id: message.id,
           conversationId: payload.conversationId,
+          senderAccountId: message.senderAccountId,
           content: message.isDeleted
             ? 'This message was deleted'
             : message.content,

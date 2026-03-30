@@ -8,6 +8,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { PaymentMethod } from '@prisma/client';
 
 export class CreateRideDto {
@@ -15,12 +16,14 @@ export class CreateRideDto {
   @IsNumber()
   @Min(-90)
   @Max(90)
+  @Type(() => Number)
   pickupLat: number;
 
   @ApiProperty({ example: 36.8219, description: 'Pickup longitude' })
   @IsNumber()
   @Min(-180)
   @Max(180)
+  @Type(() => Number)
   pickupLng: number;
 
   @ApiProperty({ example: 'Westlands, Nairobi' })
@@ -32,12 +35,14 @@ export class CreateRideDto {
   @IsNumber()
   @Min(-90)
   @Max(90)
+  @Type(() => Number)
   dropoffLat: number;
 
   @ApiProperty({ example: 36.7073, description: 'Dropoff longitude' })
   @IsNumber()
   @Min(-180)
   @Max(180)
+  @Type(() => Number)
   dropoffLng: number;
 
   @ApiProperty({ example: 'Karen, Nairobi' })

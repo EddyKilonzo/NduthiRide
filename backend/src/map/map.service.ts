@@ -25,43 +25,50 @@ export interface RouteResult {
 @Injectable()
 export class MapService {
   private readonly logger = new Logger(MapService.name);
-  private readonly baseUrl = 'https://api.mapbox.com';
+  
+  // OpenStreetMap Nominatim for Geocoding (Free)
+  private readonly geocodeUrl = 'https://nominatim.openstreetmap.org';
+  // OSRM Public Instance for Routing (Free)
+  private readonly routingUrl = 'https://router.project-osrm.org';
 
   constructor(
     private readonly config: ConfigService,
     private readonly http: HttpService,
   ) {}
 
-  private get token(): string {
-    return this.config.getOrThrow<string>('mapbox.accessToken');
+  /** 
+   * Custom headers for Nominatim (they require a valid User-Agent)
+   */
+  private get headers() {
+    return {
+      'User-Agent': 'NduthiRide-App/1.0 (contact@nduthiride.co.ke)',
+    };
   }
 
   // ─── Geocoding ────────────────────────────────────────────
 
   /**
-   * Forward geocode: converts an address string to coordinates.
-   * Biased towards Kenya by proximity hint to Nairobi.
+   * Forward geocode: converts an address string to coordinates using Nominatim.
+   * Biased towards Kenya.
    */
   async geocode(query: string): Promise<GeocodeResult[]> {
     try {
       const encoded = encodeURIComponent(query);
-      const url =
-        `${this.baseUrl}/search/geocode/v6/forward` +
-        `?q=${encoded}&proximity=36.8219,-1.2921&country=KE&limit=5&access_token=${this.token}`;
+      // viewbox for Kenya roughly: 33.9,-4.7 to 41.9,5.5
+      const url = `${this.geocodeUrl}/search?q=${encoded}&format=json&addressdetails=1&limit=5&countrycodes=ke`;
 
       const response = await firstValueFrom(
-        this.http.get<{
-          features: Array<{
-            properties: { full_address: string };
-            geometry: { coordinates: [number, number] };
-          }>;
-        }>(url),
+        this.http.get<Array<{
+          display_name: string;
+          lat: string;
+          lon: string;
+        }>>(url, { headers: this.headers }),
       );
 
-      return response.data.features.map((f) => ({
-        full_address: f.properties.full_address,
-        lat: f.geometry.coordinates[1],
-        lng: f.geometry.coordinates[0],
+      return response.data.map((f) => ({
+        full_address: f.display_name,
+        lat: parseFloat(f.lat),
+        lng: parseFloat(f.lon),
       }));
     } catch (error) {
       this.logger.error(`Geocode failed for query: ${query}`, error);
@@ -70,22 +77,17 @@ export class MapService {
   }
 
   /**
-   * Reverse geocode: converts coordinates to a human-readable address.
+   * Reverse geocode: converts coordinates to a human-readable address using Nominatim.
    */
   async reverseGeocode(lat: number, lng: number): Promise<string> {
     try {
-      const url =
-        `${this.baseUrl}/search/geocode/v6/reverse` +
-        `?longitude=${lng}&latitude=${lat}&access_token=${this.token}`;
+      const url = `${this.geocodeUrl}/reverse?lat=${lat}&lon=${lng}&format=json`;
 
       const response = await firstValueFrom(
-        this.http.get<{
-          features: Array<{ properties: { full_address: string } }>;
-        }>(url),
+        this.http.get<{ display_name: string }>(url, { headers: this.headers }),
       );
 
-      const first = response.data.features[0];
-      return first?.properties.full_address ?? `${lat}, ${lng}`;
+      return response.data.display_name ?? `${lat}, ${lng}`;
     } catch (error) {
       this.logger.error(`Reverse geocode failed: ${lat},${lng}`, error);
       return `${lat}, ${lng}`;
@@ -95,7 +97,7 @@ export class MapService {
   // ─── Directions ───────────────────────────────────────────
 
   /**
-   * Gets a driving route between two points using Mapbox Directions API.
+   * Gets a driving route between two points using OSRM API.
    * Returns distance, estimated duration, and the route geometry coordinates.
    */
   async getDirections(
@@ -104,9 +106,7 @@ export class MapService {
   ): Promise<RouteResult> {
     try {
       const coords = `${origin.lng},${origin.lat};${destination.lng},${destination.lat}`;
-      const url =
-        `${this.baseUrl}/directions/v5/mapbox/driving/${coords}` +
-        `?geometries=geojson&overview=full&access_token=${this.token}`;
+      const url = `${this.routingUrl}/route/v1/driving/${coords}?geometries=geojson&overview=full`;
 
       const response = await firstValueFrom(
         this.http.get<{
@@ -137,7 +137,7 @@ export class MapService {
 
   /**
    * Calculates the ETA in minutes from a rider's current position to a destination.
-   * Uses Mapbox Directions for real-time traffic-aware duration.
+   * Uses OSRM for routing duration.
    */
   async getETA(
     riderPos: Coordinates,
@@ -147,7 +147,7 @@ export class MapService {
       const result = await this.getDirections(riderPos, destination);
       return result.durationMins;
     } catch {
-      // Fall back to Haversine estimate if Mapbox call fails
+      // Fall back to Haversine estimate if OSRM call fails
       const distanceKm = haversineKm(
         riderPos.lat,
         riderPos.lng,

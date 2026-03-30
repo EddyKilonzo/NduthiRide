@@ -8,6 +8,10 @@ export default () => {
   const mailSecure =
     mailSecureEnv === 'true' ||
     (mailSecureEnv !== 'false' && mailPort === 465);
+  const smtpFrom = process.env.SMTP_FROM ?? '';
+  const smtpFromMatch = smtpFrom.match(/^"?([^"<]+?)\s*<([^>]+)>"?$/);
+  const fallbackFromName = smtpFromMatch?.[1]?.trim();
+  const fallbackFromAddress = smtpFromMatch?.[2]?.trim();
 
   return {
   app: {
@@ -34,10 +38,7 @@ export default () => {
     passkey: process.env.MPESA_PASSKEY,
     callbackUrl: process.env.MPESA_CALLBACK_URL,
     apiUrl: process.env.MPESA_API_URL ?? 'https://sandbox.safaricom.co.ke',
-  },
-
-  mapbox: {
-    accessToken: process.env.MAPBOX_ACCESS_TOKEN,
+    webhookSecret: process.env.LIPANA_WEBHOOK_SECRET,
   },
 
   cloudinary: {
@@ -53,15 +54,23 @@ export default () => {
   },
 
   mail: {
-    host: process.env.MAIL_HOST ?? 'smtp.mailtrap.io',
-    port: mailPort,
-    secure: mailSecure,
+    host: process.env.MAIL_HOST ?? process.env.SMTP_HOST ?? 'smtp.mailtrap.io',
+    port: parseInt(process.env.MAIL_PORT ?? process.env.SMTP_PORT ?? '587', 10),
+    secure:
+      process.env.MAIL_SECURE === 'true' ||
+      (process.env.MAIL_SECURE !== 'false' &&
+        parseInt(process.env.MAIL_PORT ?? process.env.SMTP_PORT ?? '587', 10) ===
+          465),
     /** When using plain SMTP (e.g. Mailpit on 1025), set MAIL_REQUIRE_TLS=false */
     requireTls: process.env.MAIL_REQUIRE_TLS !== 'false',
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-    fromName: process.env.MAIL_FROM_NAME ?? 'NduthiRide',
-    fromAddress: process.env.MAIL_FROM_ADDRESS ?? 'no-reply@nduthiride.co.ke',
+    user: process.env.MAIL_USER ?? process.env.SMTP_USER,
+    pass: process.env.MAIL_PASS ?? process.env.SMTP_PASS,
+    fromName: process.env.MAIL_FROM_NAME ?? fallbackFromName ?? 'NduthiRide',
+    fromAddress:
+      process.env.MAIL_FROM_ADDRESS ??
+      fallbackFromAddress ??
+      process.env.SENDER_EMAIL ??
+      'no-reply@nduthiride.co.ke',
     otpExpiresMins: parseInt(process.env.OTP_EXPIRES_MINS ?? '10', 10),
     /** Logs OTP to server console in development when MAIL_DEBUG_OTP=true (never in production). */
     debugLogOtp:

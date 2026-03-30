@@ -12,6 +12,7 @@ import { MailService } from '../mail/mail.service';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { ChatService } from '../chat/chat.service';
 import { ChatGateway } from '../chat/chat.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const mockPrisma = {
   parcel: {
@@ -22,6 +23,9 @@ const mockPrisma = {
     update: jest.fn(),
     count: jest.fn(),
   },
+  account: {
+    findUnique: jest.fn(),
+  },
   rider: {
     findUnique: jest.fn(),
     update: jest.fn(),
@@ -29,6 +33,9 @@ const mockPrisma = {
   rating: {
     create: jest.fn(),
     findMany: jest.fn(),
+  },
+  setting: {
+    findMany: jest.fn().mockResolvedValue([]),
   },
 };
 
@@ -38,16 +45,22 @@ const mockMail = {
 
 const mockTrackingGateway = {
   emitNewParcelRequest: jest.fn(),
+  emitToAccount: jest.fn(),
 };
 
 const mockChatService = {
   createConversation: jest.fn(),
   getConversationByRideOrParcel: jest.fn(),
-  closeConversation: jest.fn(),
+  closeConversation: jest.fn().mockResolvedValue({ id: 'conv-1', closedAt: new Date() }),
 };
 
 const mockChatGateway = {
   emitChatClosed: jest.fn(),
+};
+
+const mockNotificationsService = {
+  createInAppNotification: jest.fn(),
+  send: jest.fn(),
 };
 
 describe('ParcelsService', () => {
@@ -59,6 +72,7 @@ describe('ParcelsService', () => {
         ParcelsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: MailService, useValue: mockMail },
+        { provide: NotificationsService, useValue: mockNotificationsService },
         { provide: TrackingGateway, useValue: mockTrackingGateway },
         { provide: ChatService, useValue: mockChatService },
         { provide: ChatGateway, useValue: mockChatGateway },
@@ -208,6 +222,7 @@ describe('ParcelsService', () => {
 
       mockPrisma.rider.findUnique.mockResolvedValue(mockRider);
       mockPrisma.parcel.findUnique.mockResolvedValue(mockParcel);
+      mockPrisma.account.findUnique.mockResolvedValue({ fullName: 'Rider Name' });
       mockPrisma.parcel.update.mockResolvedValue({
         ...mockParcel,
         riderId,
@@ -247,6 +262,7 @@ describe('ParcelsService', () => {
 
       mockPrisma.rider.findUnique.mockResolvedValue(mockRider);
       mockPrisma.parcel.findUnique.mockResolvedValue(mockParcel);
+      mockPrisma.account.findUnique.mockResolvedValue({ fullName: 'Rider' });
       mockPrisma.parcel.update.mockResolvedValue({
         ...mockParcel,
         status: ParcelStatus.PICKED_UP,
@@ -280,6 +296,7 @@ describe('ParcelsService', () => {
 
       mockPrisma.rider.findUnique.mockResolvedValue(mockRider);
       mockPrisma.parcel.findUnique.mockResolvedValue(mockParcel);
+      mockPrisma.account.findUnique.mockResolvedValue({ fullName: 'Rider' });
       mockPrisma.parcel.update.mockResolvedValue({
         ...mockParcel,
         status: ParcelStatus.DELIVERED,

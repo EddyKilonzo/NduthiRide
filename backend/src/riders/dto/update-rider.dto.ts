@@ -45,8 +45,38 @@ export class UpdateRiderProfileDto {
   @IsOptional()
   bikeModel?: string;
 
+  @ApiPropertyOptional({ example: 'KBX 123A' })
+  @IsString()
+  @IsOptional()
+  bikeRegistration?: string;
+
+  @ApiPropertyOptional({ example: 'DL123456' })
+  @IsString()
+  @IsOptional()
+  licenseNumber?: string;
+
   @ApiPropertyOptional({ description: 'Cloudinary URL of the profile photo' })
   @IsString()
   @IsOptional()
   avatarUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Cloudinary URL of the license image' })
+  @IsString()
+  @IsOptional()
+  licenseImageUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Cloudinary URL of the ID front image' })
+  @IsString()
+  @IsOptional()
+  idFrontImageUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Cloudinary URL of the ID back image' })
+  @IsString()
+  @IsOptional()
+  idBackImageUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Cloudinary URL of the logbook image' })
+  @IsString()
+  @IsOptional()
+  logbookImageUrl?: string;
 }

@@ -82,4 +82,21 @@ export class RidersController {
   ) {
     return this.ridersService.updateLocation(user.id, dto);
   }
+
+  @Get('me/payouts')
+  @ApiOperation({ summary: 'Get my payout history' })
+  @ApiResponse({ status: 200, description: 'Paginated payout list' })
+  getPayouts(@CurrentUser() user: Account) {
+    return this.ridersService.getPayouts(user.id);
+  }
+
+  @Patch('me/payouts')
+  @ApiOperation({ summary: 'Request a payout' })
+  @ApiResponse({ status: 200, description: 'Payout request created' })
+  requestPayout(
+    @CurrentUser() user: Account,
+    @Body() dto: { amount: number; method: string; details: string },
+  ) {
+    return this.ridersService.requestPayout(user.id, dto.amount, dto.method, dto.details);
+  }
 }

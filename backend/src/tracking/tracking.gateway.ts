@@ -85,6 +85,10 @@ export class TrackingGateway
         await client.join('riders'); // Receives new ride/parcel broadcast requests
       }
 
+      if (payload.role === 'ADMIN') {
+        await client.join('admins');
+      }
+
       this.logger.log(`Connected: ${payload.sub} (${payload.role})`);
     } catch {
       // Invalid JWT — disconnect immediately
@@ -98,6 +102,43 @@ export class TrackingGateway
       connectedClients.delete(data.accountId);
       this.logger.log(`Disconnected: ${data.accountId}`);
     }
+  }
+
+  // ─── Admin → Server events ────────────────────────────────
+
+  /**
+   * Admin joins the live tracking room to see all riders.
+   * Immediately pushes the initial state of all active riders.
+   */
+  @SubscribeMessage('admin:join')
+  async handleAdminJoin(@ConnectedSocket() client: Socket): Promise<void> {
+    const { role } = client.data as { role: string };
+    if (role !== 'ADMIN') return;
+
+    await client.join('admins:live-map');
+    
+    // Initial push of all active/available riders
+    const riders = await this.prisma.rider.findMany({
+      where: {
+        OR: [
+          { isAvailable: true },
+          { ridesAsRider: { some: { status: { in: ['ACCEPTED', 'EN_ROUTE_TO_PICKUP', 'ARRIVED_AT_PICKUP', 'IN_PROGRESS'] } } } },
+          { parcelsAsRider: { some: { status: { in: ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'] } } } }
+        ]
+      },
+      include: { account: { select: { fullName: true } } }
+    });
+
+    const mapData = riders.map(r => ({
+      id: r.id,
+      fullName: r.account.fullName,
+      lat: r.currentLat,
+      lng: r.currentLng,
+      status: r.isAvailable ? 'AVAILABLE' : 'ACTIVE',
+      lastSeen: r.lastSeenAt
+    })).filter(r => r.lat && r.lng);
+
+    client.emit('tracking:all-riders', mapData);
   }
 
   // ─── Rider → Server events ────────────────────────────────
@@ -116,6 +157,10 @@ export class TrackingGateway
   ): Promise<void> {
     const { accountId } = client.data as { accountId: string };
 
+    // Find the rider record
+    const rider = await this.prisma.rider.findUnique({ where: { accountId } });
+    if (!rider) return;
+
     // Persist location + history record
     await this.ridersService.updateLocation(accountId, {
       lat: payload.lat,
@@ -123,10 +168,16 @@ export class TrackingGateway
       speed: payload.speed,
     });
 
-    // Find the user on the active ride with this rider and forward their ETA
-    const rider = await this.prisma.rider.findUnique({ where: { accountId } });
-    if (!rider) return;
+    // Broadcast update to admins watching the live map
+    this.server.to('admins:live-map').emit('tracking:location', {
+      riderId: rider.id,
+      lat: payload.lat,
+      lng: payload.lng,
+      speed: payload.speed,
+      timestamp: new Date().toISOString(),
+    });
 
+    // Find the user on the active ride with this rider and forward their ETA
     const activeRide = await this.prisma.ride.findFirst({
       where: {
         riderId: rider.id,

@@ -106,6 +106,92 @@ export class ChatService {
     }
   }
 
+  /**
+   * Returns all active and recent conversations for a user or rider.
+   * Includes the last message and basic participant info.
+   */
+  async getConversations(accountId: string) {
+    try {
+      const rider = await this.prisma.rider.findUnique({ where: { accountId } });
+      const riderId = rider?.id;
+
+      const conversations = await this.prisma.conversation.findMany({
+        where: {
+          OR: [
+            { ride: { userId: accountId } },
+            { ride: { riderId: riderId || 'NONE' } },
+            { parcel: { userId: accountId } },
+            { parcel: { riderId: riderId || 'NONE' } },
+          ],
+        },
+        include: {
+          messages: {
+            where: { isDeleted: false },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            include: {
+              senderAccount: {
+                select: { fullName: true, avatarUrl: true, role: true },
+              },
+            },
+          },
+          ride: {
+            select: {
+              pickupAddress: true,
+              dropoffAddress: true,
+              user: { select: { fullName: true, avatarUrl: true } },
+              rider: { include: { account: { select: { fullName: true, avatarUrl: true } } } },
+            },
+          },
+          parcel: {
+            select: {
+              itemDescription: true,
+              user: { select: { fullName: true, avatarUrl: true } },
+              rider: { include: { account: { select: { fullName: true, avatarUrl: true } } } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return (conversations as any[]).map((conv) => {
+        const lastMsg = conv.messages[0];
+        const isRiderConv = riderId && (conv.ride?.riderId === riderId || conv.parcel?.riderId === riderId);
+        
+        // Determine the "other party" name and avatar
+        let otherPartyName = 'System';
+        let otherPartyAvatar = null;
+
+        if (isRiderConv) {
+          otherPartyName = conv.ride?.user?.fullName || conv.parcel?.user?.fullName || 'User';
+          otherPartyAvatar = conv.ride?.user?.avatarUrl || conv.parcel?.user?.avatarUrl;
+        } else {
+          otherPartyName = conv.ride?.rider?.account?.fullName || conv.parcel?.rider?.account?.fullName || 'Rider';
+          otherPartyAvatar = conv.ride?.rider?.account?.avatarUrl || conv.parcel?.rider?.account?.avatarUrl;
+        }
+
+        return {
+          id: conv.id,
+          status: conv.status,
+          updatedAt: conv.createdAt, // Fallback to createdAt as updatedAt is missing in schema
+          lastMessage: lastMsg ? {
+            content: lastMsg.content,
+            createdAt: lastMsg.createdAt,
+            senderName: lastMsg.senderAccount?.fullName,
+          } : null,
+          otherPartyName,
+          otherPartyAvatar,
+          context: conv.ride ? `Ride: ${conv.ride.pickupAddress.slice(0, 20)}...` : `Parcel: ${conv.parcel?.itemDescription}`,
+          rideId: conv.rideId,
+          parcelId: conv.parcelId,
+        };
+      });
+    } catch (error) {
+      this.logger.error(`getConversations failed for ${accountId}`, error);
+      throw error;
+    }
+  }
+
   // ─── Messages ─────────────────────────────────────────────
 
   /**

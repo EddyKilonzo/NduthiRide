@@ -20,7 +20,7 @@ import type { Account } from '@prisma/client';
 
 import { ParcelsService } from './parcels.service';
 import { CreateParcelDto } from './dto/create-parcel.dto';
-import { RideQueryDto } from '../rides/dto/ride-query.dto';
+import { ParcelQueryDto } from './dto/parcel-query.dto';
 import { EstimateParcelDto } from './dto/estimate-parcel.dto';
 import { RateParcelDto } from './dto/rate-parcel.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -46,7 +46,7 @@ export class ParcelsController {
   @UseGuards(RolesGuard)
   @Roles(Role.USER)
   @ApiOperation({ summary: 'List my parcel bookings (alias for /my)' })
-  getParcels(@CurrentUser() user: Account, @Query() query: RideQueryDto) {
+  getParcels(@CurrentUser() user: Account, @Query() query: ParcelQueryDto) {
     return this.parcelsService.getUserParcels(user.id, query);
   }
 
@@ -54,17 +54,18 @@ export class ParcelsController {
   @UseGuards(RolesGuard)
   @Roles(Role.USER)
   @ApiOperation({ summary: 'List my parcel bookings' })
-  getMyParcels(@CurrentUser() user: Account, @Query() query: RideQueryDto) {
+  getMyParcels(@CurrentUser() user: Account, @Query() query: ParcelQueryDto) {
     return this.parcelsService.getUserParcels(user.id, query);
   }
 
   @Get('estimate')
   @UseGuards(RolesGuard)
   @Roles(Role.USER)
-  @ApiOperation({ summary: 'Get parcel delivery fee estimate' })
-  getEstimate(@Query() dto: EstimateParcelDto) {
-    return this.parcelsService.calculateEstimate(dto);
+  @ApiOperation({ summary: 'Get delivery fee and distance estimate' })
+  async getEstimate(@Query() dto: EstimateParcelDto) {
+    return await this.parcelsService.calculateEstimate(dto);
   }
+
 
   @Post(':id/rate')
   @UseGuards(RolesGuard)
@@ -87,6 +88,22 @@ export class ParcelsController {
   })
   getActiveParcel(@CurrentUser() user: Account) {
     return this.parcelsService.getRiderActiveParcel(user.id);
+  }
+
+  @Get('rider/history')
+  @UseGuards(RolesGuard)
+  @Roles(Role.RIDER)
+  @ApiOperation({ summary: 'List my assigned parcels (rider only)' })
+  getRiderHistory(@CurrentUser() user: Account, @Query() query: ParcelQueryDto) {
+    return this.parcelsService.getRiderParcels(user.id, query);
+  }
+
+  @Get('nearby')
+  @UseGuards(RolesGuard)
+  @Roles(Role.RIDER)
+  @ApiOperation({ summary: 'List nearby pending parcel requests (rider only)' })
+  getNearbyParcels(@Query() query: ParcelQueryDto) {
+    return this.parcelsService.getNearbyPendingParcels(query);
   }
 
   @Patch(':id/accept')

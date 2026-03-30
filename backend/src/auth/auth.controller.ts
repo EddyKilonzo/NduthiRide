@@ -72,7 +72,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Log in with email and password' })
+  @ApiOperation({ summary: 'Log in with email/phone and password' })
   @ApiResponse({
     status: 200,
     description: 'Login successful — returns token pair',

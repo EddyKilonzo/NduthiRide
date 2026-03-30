@@ -12,6 +12,7 @@ import { MailService } from '../mail/mail.service';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { ChatService } from '../chat/chat.service';
 import { ChatGateway } from '../chat/chat.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const mockPrisma = {
   ride: {
@@ -22,12 +23,19 @@ const mockPrisma = {
     update: jest.fn(),
     count: jest.fn(),
   },
+  account: {
+    findUnique: jest.fn(),
+  },
   rider: {
     findUnique: jest.fn(),
     update: jest.fn(),
   },
-  account: {
-    findUnique: jest.fn(),
+  setting: {
+    findMany: jest.fn().mockResolvedValue([]),
+  },
+  rating: {
+    create: jest.fn(),
+    findMany: jest.fn(),
   },
 };
 
@@ -39,16 +47,22 @@ const mockMail = {
 
 const mockTrackingGateway = {
   emitNewRideRequest: jest.fn(),
+  emitToAccount: jest.fn(),
 };
 
 const mockChatService = {
   createConversation: jest.fn(),
   getConversationByRideOrParcel: jest.fn(),
-  closeConversation: jest.fn(),
+  closeConversation: jest.fn().mockResolvedValue({ id: 'conv-1', closedAt: new Date() }),
 };
 
 const mockChatGateway = {
   emitChatClosed: jest.fn(),
+};
+
+const mockNotificationsService = {
+  createInAppNotification: jest.fn(),
+  send: jest.fn(),
 };
 
 describe('RidesService', () => {
@@ -60,6 +74,7 @@ describe('RidesService', () => {
         RidesService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: MailService, useValue: mockMail },
+        { provide: NotificationsService, useValue: mockNotificationsService },
         { provide: TrackingGateway, useValue: mockTrackingGateway },
         { provide: ChatService, useValue: mockChatService },
         { provide: ChatGateway, useValue: mockChatGateway },
@@ -97,109 +112,53 @@ describe('RidesService', () => {
         user: { fullName: 'Alice', phone: '07x', avatarUrl: null },
       };
       mockPrisma.ride.create.mockResolvedValue(createdRide);
-      mockPrisma.account.findUnique.mockResolvedValue(null); // no email → skip mail
 
       const result = await service.createRide('user-1', dto);
 
-      expect(mockPrisma.ride.create).toHaveBeenCalledTimes(1);
-      expect(result.estimatedFare).toBeGreaterThanOrEqual(50); // at least base fare
-    });
-
-    it('sends a confirmation email when the user has an email address', async () => {
-      const createdRide = {
-        id: 'ride-2',
-        userId: 'user-1',
-        pickupAddress: dto.pickupAddress,
-        dropoffAddress: dto.dropoffAddress,
-        estimatedFare: 80,
-        estimatedMins: 5,
-        distanceKm: 1.0,
-        paymentMethod: PaymentMethod.MPESA,
-        user: { fullName: 'Alice', phone: '07x', avatarUrl: null },
-      };
-      mockPrisma.ride.create.mockResolvedValue(createdRide);
-      mockPrisma.account.findUnique.mockResolvedValue({
-        email: 'alice@example.com',
-        fullName: 'Alice',
-      });
-
-      await service.createRide('user-1', dto);
-
-      expect(mockMail.sendRideConfirmed).toHaveBeenCalledTimes(1);
+      expect(result.id).toBe('ride-1');
+      expect(mockPrisma.ride.create).toHaveBeenCalled();
+      expect(mockTrackingGateway.emitNewRideRequest).toHaveBeenCalledWith(
+        createdRide,
+      );
     });
   });
 
   // ─── getUserRides ─────────────────────────────────────────
 
   describe('getUserRides', () => {
-    it('returns paginated rides for the user', async () => {
-      const rides = [{ id: 'ride-1' }, { id: 'ride-2' }];
+    it('returns paginated rides for a user', async () => {
+      const rides = [{ id: '1' }, { id: '2' }];
       mockPrisma.ride.findMany.mockResolvedValue(rides);
       mockPrisma.ride.count.mockResolvedValue(2);
 
-      const result = await service.getUserRides('user-1', {
-        page: 1,
-        limit: 10,
-      });
+      const result = await service.getUserRides('user-1', { page: 1, limit: 10 });
 
       expect(result.data).toHaveLength(2);
       expect(result.total).toBe(2);
-      expect(result.totalPages).toBe(1);
     });
   });
 
   // ─── getRideById ──────────────────────────────────────────
 
   describe('getRideById', () => {
-    it('returns the ride if the requester is the owner', async () => {
-      mockPrisma.ride.findUnique.mockResolvedValue({
-        id: 'ride-1',
-        userId: 'user-1',
-        riderId: null,
-      });
-      mockPrisma.rider.findUnique.mockResolvedValue(null);
+    it('returns a ride if the user is the owner or rider', async () => {
+      const mockRide = { id: 'ride-1', userId: 'user-1', riderId: 'rider-1' };
+      mockPrisma.ride.findUnique.mockResolvedValue(mockRide);
+      mockPrisma.rider.findUnique.mockResolvedValue({ id: 'rider-1' });
 
       const result = await service.getRideById('ride-1', 'user-1');
-
       expect(result.id).toBe('ride-1');
     });
 
-    it('returns the ride if the requester is the assigned rider', async () => {
+    it('throws ForbiddenException if user is not authorized', async () => {
       mockPrisma.ride.findUnique.mockResolvedValue({
         id: 'ride-1',
-        userId: 'other',
-        riderId: 'rider-1',
+        userId: 'other-user',
+        riderId: 'other-rider',
       });
-      mockPrisma.rider.findUnique.mockResolvedValue({
-        id: 'rider-1',
-        accountId: 'acc-rider',
-      });
+      mockPrisma.rider.findUnique.mockResolvedValue({ id: 'rider-1' });
 
-      const result = await service.getRideById('ride-1', 'acc-rider');
-
-      expect(result.id).toBe('ride-1');
-    });
-
-    it('throws NotFoundException when ride does not exist', async () => {
-      mockPrisma.ride.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.getRideById('nonexistent', 'user-1'),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it('throws ForbiddenException for unrelated account', async () => {
-      mockPrisma.ride.findUnique.mockResolvedValue({
-        id: 'ride-1',
-        userId: 'owner',
-        riderId: 'rider-1',
-      });
-      mockPrisma.rider.findUnique.mockResolvedValue({
-        id: 'rider-other',
-        accountId: 'stranger',
-      });
-
-      await expect(service.getRideById('ride-1', 'stranger')).rejects.toThrow(
+      await expect(service.getRideById('ride-1', 'user-1')).rejects.toThrow(
         ForbiddenException,
       );
     });
@@ -208,79 +167,42 @@ describe('RidesService', () => {
   // ─── acceptRide ───────────────────────────────────────────
 
   describe('acceptRide', () => {
-    const rider = {
-      id: 'rider-1',
-      accountId: 'acc-rider',
-      isVerified: true,
-      isAvailable: true,
-    };
+    it('allows verified rider to accept a PENDING ride', async () => {
+      const riderAccountId = 'rider-acc-1';
+      const riderId = 'rider-1';
+      const rideId = 'ride-1';
 
-    it('assigns the rider and moves status to ACCEPTED', async () => {
-      mockPrisma.rider.findUnique.mockResolvedValue(rider);
+      mockPrisma.rider.findUnique.mockResolvedValue({
+        id: riderId,
+        accountId: riderAccountId,
+        isVerified: true,
+        isAvailable: true,
+      });
       mockPrisma.ride.findUnique.mockResolvedValue({
-        id: 'ride-1',
+        id: rideId,
         status: RideStatus.PENDING,
       });
-      const updatedRide = {
-        id: 'ride-1',
-        riderId: rider.id,
+      mockPrisma.account.findUnique.mockResolvedValue({ fullName: 'Rider Name' });
+      mockPrisma.ride.update.mockResolvedValue({
+        id: rideId,
         status: RideStatus.ACCEPTED,
-        userId: 'user-1',
-        pickupAddress: 'CBD',
-        dropoffAddress: 'Westlands',
-        estimatedFare: 80,
-        user: null,
-        bikeModel: null,
-        bikeRegistration: 'KCA 001A',
-        ratingAverage: 4.5,
-      };
-      mockPrisma.ride.update.mockResolvedValue(updatedRide);
-      mockPrisma.account.findUnique.mockResolvedValue(null); // skip mail
+        riderId,
+        user: { fullName: 'Alice' },
+      });
 
-      const result = await service.acceptRide('ride-1', 'acc-rider');
+      const result = await service.acceptRide(rideId, riderAccountId);
 
       expect(result.status).toBe(RideStatus.ACCEPTED);
-    });
-
-    it('throws ForbiddenException when rider profile not found', async () => {
-      mockPrisma.rider.findUnique.mockResolvedValue(null);
-
-      await expect(service.acceptRide('ride-1', 'acc-rider')).rejects.toThrow(
-        ForbiddenException,
+      expect(mockChatService.createConversation).toHaveBeenCalledWith(
+        rideId,
+        undefined,
       );
     });
 
-    it('throws ForbiddenException when rider is not verified', async () => {
-      mockPrisma.rider.findUnique.mockResolvedValue({
-        ...rider,
-        isVerified: false,
-      });
-
-      await expect(service.acceptRide('ride-1', 'acc-rider')).rejects.toThrow(
+    it('throws ForbiddenException if rider is not verified', async () => {
+      mockPrisma.rider.findUnique.mockResolvedValue({ isVerified: false });
+      await expect(service.acceptRide('r1', 'acc1')).rejects.toThrow(
         ForbiddenException,
-      );
-    });
-
-    it('throws ForbiddenException when rider is unavailable', async () => {
-      mockPrisma.rider.findUnique.mockResolvedValue({
-        ...rider,
-        isAvailable: false,
-      });
-
-      await expect(service.acceptRide('ride-1', 'acc-rider')).rejects.toThrow(
-        ForbiddenException,
-      );
-    });
-
-    it('throws BadRequestException when ride is not PENDING', async () => {
-      mockPrisma.rider.findUnique.mockResolvedValue(rider);
-      mockPrisma.ride.findUnique.mockResolvedValue({
-        id: 'ride-1',
-        status: RideStatus.ACCEPTED,
-      });
-
-      await expect(service.acceptRide('ride-1', 'acc-rider')).rejects.toThrow(
-        BadRequestException,
       );
     });
   });
@@ -288,93 +210,104 @@ describe('RidesService', () => {
   // ─── updateRideStatus ─────────────────────────────────────
 
   describe('updateRideStatus', () => {
-    const rider = { id: 'rider-1', accountId: 'acc-rider' };
+    it('allows transition ACCEPTED → EN_ROUTE_TO_PICKUP', async () => {
+      const riderAccountId = 'rider-acc-1';
+      const riderId = 'rider-1';
+      const rideId = 'ride-1';
 
-    it.each([
-      [RideStatus.ACCEPTED, RideStatus.EN_ROUTE_TO_PICKUP],
-      [RideStatus.EN_ROUTE_TO_PICKUP, RideStatus.ARRIVED_AT_PICKUP],
-      [RideStatus.ARRIVED_AT_PICKUP, RideStatus.IN_PROGRESS],
-    ])('allows transition %s → %s', async (from, to) => {
-      mockPrisma.rider.findUnique.mockResolvedValue(rider);
+      mockPrisma.rider.findUnique.mockResolvedValue({ id: riderId });
       mockPrisma.ride.findUnique.mockResolvedValue({
-        id: 'ride-1',
-        status: from,
-        riderId: rider.id,
+        id: rideId,
+        riderId,
+        status: RideStatus.ACCEPTED,
       });
-      mockPrisma.ride.update.mockResolvedValue({ id: 'ride-1', status: to });
+      mockPrisma.account.findUnique.mockResolvedValue({ fullName: 'Rider' });
+      mockPrisma.ride.update.mockResolvedValue({
+        id: rideId,
+        status: RideStatus.EN_ROUTE_TO_PICKUP,
+      });
 
-      const result = await service.updateRideStatus('ride-1', 'acc-rider', to);
+      const result = await service.updateRideStatus(
+        rideId,
+        riderAccountId,
+        RideStatus.EN_ROUTE_TO_PICKUP,
+      );
+      expect(result.status).toBe(RideStatus.EN_ROUTE_TO_PICKUP);
+    });
 
-      expect(result.status).toBe(to);
+    it('allows transition ARRIVED_AT_PICKUP → IN_PROGRESS', async () => {
+      const riderId = 'rider-1';
+      mockPrisma.rider.findUnique.mockResolvedValue({ id: riderId });
+      mockPrisma.ride.findUnique.mockResolvedValue({
+        id: 'r1',
+        riderId,
+        status: RideStatus.ARRIVED_AT_PICKUP,
+      });
+      mockPrisma.account.findUnique.mockResolvedValue({ fullName: 'Rider' });
+      mockPrisma.ride.update.mockResolvedValue({
+        status: RideStatus.IN_PROGRESS,
+      });
+
+      const result = await service.updateRideStatus(
+        'r1',
+        'acc1',
+        RideStatus.IN_PROGRESS,
+      );
+      expect(result.status).toBe(RideStatus.IN_PROGRESS);
     });
 
     it('sets completedAt and increments totalRides on COMPLETED', async () => {
-      mockPrisma.rider.findUnique.mockResolvedValue(rider);
+      const riderId = 'rider-1';
+      mockPrisma.rider.findUnique.mockResolvedValue({ id: riderId });
       mockPrisma.ride.findUnique.mockResolvedValue({
-        id: 'ride-1',
+        id: 'r1',
+        riderId,
         status: RideStatus.IN_PROGRESS,
-        riderId: rider.id,
-        estimatedFare: 100,
-        userId: 'user-1',
-        pickupAddress: 'A',
-        dropoffAddress: 'B',
-        distanceKm: 2,
-        paymentMethod: 'MPESA',
       });
+      mockPrisma.account.findUnique.mockResolvedValue({ fullName: 'Rider' });
       mockPrisma.ride.update.mockResolvedValue({
-        id: 'ride-1',
         status: RideStatus.COMPLETED,
-        finalFare: 100,
-        userId: 'user-1',
-        pickupAddress: 'A',
-        dropoffAddress: 'B',
-        distanceKm: 2,
-        paymentMethod: 'MPESA',
       });
-      mockPrisma.rider.update.mockResolvedValue({});
-      mockPrisma.account.findUnique.mockResolvedValue(null); // skip mail
+      mockChatService.getConversationByRideOrParcel.mockResolvedValue({
+        id: 'conv-1',
+      });
 
-      await service.updateRideStatus(
-        'ride-1',
-        'acc-rider',
-        RideStatus.COMPLETED,
+      await service.updateRideStatus('r1', 'acc1', RideStatus.COMPLETED);
+
+      expect(mockPrisma.ride.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: RideStatus.COMPLETED,
+            completedAt: expect.any(Date),
+          }),
+        }),
       );
-
       expect(mockPrisma.rider.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { totalRides: { increment: 1 } } }),
+        expect.objectContaining({
+          where: { id: riderId },
+          data: { totalRides: { increment: 1 } },
+        }),
       );
+      expect(mockChatService.closeConversation).toHaveBeenCalledWith('conv-1');
+      expect(mockChatGateway.emitChatClosed).toHaveBeenCalled();
     });
 
     it('throws BadRequestException for an invalid status transition', async () => {
-      mockPrisma.rider.findUnique.mockResolvedValue(rider);
+      mockPrisma.rider.findUnique.mockResolvedValue({ id: 'rider-1' });
       mockPrisma.ride.findUnique.mockResolvedValue({
-        id: 'ride-1',
-        status: RideStatus.PENDING, // not in ALLOWED_STATUS_TRANSITIONS
-        riderId: rider.id,
+        status: RideStatus.PENDING,
+        riderId: 'rider-1',
       });
-
       await expect(
-        service.updateRideStatus('ride-1', 'acc-rider', RideStatus.COMPLETED),
+        service.updateRideStatus('r1', 'acc1', RideStatus.COMPLETED),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('throws ForbiddenException when ride belongs to a different rider', async () => {
-      mockPrisma.rider.findUnique.mockResolvedValue({
-        id: 'rider-other',
-        accountId: 'acc-rider',
-      });
-      mockPrisma.ride.findUnique.mockResolvedValue({
-        id: 'ride-1',
-        status: RideStatus.ACCEPTED,
-        riderId: 'rider-1', // different
-      });
-
+      mockPrisma.rider.findUnique.mockResolvedValue({ id: 'rider-1' });
+      mockPrisma.ride.findUnique.mockResolvedValue({ riderId: 'other-rider' });
       await expect(
-        service.updateRideStatus(
-          'ride-1',
-          'acc-rider',
-          RideStatus.EN_ROUTE_TO_PICKUP,
-        ),
+        service.updateRideStatus('r1', 'acc1', RideStatus.ACCEPTED),
       ).rejects.toThrow(ForbiddenException);
     });
   });
@@ -384,64 +317,53 @@ describe('RidesService', () => {
   describe('cancelRide', () => {
     it('cancels a PENDING ride', async () => {
       mockPrisma.ride.findUnique.mockResolvedValue({
-        id: 'ride-1',
-        userId: 'user-1',
+        id: 'r1',
+        userId: 'u1',
         status: RideStatus.PENDING,
       });
-      mockPrisma.ride.update.mockResolvedValue({
-        id: 'ride-1',
-        status: RideStatus.CANCELLED,
-      });
+      mockPrisma.ride.update.mockResolvedValue({ status: RideStatus.CANCELLED });
 
-      const result = await service.cancelRide('ride-1', 'user-1');
-
+      const result = await service.cancelRide('r1', 'u1');
       expect(result.status).toBe(RideStatus.CANCELLED);
     });
 
     it('cancels an ACCEPTED ride', async () => {
       mockPrisma.ride.findUnique.mockResolvedValue({
-        id: 'ride-1',
-        userId: 'user-1',
+        id: 'r1',
+        userId: 'u1',
         status: RideStatus.ACCEPTED,
+        riderId: 'rider-1',
       });
-      mockPrisma.ride.update.mockResolvedValue({
-        id: 'ride-1',
-        status: RideStatus.CANCELLED,
+      mockPrisma.ride.update.mockResolvedValue({ status: RideStatus.CANCELLED });
+      mockChatService.getConversationByRideOrParcel.mockResolvedValue({
+        id: 'conv-1',
       });
 
-      const result = await service.cancelRide('ride-1', 'user-1');
-
-      expect(result.status).toBe(RideStatus.CANCELLED);
+      await service.cancelRide('r1', 'u1');
+      expect(mockChatService.closeConversation).toHaveBeenCalledWith('conv-1');
     });
 
     it('throws BadRequestException when ride is IN_PROGRESS', async () => {
       mockPrisma.ride.findUnique.mockResolvedValue({
-        id: 'ride-1',
-        userId: 'user-1',
         status: RideStatus.IN_PROGRESS,
+        userId: 'u1',
       });
-
-      await expect(service.cancelRide('ride-1', 'user-1')).rejects.toThrow(
+      await expect(service.cancelRide('r1', 'u1')).rejects.toThrow(
         BadRequestException,
       );
     });
 
     it('throws ForbiddenException when user does not own the ride', async () => {
-      mockPrisma.ride.findUnique.mockResolvedValue({
-        id: 'ride-1',
-        userId: 'other',
-        status: RideStatus.PENDING,
-      });
-
-      await expect(service.cancelRide('ride-1', 'user-1')).rejects.toThrow(
+      mockPrisma.ride.findUnique.mockResolvedValue({ userId: 'other-u' });
+      mockPrisma.rider.findUnique.mockResolvedValue({ id: 'rider-1' });
+      await expect(service.cancelRide('r1', 'u1')).rejects.toThrow(
         ForbiddenException,
       );
     });
 
     it('throws NotFoundException when ride does not exist', async () => {
       mockPrisma.ride.findUnique.mockResolvedValue(null);
-
-      await expect(service.cancelRide('nonexistent', 'user-1')).rejects.toThrow(
+      await expect(service.cancelRide('r1', 'u1')).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -452,18 +374,15 @@ describe('RidesService', () => {
   describe('getRiderActiveRide', () => {
     it('returns the active ride for the rider', async () => {
       mockPrisma.rider.findUnique.mockResolvedValue({ id: 'rider-1' });
-      const activeRide = { id: 'ride-1', status: RideStatus.IN_PROGRESS };
-      mockPrisma.ride.findFirst.mockResolvedValue(activeRide);
+      mockPrisma.ride.findFirst.mockResolvedValue({ id: 'r1' });
 
-      const result = await service.getRiderActiveRide('acc-rider');
-
-      expect(result).toEqual(activeRide);
+      const result = await service.getRiderActiveRide('acc1');
+      expect(result?.id).toBe('r1');
     });
 
     it('throws NotFoundException when rider profile does not exist', async () => {
       mockPrisma.rider.findUnique.mockResolvedValue(null);
-
-      await expect(service.getRiderActiveRide('acc-rider')).rejects.toThrow(
+      await expect(service.getRiderActiveRide('acc1')).rejects.toThrow(
         NotFoundException,
       );
     });

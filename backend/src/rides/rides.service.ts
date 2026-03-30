@@ -10,6 +10,7 @@ import {
 import { RideStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateRideDto } from './dto/create-ride.dto';
 import { RideQueryDto } from './dto/ride-query.dto';
 import { EstimateRideDto } from './dto/estimate-ride.dto';
@@ -18,6 +19,7 @@ import { TrackingGateway } from '../tracking/tracking.gateway';
 import { ChatService } from '../chat/chat.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { haversineKm } from '../common/utils/geo';
+import { MapService } from '../map/map.service';
 
 // Base fare in KES (Kenyan Shillings)
 const BASE_FARE_KES = 50;
@@ -39,8 +41,10 @@ export class RidesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly notificationsService: NotificationsService,
     private readonly trackingGateway: TrackingGateway,
     private readonly chatService: ChatService,
+    private readonly mapService: MapService,
     @Inject(forwardRef(() => ChatGateway))
     private readonly chatGateway: ChatGateway,
   ) {}
@@ -49,25 +53,62 @@ export class RidesService {
 
   /**
    * Calculates a fare and time estimate based on coordinates.
+   * Uses real routing via OSRM and rates from the settings table.
    */
-  calculateEstimate(dto: EstimateRideDto) {
-    const distanceKm = haversineKm(
-      dto.pickupLat,
-      dto.pickupLng,
-      dto.dropoffLat,
-      dto.dropoffLng,
-    );
+  async calculateEstimate(dto: EstimateRideDto) {
+    // 1. Get rates from settings (fallback to constants)
+    const settings = await this.prisma.setting.findMany();
+    const minFareVal = settings.find((s) => s.key === 'MIN_FARE')?.value;
+    const perKmRateVal = settings.find((s) => s.key === 'PER_KM_RATE')?.value;
 
-    const estimatedFare = Math.round(
-      BASE_FARE_KES + distanceKm * PER_KM_RATE_KES,
-    );
-    const estimatedMins = Math.round((distanceKm / AVG_SPEED_KPH) * 60);
+    const baseFare = minFareVal ? parseFloat(minFareVal) : BASE_FARE_KES;
+    const perKmRate = perKmRateVal ? parseFloat(perKmRateVal) : PER_KM_RATE_KES;
 
-    return {
-      distanceKm: parseFloat(distanceKm.toFixed(2)),
-      estimatedFare,
-      estimatedMins,
-    };
+    try {
+      // 2. Try real routing via MapService (OSRM Public API)
+      const route = await this.mapService.getDirections(
+        { lat: dto.pickupLat, lng: dto.pickupLng },
+        { lat: dto.dropoffLat, lng: dto.dropoffLng },
+      );
+
+      // Price = base + (distance * per_km) — capped at MIN_FARE
+      const estimatedFare = Math.max(
+        baseFare,
+        Math.round(baseFare + route.distanceKm * perKmRate),
+      );
+
+      return {
+        distanceKm: route.distanceKm,
+        estimatedFare,
+        estimatedMins: route.durationMins,
+        baseFare,
+        perKmRate,
+      };
+    } catch (error) {
+      this.logger.warn(`Routing estimate failed, falling back to Haversine: ${error.message}`);
+      
+      // 3. Fallback to Haversine straight-line distance
+      const distanceKm = haversineKm(
+        dto.pickupLat,
+        dto.pickupLng,
+        dto.dropoffLat,
+        dto.dropoffLng,
+      );
+
+      const estimatedFare = Math.max(
+        baseFare,
+        Math.round(baseFare + distanceKm * perKmRate),
+      );
+      const estimatedMins = Math.round((distanceKm / AVG_SPEED_KPH) * 60);
+
+      return {
+        distanceKm: parseFloat(distanceKm.toFixed(2)),
+        estimatedFare,
+        estimatedMins,
+        baseFare,
+        perKmRate,
+      };
+    }
   }
 
   /**
@@ -76,7 +117,7 @@ export class RidesService {
    */
   async createRide(userId: string, dto: CreateRideDto) {
     try {
-      const estimate = this.calculateEstimate(dto);
+      const estimate = await this.calculateEstimate(dto);
 
       const ride = await this.prisma.ride.create({
         data: {
@@ -173,6 +214,103 @@ export class RidesService {
       };
     } catch (error) {
       this.logger.error(`getUserRides failed for user ${userId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Returns paginated completed/filtered rides assigned to the authenticated rider.
+   */
+  async getRiderRides(accountId: string, query: RideQueryDto) {
+    try {
+      const rider = await this.prisma.rider.findUnique({ where: { accountId } });
+      if (!rider) throw new NotFoundException('Rider profile not found');
+
+      const skip = (query.page - 1) * query.limit;
+      const where = {
+        riderId: rider.id,
+        ...(query.status && { status: query.status }),
+      };
+
+      const [rides, total] = await Promise.all([
+        this.prisma.ride.findMany({
+          where,
+          skip,
+          take: query.limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: { select: { fullName: true, avatarUrl: true, phone: true } },
+            payment: { select: { status: true, amount: true } },
+            rating: { select: { score: true } },
+          },
+        }),
+        this.prisma.ride.count({ where }),
+      ]);
+
+      return {
+        data: rides,
+        total,
+        page: query.page,
+        totalPages: Math.ceil(total / query.limit),
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      this.logger.error(`getRiderRides failed for account ${accountId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Returns a list of all PENDING ride requests within a given radius (km).
+   * Used by riders to browse nearby work.
+   */
+  async getNearbyPendingRides(query: RideQueryDto) {
+    const { lat, lng, radiusKm = 500, limit = 20 } = query;
+    
+    if (lat === undefined || lng === undefined) {
+      // If no location provided, just return most recent pending rides
+      return this.prisma.ride.findMany({
+        where: { status: RideStatus.PENDING },
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { fullName: true, avatarUrl: true } },
+        },
+      });
+    }
+
+    try {
+      // 1 degree ≈ 111 km
+      const delta = radiusKm / 111;
+
+      const rides = await this.prisma.ride.findMany({
+        where: {
+          status: RideStatus.PENDING,
+          pickupLat: { gte: lat - delta, lte: lat + delta },
+          pickupLng: { gte: lng - delta, lte: lng + delta },
+        },
+        take: limit * 2, // Take more for manual Haversine filtering
+        include: {
+          user: { select: { fullName: true, avatarUrl: true } },
+        },
+      });
+
+      // Precise Haversine distance filtering
+      return rides
+        .map((ride) => ({
+          ...ride,
+          distanceFromRiderKm: haversineKm(
+            lat,
+            lng,
+            ride.pickupLat,
+            ride.pickupLng,
+          ),
+        }))
+        .filter((r) => r.distanceFromRiderKm <= radiusKm)
+        .sort((a, b) => a.distanceFromRiderKm - b.distanceFromRiderKm)
+        .slice(0, limit);
+    } catch (error) {
+      this.logger.error('getNearbyPendingRides failed', error);
       throw error;
     }
   }
@@ -284,6 +422,14 @@ export class RidesService {
         });
       }
 
+      // Add in-app notification
+      await this.sendRideNotification(
+        updated.userId,
+        'Rider Assigned',
+        `${riderAccount?.fullName ?? 'Your rider'} has accepted your ride request and is on the way!`,
+        rideId,
+      );
+
       return updated;
     } catch (error) {
       if (
@@ -328,6 +474,16 @@ export class RidesService {
       if (newStatus === RideStatus.COMPLETED) {
         data.completedAt = new Date();
         data.finalFare = ride.estimatedFare; // Payment service will confirm actual fare
+
+        // Calculate commission
+        const settings = await this.prisma.setting.findMany({ where: { key: 'COMMISSION_PERCENTAGE' } });
+        const commissionPct = settings.length > 0 ? parseFloat(settings[0].value) : 15; // Default 15%
+        const finalFare = ride.estimatedFare;
+        const commissionAmount = (commissionPct / 100) * finalFare;
+        const riderEarnings = finalFare - commissionAmount;
+
+        data.commissionAmount = commissionAmount;
+        data.riderEarnings = riderEarnings;
       }
 
       const updated = await this.prisma.ride.update({
@@ -335,11 +491,14 @@ export class RidesService {
         data,
       });
 
-      // Update rider's total rides count on completion
+      // Update rider's total rides count and earnings on completion
       if (newStatus === RideStatus.COMPLETED) {
         await this.prisma.rider.update({
           where: { id: rider.id },
-          data: { totalRides: { increment: 1 } },
+          data: { 
+            totalRides: { increment: 1 },
+            totalEarnings: { increment: updated.riderEarnings || 0 }
+          },
         });
 
         // Close the chat conversation
@@ -354,6 +513,30 @@ export class RidesService {
       }
 
       this.logger.log(`Ride ${rideId} status → ${newStatus}`);
+
+      // In-app notifications for status updates
+      if (newStatus === RideStatus.ARRIVED_AT_PICKUP) {
+        await this.sendRideNotification(
+          updated.userId,
+          'Rider Arrived',
+          'Your rider has arrived at the pickup location.',
+          rideId,
+        );
+      } else if (newStatus === RideStatus.IN_PROGRESS) {
+        await this.sendRideNotification(
+          updated.userId,
+          'Ride Started',
+          'Your ride has started. Enjoy the trip!',
+          rideId,
+        );
+      } else if (newStatus === RideStatus.COMPLETED) {
+        await this.sendRideNotification(
+          updated.userId,
+          'Ride Completed',
+          `Your trip is finished. Total fare: KES ${updated.finalFare}`,
+          rideId,
+        );
+      }
 
       // Send receipt email on completion
       if (newStatus === RideStatus.COMPLETED) {
@@ -540,6 +723,28 @@ export class RidesService {
         throw error;
       this.logger.error(`rateRide failed: ${rideId}`, error);
       throw error;
+    }
+  }
+
+  private async sendRideNotification(
+    accountId: string,
+    title: string,
+    body: string,
+    rideId: string,
+  ) {
+    try {
+      await this.notificationsService.createInAppNotification(
+        accountId,
+        title,
+        body,
+        'RIDE_UPDATE',
+        { rideId },
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send ride notification to ${accountId}`,
+        error,
+      );
     }
   }
 }

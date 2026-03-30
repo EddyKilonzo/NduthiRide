@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { Role, RideStatus, ParcelStatus, PaymentStatus } from '@prisma/client';
 
 /** Reusable pagination + search query used across most admin list endpoints */
@@ -40,6 +40,17 @@ export class ListAccountsDto extends PaginationDto {
 
   @ApiPropertyOptional({ description: 'Filter by active/inactive status' })
   @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => {
+    // Query params arrive as strings (e.g. "false"), so convert explicitly.
+    if (value === true || value === false) return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true') return true;
+      if (normalized === 'false') return false;
+    }
+    return value;
+  })
   isActive?: boolean;
 }
 
@@ -62,4 +73,9 @@ export class ListPaymentsDto extends PaginationDto {
   @IsEnum(PaymentStatus)
   @IsOptional()
   status?: PaymentStatus;
+
+  @ApiPropertyOptional({ enum: ['MPESA', 'CASH'] })
+  @IsEnum(['MPESA', 'CASH'])
+  @IsOptional()
+  method?: 'MPESA' | 'CASH';
 }

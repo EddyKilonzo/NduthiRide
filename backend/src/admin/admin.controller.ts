@@ -123,4 +123,67 @@ export class AdminController {
   listPayments(@Query() query: ListPaymentsDto) {
     return this.adminService.listPayments(query);
   }
+
+  // ─── Settings ───────────────────────────────────────────
+
+  @Get('settings')
+  @ApiOperation({ summary: 'List all platform settings' })
+  @ApiResponse({ status: 200, description: 'Returns all settings' })
+  getSettings() {
+    return this.adminService.getSettings();
+  }
+
+  @Patch('settings')
+  @ApiOperation({ summary: 'Update platform settings' })
+  @ApiResponse({ status: 200, description: 'Settings updated' })
+  updateSettings(@Body() dto: Record<string, string>) {
+    return this.adminService.updateSettings(dto);
+  }
+
+  // ─── Payouts ───────────────────────────────────────────
+
+  @Get('payouts')
+  @ApiOperation({ summary: 'List all payout requests' })
+  @ApiResponse({ status: 200, description: 'Paginated list of payouts' })
+  listPayouts(@Query('page') page?: number, @Query('limit') limit?: number) {
+    return this.adminService.listPayouts(page, limit);
+  }
+
+  @Patch('payouts/:id')
+  @ApiOperation({ summary: 'Update payout status' })
+  @ApiResponse({ status: 200, description: 'Payout updated' })
+  updatePayoutStatus(
+    @Param('id') id: string,
+    @Body() dto: { status: string; reference?: string },
+  ) {
+    return this.adminService.updatePayoutStatus(id, dto);
+  }
+
+  // ─── Support ───────────────────────────────────────────
+
+  @Get('support/tickets')
+  @ApiOperation({ summary: 'List all support tickets' })
+  @ApiResponse({ status: 200, description: 'Paginated list of tickets' })
+  listTickets(@Query('page') page?: number, @Query('limit') limit?: number) {
+    return this.adminService.listSupportTickets(page, limit);
+  }
+
+  @Patch('support/tickets/:id')
+  @ApiOperation({ summary: 'Update support ticket status' })
+  @ApiResponse({ status: 200, description: 'Ticket updated' })
+  updateTicketStatus(
+    @Param('id') id: string,
+    @Body() dto: { status: string },
+  ) {
+    return this.adminService.updateTicketStatus(id, dto);
+  }
+
+  // ─── Audit Logs ────────────────────────────────────────
+
+  @Get('audit-logs')
+  @ApiOperation({ summary: 'List all payment audit logs' })
+  @ApiResponse({ status: 200, description: 'Paginated list of audit logs' })
+  listAuditLogs(@Query('page') page?: number, @Query('limit') limit?: number) {
+    return this.adminService.listAuditLogs(page, limit);
+  }
 }

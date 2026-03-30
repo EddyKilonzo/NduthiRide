@@ -31,6 +31,13 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
+  @Get('conversations')
+  @ApiOperation({ summary: 'List all conversations for the current user' })
+  getConversations(@CurrentUser() user: Account) {
+    return this.chatService.getConversations(user.id);
+  }
+
+
   @Get('conversation/ride/:rideId')
   @ApiOperation({
     summary: 'Get conversation for a ride (with last 30 messages)',

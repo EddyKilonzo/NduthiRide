@@ -66,8 +66,8 @@ export class RidesController {
   @UseGuards(RolesGuard)
   @Roles(Role.USER)
   @ApiOperation({ summary: 'Get fare and time estimate' })
-  getEstimate(@Query() dto: EstimateRideDto) {
-    return this.ridesService.calculateEstimate(dto);
+  async getEstimate(@Query() dto: EstimateRideDto) {
+    return await this.ridesService.calculateEstimate(dto);
   }
 
   @Patch(':id/cancel')
@@ -104,6 +104,22 @@ export class RidesController {
   @ApiOperation({ summary: 'Get my currently active ride (rider only)' })
   getActiveRide(@CurrentUser() user: Account) {
     return this.ridesService.getRiderActiveRide(user.id);
+  }
+
+  @Get('rider/history')
+  @UseGuards(RolesGuard)
+  @Roles(Role.RIDER)
+  @ApiOperation({ summary: 'List my assigned rides (rider only)' })
+  getRiderHistory(@CurrentUser() user: Account, @Query() query: RideQueryDto) {
+    return this.ridesService.getRiderRides(user.id, query);
+  }
+
+  @Get('nearby')
+  @UseGuards(RolesGuard)
+  @Roles(Role.RIDER)
+  @ApiOperation({ summary: 'List nearby pending ride requests (rider only)' })
+  getNearbyRides(@Query() query: RideQueryDto) {
+    return this.ridesService.getNearbyPendingRides(query);
   }
 
   @Patch(':id/accept')

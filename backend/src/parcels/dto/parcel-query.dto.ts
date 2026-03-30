@@ -1,9 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { RideStatus } from '@prisma/client';
+import { ParcelStatus } from '@prisma/client';
 
-export class RideQueryDto {
+export class ParcelQueryDto {
   @ApiPropertyOptional({ example: 1 })
   @IsInt()
   @Min(1)
@@ -19,10 +19,10 @@ export class RideQueryDto {
   @Type(() => Number)
   limit: number = 10;
 
-  @ApiPropertyOptional({ enum: RideStatus })
-  @IsEnum(RideStatus)
+  @ApiPropertyOptional({ enum: ParcelStatus })
+  @IsEnum(ParcelStatus)
   @IsOptional()
-  status?: RideStatus;
+  status?: ParcelStatus;
 
   @ApiPropertyOptional({ example: -1.2921 })
   @IsOptional()

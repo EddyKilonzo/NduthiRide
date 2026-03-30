@@ -10,6 +10,7 @@ import {
   SetAccountStatusDto,
   SetRiderVerificationDto,
 } from './dto/admin-action.dto';
+import { SupportService } from '../support/support.service';
 
 /** Generic paginated result wrapper */
 export interface PaginatedResult<T> {
@@ -24,7 +25,10 @@ export interface PaginatedResult<T> {
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly supportService: SupportService,
+  ) {}
 
   // ─── Dashboard ────────────────────────────────────────────
 
@@ -45,6 +49,7 @@ export class AdminService {
         totalParcels,
         completedParcels,
         totalRevenue,
+        suspiciousCount,
       ] = await Promise.all([
         this.prisma.account.count({ where: { role: 'USER' } }),
         this.prisma.account.count({ where: { role: 'RIDER' } }),
@@ -71,6 +76,12 @@ export class AdminService {
           _sum: { amount: true },
           where: { status: 'COMPLETED' },
         }),
+        this.prisma.paymentAudit.count({
+          where: {
+            action: 'PAYMENT_FAILED',
+            createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          },
+        }),
       ]);
 
       return {
@@ -84,6 +95,7 @@ export class AdminService {
         totalParcels,
         completedParcels,
         totalRevenue: totalRevenue._sum.amount ?? 0,
+        suspiciousCount,
       };
     } catch (error) {
       this.logger.error('getDashboardStats failed', error);
@@ -130,13 +142,20 @@ export class AdminService {
             isActive: true,
             avatarUrl: true,
             createdAt: true,
-            // Include rider status if applicable
+            // Include rider details if applicable
             rider: {
               select: {
                 isVerified: true,
                 isAvailable: true,
                 ratingAverage: true,
                 totalRides: true,
+                licenseNumber: true,
+                bikeRegistration: true,
+                bikeModel: true,
+                licenseImageUrl: true,
+                idFrontImageUrl: true,
+                idBackImageUrl: true,
+                logbookImageUrl: true,
               },
             },
           },
@@ -168,7 +187,25 @@ export class AdminService {
           avatarUrl: true,
           createdAt: true,
           updatedAt: true,
-          rider: true,
+          rider: {
+            select: {
+              isVerified: true,
+              isAvailable: true,
+              ratingAverage: true,
+              totalRides: true,
+              licenseNumber: true,
+              bikeRegistration: true,
+              bikeModel: true,
+              licenseImageUrl: true,
+              idFrontImageUrl: true,
+              idBackImageUrl: true,
+              logbookImageUrl: true,
+              currentLat: true,
+              currentLng: true,
+              lastSeenAt: true,
+              totalEarnings: true,
+            },
+          },
           _count: {
             select: { rides: true, parcels: true, ratings: true },
           },
@@ -376,6 +413,7 @@ export class AdminService {
 
       const where = {
         ...(dto.status && { status: dto.status }),
+        ...(dto.method && { method: dto.method }),
       };
 
       const [payments, total] = await Promise.all([
@@ -409,6 +447,78 @@ export class AdminService {
       this.logger.error('listPayments failed', error);
       throw error;
     }
+  }
+
+  // ─── Settings ───────────────────────────────────────────
+
+  async getSettings(): Promise<Record<string, string>> {
+    const settings = await this.prisma.setting.findMany();
+    return settings.reduce((acc, s) => ({ ...acc, [s.key]: s.value }), {});
+  }
+
+  async updateSettings(dto: Record<string, string>): Promise<void> {
+    const operations = Object.entries(dto).map(([key, value]) =>
+      this.prisma.setting.upsert({
+        where: { key },
+        update: { value },
+        create: { key, value },
+      }),
+    );
+    await Promise.all(operations);
+  }
+
+  // ─── Payouts ────────────────────────────────────────────
+
+  async listPayouts(page = 1, limit = 20): Promise<PaginatedResult<unknown>> {
+    const skip = (page - 1) * limit;
+    const [payouts, total] = await Promise.all([
+      this.prisma.payout.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          rider: { include: { account: { select: { fullName: true, phone: true } } } },
+        },
+      }),
+      this.prisma.payout.count(),
+    ]);
+    return this.paginate(payouts, total, page, limit);
+  }
+
+  async updatePayoutStatus(id: string, dto: { status: string; reference?: string }): Promise<unknown> {
+    return this.prisma.payout.update({
+      where: { id },
+      data: {
+        status: dto.status,
+        reference: dto.reference,
+        processedAt: dto.status === 'COMPLETED' ? new Date() : undefined,
+      },
+    });
+  }
+
+  // ─── Support ────────────────────────────────────────────
+
+  async listSupportTickets(page = 1, limit = 20): Promise<PaginatedResult<unknown>> {
+    return this.supportService.listAllTickets(page, limit) as any;
+  }
+
+  async updateTicketStatus(id: string, dto: { status: string }): Promise<unknown> {
+    return this.supportService.updateTicketStatus(id, dto.status);
+  }
+
+  // ─── Audit Logs ─────────────────────────────────────────
+
+  async listAuditLogs(page = 1, limit = 20): Promise<PaginatedResult<unknown>> {
+    const skip = (page - 1) * limit;
+    const [logs, total] = await Promise.all([
+      this.prisma.paymentAudit.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.paymentAudit.count(),
+    ]);
+    return this.paginate(logs, total, page, limit);
   }
 
   // ─── Helpers ──────────────────────────────────────────────

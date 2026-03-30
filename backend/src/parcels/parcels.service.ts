@@ -10,14 +10,17 @@ import {
 import { ParcelStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateParcelDto } from './dto/create-parcel.dto';
-import { RideQueryDto } from '../rides/dto/ride-query.dto';
+import { ParcelQueryDto } from './dto/parcel-query.dto';
 import { EstimateParcelDto } from './dto/estimate-parcel.dto';
 import { RateParcelDto } from './dto/rate-parcel.dto';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { ChatService } from '../chat/chat.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { haversineKm } from '../common/utils/geo';
+import { haversineKm } from '../common/utils/geo';
+import { MapService } from '../map/map.service';
 
 // Delivery fee: base + per-km rate + weight surcharge per kg over 1kg
 const BASE_FEE = 80;
@@ -37,32 +40,70 @@ export class ParcelsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly notificationsService: NotificationsService,
     private readonly trackingGateway: TrackingGateway,
     private readonly chatService: ChatService,
+    private readonly mapService: MapService,
     @Inject(forwardRef(() => ChatGateway))
     private readonly chatGateway: ChatGateway,
   ) {}
 
   /**
    * Calculates a delivery fee estimate based on coordinates and weight.
+   * Uses real routing via OSRM and rates from settings.
    */
-  calculateEstimate(dto: EstimateParcelDto) {
-    const distanceKm = haversineKm(
-      dto.pickupLat,
-      dto.pickupLng,
-      dto.dropoffLat,
-      dto.dropoffLng,
-    );
+  async calculateEstimate(dto: EstimateParcelDto) {
+    // 1. Get rates from settings (fallback to constants)
+    const settings = await this.prisma.setting.findMany();
+    const minFeeVal = settings.find((s) => s.key === 'PARCEL_BASE_FEE')?.value;
+    const perKmVal = settings.find((s) => s.key === 'PARCEL_PER_KM')?.value;
+
+    const baseFee = minFeeVal ? parseFloat(minFeeVal) : BASE_FEE;
+    const perKmRate = perKmVal ? parseFloat(perKmVal) : PER_KM_RATE;
+
     const weightSurcharge =
       Math.max(0, dto.weightKg - 1) * WEIGHT_SURCHARGE_PER_KG;
-    const deliveryFee = Math.round(
-      BASE_FEE + distanceKm * PER_KM_RATE + weightSurcharge,
-    );
 
-    return {
-      distanceKm: parseFloat(distanceKm.toFixed(2)),
-      deliveryFee,
-    };
+    try {
+      // 2. Try real routing
+      const route = await this.mapService.getDirections(
+        { lat: dto.pickupLat, lng: dto.pickupLng },
+        { lat: dto.dropoffLat, lng: dto.dropoffLng },
+      );
+
+      const deliveryFee = Math.round(
+        baseFee + route.distanceKm * perKmRate + weightSurcharge,
+      );
+
+      return {
+        distanceKm: route.distanceKm,
+        deliveryFee,
+        baseFee,
+        perKmRate,
+        weightSurcharge,
+      };
+    } catch (error) {
+      this.logger.warn(`Routing failed for parcel, using Haversine: ${error.message}`);
+      
+      const distanceKm = haversineKm(
+        dto.pickupLat,
+        dto.pickupLng,
+        dto.dropoffLat,
+        dto.dropoffLng,
+      );
+      
+      const deliveryFee = Math.round(
+        baseFee + distanceKm * perKmRate + weightSurcharge,
+      );
+
+      return {
+        distanceKm: parseFloat(distanceKm.toFixed(2)),
+        deliveryFee,
+        baseFee,
+        perKmRate,
+        weightSurcharge,
+      };
+    }
   }
 
   /**
@@ -71,7 +112,7 @@ export class ParcelsService {
    */
   async createParcel(userId: string, dto: CreateParcelDto) {
     try {
-      const estimate = this.calculateEstimate(dto);
+      const estimate = await this.calculateEstimate(dto);
 
       const parcel = await this.prisma.parcel.create({
         data: {
@@ -113,10 +154,11 @@ export class ParcelsService {
   /**
    * Paginated list of parcels for the authenticated user.
    */
-  async getUserParcels(userId: string, query: RideQueryDto) {
+  async getUserParcels(userId: string, query: ParcelQueryDto) {
     try {
       const skip = (query.page - 1) * query.limit;
-      const where = { userId };
+      const where: any = { userId };
+      if (query.status) where.status = query.status;
 
       const [parcels, total] = await Promise.all([
         this.prisma.parcel.findMany({
@@ -147,6 +189,101 @@ export class ParcelsService {
       };
     } catch (error) {
       this.logger.error(`getUserParcels failed for ${userId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Paginated list of parcels assigned to the authenticated rider.
+   */
+  async getRiderParcels(accountId: string, query: ParcelQueryDto) {
+    try {
+      const rider = await this.prisma.rider.findUnique({ where: { accountId } });
+      if (!rider) throw new NotFoundException('Rider profile not found');
+
+      const skip = (query.page - 1) * query.limit;
+      const where: any = { riderId: rider.id };
+      if (query.status) where.status = query.status;
+
+      const [parcels, total] = await Promise.all([
+        this.prisma.parcel.findMany({
+          where,
+          skip,
+          take: query.limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: { select: { fullName: true, avatarUrl: true, phone: true } },
+            payment: { select: { status: true, amount: true } },
+            rating: { select: { score: true } },
+          },
+        }),
+        this.prisma.parcel.count({ where }),
+      ]);
+
+      return {
+        data: parcels,
+        total,
+        page: query.page,
+        totalPages: Math.ceil(total / query.limit),
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      this.logger.error(`getRiderParcels failed for ${accountId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Returns a list of all PENDING parcel requests within a given radius (km).
+   * Used by riders to browse nearby work.
+   */
+  async getNearbyPendingParcels(query: ParcelQueryDto) {
+    const { lat, lng, radiusKm = 500, limit = 20 } = query;
+
+    if (lat === undefined || lng === undefined) {
+      // If no location provided, just return most recent pending parcels
+      return this.prisma.parcel.findMany({
+        where: { status: ParcelStatus.PENDING },
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { fullName: true, avatarUrl: true } },
+        },
+      });
+    }
+
+    try {
+      // 1 degree ≈ 111 km
+      const delta = radiusKm / 111;
+
+      const parcels = await this.prisma.parcel.findMany({
+        where: {
+          status: ParcelStatus.PENDING,
+          pickupLat: { gte: lat - delta, lte: lat + delta },
+          pickupLng: { gte: lng - delta, lte: lng + delta },
+        },
+        take: limit * 2, // Take more for manual Haversine filtering
+        include: {
+          user: { select: { fullName: true, avatarUrl: true } },
+        },
+      });
+
+      // Precise Haversine distance filtering
+      return parcels
+        .map((parcel) => ({
+          ...parcel,
+          distanceFromRiderKm: haversineKm(
+            lat,
+            lng,
+            parcel.pickupLat,
+            parcel.pickupLng,
+          ),
+        }))
+        .filter((p) => p.distanceFromRiderKm <= radiusKm)
+        .sort((a, b) => a.distanceFromRiderKm - b.distanceFromRiderKm)
+        .slice(0, limit);
+    } catch (error) {
+      this.logger.error('getNearbyPendingParcels failed', error);
       throw error;
     }
   }
@@ -226,6 +363,18 @@ export class ParcelsService {
       // Create a chat conversation for the parcel
       await this.chatService.createConversation(undefined, parcelId);
 
+      // In-app notification
+      const riderAccount = await this.prisma.account.findUnique({
+        where: { id: accountId },
+        select: { fullName: true },
+      });
+      await this.sendParcelNotification(
+        updated.userId,
+        'Delivery Accepted',
+        `${riderAccount?.fullName ?? 'A rider'} has accepted your parcel delivery request.`,
+        parcelId,
+      );
+
       return updated;
     } catch (error) {
       if (
@@ -270,6 +419,16 @@ export class ParcelsService {
       const data: Record<string, unknown> = { status: newStatus };
       if (newStatus === ParcelStatus.DELIVERED) {
         data.deliveredAt = new Date();
+
+        // Calculate commission
+        const settings = await this.prisma.setting.findMany({ where: { key: 'COMMISSION_PERCENTAGE' } });
+        const commissionPct = settings.length > 0 ? parseFloat(settings[0].value) : 15; // Default 15%
+        const deliveryFee = parcel.deliveryFee;
+        const commissionAmount = (commissionPct / 100) * deliveryFee;
+        const riderEarnings = deliveryFee - commissionAmount;
+
+        data.commissionAmount = commissionAmount;
+        data.riderEarnings = riderEarnings;
       }
 
       const updated = await this.prisma.parcel.update({
@@ -277,8 +436,16 @@ export class ParcelsService {
         data,
       });
 
-      // Close the chat conversation on delivery
+      // Update rider's total earnings on delivery
       if (newStatus === ParcelStatus.DELIVERED) {
+        await this.prisma.rider.update({
+          where: { id: rider.id },
+          data: { 
+            totalEarnings: { increment: updated.riderEarnings || 0 }
+          },
+        });
+
+        // Close the chat conversation on delivery
         const conversation =
           await this.chatService.getConversationByRideOrParcel(
             undefined,
@@ -293,6 +460,31 @@ export class ParcelsService {
       }
 
       this.logger.log(`Parcel ${parcelId} status → ${newStatus}`);
+
+      // In-app notifications
+      if (newStatus === ParcelStatus.PICKED_UP) {
+        await this.sendParcelNotification(
+          updated.userId,
+          'Parcel Picked Up',
+          'Your parcel has been picked up by the rider.',
+          parcelId,
+        );
+      } else if (newStatus === ParcelStatus.IN_TRANSIT) {
+        await this.sendParcelNotification(
+          updated.userId,
+          'Parcel In Transit',
+          'Your parcel is now on its way to the destination.',
+          parcelId,
+        );
+      } else if (newStatus === ParcelStatus.DELIVERED) {
+        await this.sendParcelNotification(
+          updated.userId,
+          'Parcel Delivered',
+          `Your parcel has been successfully delivered. Fee: KES ${updated.deliveryFee}`,
+          parcelId,
+        );
+      }
+
       return updated;
     } catch (error) {
       if (
@@ -492,6 +684,28 @@ export class ParcelsService {
         throw error;
       this.logger.error(`rateParcel failed: ${parcelId}`, error);
       throw error;
+    }
+  }
+
+  private async sendParcelNotification(
+    accountId: string,
+    title: string,
+    body: string,
+    parcelId: string,
+  ) {
+    try {
+      await this.notificationsService.createInAppNotification(
+        accountId,
+        title,
+        body,
+        'PARCEL_UPDATE',
+        { parcelId },
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send parcel notification to ${accountId}`,
+        error,
+      );
     }
   }
 }

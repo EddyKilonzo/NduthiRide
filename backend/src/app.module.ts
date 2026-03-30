@@ -16,6 +16,8 @@ import { MapModule } from './map/map.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { SupportModule } from './support/support.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -59,6 +61,9 @@ import { NotificationsModule } from './notifications/notifications.module';
 
     // Admin dashboard
     AdminModule,
+
+    // Media uploads (Cloudinary)
+    MediaModule,
   ],
   providers: [
     {

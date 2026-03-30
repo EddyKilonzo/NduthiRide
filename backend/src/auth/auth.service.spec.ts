@@ -19,6 +19,7 @@ jest.mock('bcrypt');
 const mockPrisma = {
   account: {
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
   },
@@ -189,7 +190,7 @@ describe('AuthService', () => {
     };
 
     it('returns tokens on valid credentials', async () => {
-      mockPrisma.account.findUnique.mockResolvedValue(account);
+      mockPrisma.account.findFirst.mockResolvedValue(account);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       mockConfig.getOrThrow.mockReturnValue('15m');
       mockJwt.signAsync.mockResolvedValue('token');
@@ -206,20 +207,20 @@ describe('AuthService', () => {
     });
 
     it('throws UnauthorizedException for unknown email', async () => {
-      mockPrisma.account.findUnique.mockResolvedValue(null);
+      mockPrisma.account.findFirst.mockResolvedValue(null);
 
       await expect(service.login(dto)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws UnauthorizedException for wrong password', async () => {
-      mockPrisma.account.findUnique.mockResolvedValue(account);
+      mockPrisma.account.findFirst.mockResolvedValue(account);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(service.login(dto)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws UnauthorizedException for inactive account', async () => {
-      mockPrisma.account.findUnique.mockResolvedValue({
+      mockPrisma.account.findFirst.mockResolvedValue({
         ...account,
         isActive: false,
       });

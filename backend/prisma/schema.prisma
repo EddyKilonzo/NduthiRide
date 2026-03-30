@@ -10,6 +10,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ─── Enums ───────────────────────────────────────────────────
@@ -88,6 +89,8 @@ model Account {
   ratings             Rating[]            @relation("UserRatings")
   messages            Message[]
   verificationTokens  VerificationToken[]
+  notifications       Notification[]
+  supportTickets      SupportTicket[]
 
   @@map("accounts")
 }
@@ -121,6 +124,12 @@ model Rider {
   bikeRegistration String? @map("bike_registration")
   bikeModel        String? @map("bike_model")
 
+  // Document Verification URLs (Cloudinary)
+  licenseImageUrl    String? @map("license_image_url")
+  idFrontImageUrl    String? @map("id_front_image_url")
+  idBackImageUrl     String? @map("id_back_image_url")
+  logbookImageUrl    String? @map("logbook_image_url")
+
   isAvailable Boolean  @default(false) @map("is_available")
   isVerified  Boolean  @default(false) @map("is_verified")
 
@@ -142,6 +151,7 @@ model Rider {
   parcelsAsRider  Parcel[]          @relation("RiderParcels")
   locationHistory LocationHistory[]
   ratingsReceived Rating[]          @relation("RiderRatings")
+  payouts         Payout[]
 
   @@map("riders")
 }
@@ -172,6 +182,10 @@ model Ride {
   finalFare     Float? @map("final_fare") // Set when trip is completed
   distanceKm    Float  @map("distance_km")
   estimatedMins Int    @map("estimated_mins")
+
+  // Financial breakdown
+  commissionAmount Float? @map("commission_amount")
+  riderEarnings    Float? @map("rider_earnings")
 
   paymentMethod PaymentMethod @default(MPESA) @map("payment_method")
   mpesaPhone    String?       @map("mpesa_phone")
@@ -218,6 +232,10 @@ model Parcel {
 
   deliveryFee Float @map("delivery_fee")
   distanceKm  Float @map("distance_km")
+
+  // Financial breakdown
+  commissionAmount Float? @map("commission_amount")
+  riderEarnings    Float? @map("rider_earnings")
 
   // Proof-of-delivery image URL (uploaded to Cloudinary by the rider)
   proofImageUrl String? @map("proof_image_url")
@@ -372,3 +390,61 @@ model PaymentAudit {
   @@index([userId])
   @@map("payment_audit")
 }
+
+// ─── New Models ──────────────────────────────────────────────
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  accountId String   @map("account_id")
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  type      String   // e.g., RIDE_UPDATE, SYSTEM, PROMO
+  data      Json?    // Extra metadata (rideId, etc.)
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([accountId, createdAt])
+  @@map("notifications")
+}
+
+model Payout {
+  id          String   @id @default(cuid())
+  riderId     String   @map("rider_id")
+  rider       Rider    @relation(fields: [riderId], references: [id])
+  amount      Float
+  status      String   // PENDING, COMPLETED, FAILED
+  method      String   // MPESA, BANK
+  accountDetails String? @map("account_details") // Phone number or Bank account
+  reference   String?  // M-Pesa transaction ID for payout
+  createdAt   DateTime @default(now()) @map("created_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@index([riderId])
+  @@map("payouts")
+}
+
+model SupportTicket {
+  id        String   @id @default(cuid())
+  accountId String   @map("account_id")
+  account   Account  @relation(fields: [accountId], references: [id])
+  subject   String
+  message   String
+  status    String   @default("OPEN") // OPEN, IN_PROGRESS, CLOSED
+  priority  String   @default("NORMAL") // LOW, NORMAL, HIGH
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([accountId])
+  @@map("support_tickets")
+}
+

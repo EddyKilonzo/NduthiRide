@@ -10,4 +10,7 @@ export default defineConfig({
   datasource: {
     url: process.env.DATABASE_URL,
   },
+  migrations: {
+    seed: 'node ./node_modules/ts-node/dist/bin.js ./prisma/seed.ts',
+  },
 });
