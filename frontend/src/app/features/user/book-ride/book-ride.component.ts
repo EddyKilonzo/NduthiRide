@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal, effect } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -7,6 +7,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { RideService } from '../../../core/services/ride.service';
 import { MapService } from '../../../core/services/map.service';
 import { ToastService } from '../../../core/services/toast.service';
+import type { FareEstimate } from '../../../core/models/ride.models';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import {
   RoutePickerMapComponent,
@@ -84,6 +85,7 @@ const KE_PHONE = /^(\+254|0)(7|1)\d{8}$/;
                   [attr.aria-describedby]="descIds('pickupAddress', 'ride-pickup')"
                   placeholder="e.g. Sarit Centre, Westlands"
                   (input)="onPickupInput($event)"
+                  (blur)="onPickupBlur()"
                 />
                 @if (showErr('pickupAddress')) {
                   <span id="ride-pickup-err" class="form-error" role="alert">{{ fieldMsg('pickupAddress') }}</span>
@@ -116,6 +118,7 @@ const KE_PHONE = /^(\+254|0)(7|1)\d{8}$/;
                   [attr.aria-describedby]="descIds('dropoffAddress', 'ride-dropoff')"
                   placeholder="e.g. Two Rivers Mall, Ruaka"
                   (input)="onDropoffInput($event)"
+                  (blur)="onDropoffBlur()"
                 />
                 @if (showErr('dropoffAddress')) {
                   <span id="ride-dropoff-err" class="form-error" role="alert">{{ fieldMsg('dropoffAddress') }}</span>
@@ -182,11 +185,8 @@ const KE_PHONE = /^(\+254|0)(7|1)\d{8}$/;
             }
 
             <div class="form-actions-row book-actions">
-              <button type="button" class="btn btn--secondary btn--compact" (click)="getEstimate()" [disabled]="estimating()">
-                @if (estimating()) { <app-spinner [size]="16" /> } @else { Get estimate }
-              </button>
               <button type="submit" class="btn btn--primary btn--full btn--compact"
-                [disabled]="loading() || !estimate()">
+                [disabled]="loading() || estimating()">
                 @if (loading()) { <app-spinner [size]="18" /> } @else { Confirm booking }
               </button>
             </div>
@@ -558,6 +558,11 @@ const KE_PHONE = /^(\+254|0)(7|1)\d{8}$/;
       color: var(--clr-text-muted);
     }
     .est-row strong { color: var(--clr-text); font-weight: 600; }
+    .est-row--sub {
+      font-size: 11px;
+      margin-top: -4px;
+      color: var(--clr-text-dim);
+    }
     .est-row--total {
       font-size: 15px;
       padding-top: 8px;
@@ -578,7 +583,7 @@ export class BookRideComponent {
 
   protected readonly loading = signal(false);
   protected readonly estimating = signal(false);
-  protected readonly estimate = signal<{ distanceKm: number; estimatedMins: number; estimatedFare: number } | null>(null);
+  protected readonly estimate = signal<FareEstimate | null>(null);
   protected readonly submitAttempted = signal(false);
 
   protected readonly pickupPoint = signal<RouteMapPoint | null>(null);
@@ -611,6 +616,15 @@ export class BookRideComponent {
     };
     syncMpesa(methodCtrl.value);
     methodCtrl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((m) => syncMpesa(m));
+
+    // Auto-fetch estimate when points change
+    effect(() => {
+      const p = this.pickupPoint();
+      const d = this.dropoffPoint();
+      if (p && d) {
+        this.getEstimate();
+      }
+    }, { allowSignalWrites: true });
   }
 
   /** aria-describedby: hint + error when shown */
@@ -728,6 +742,35 @@ export class BookRideComponent {
     });
   }
 
+  protected onPickupBlur(): void {
+    const val = this.form.controls.pickupAddress.value;
+    if (!this.pickupPoint() && val.length >= 3) {
+      void this.resolvePoint(val, 'pickup');
+    }
+  }
+
+  protected onDropoffBlur(): void {
+    const val = this.form.controls.dropoffAddress.value;
+    if (!this.dropoffPoint() && val.length >= 3) {
+      void this.resolvePoint(val, 'dropoff');
+    }
+  }
+
+  private async resolvePoint(address: string, leg: 'pickup' | 'dropoff'): Promise<RouteMapPoint | null> {
+    try {
+      const res = await this.mapApi.geocode(address);
+      if (res.length > 0) {
+        const p = { lat: res[0].lat, lng: res[0].lng };
+        if (leg === 'pickup') this.pickupPoint.set(p);
+        else this.dropoffPoint.set(p);
+        return p;
+      }
+    } catch {
+      // Silently fail, submit() will handle the warning
+    }
+    return null;
+  }
+
   protected getEstimate(): void {
     this.form.controls.pickupAddress.markAsTouched();
     this.form.controls.dropoffAddress.markAsTouched();
@@ -756,7 +799,7 @@ export class BookRideComponent {
       });
   }
 
-  protected submit(): void {
+  protected async submit(): Promise<void> {
     if (this.loading()) return;
     this.submitAttempted.set(true);
     if (this.form.invalid) {
@@ -764,13 +807,38 @@ export class BookRideComponent {
       this.touchHaptic();
       return;
     }
-    const pickup = this.pickupPoint();
-    const dropoff = this.dropoffPoint();
+
+    let pickup = this.pickupPoint();
+    let dropoff = this.dropoffPoint();
+
+    // Auto-resolve points if they are missing (e.g. user typed and submitted fast)
     if (!pickup || !dropoff) {
-      this.toast.warning('Could not place pins for both addresses — check spelling and try again');
+      this.loading.set(true);
+      if (!pickup) pickup = await this.resolvePoint(this.form.controls.pickupAddress.value, 'pickup');
+      if (!dropoff) dropoff = await this.resolvePoint(this.form.controls.dropoffAddress.value, 'dropoff');
+      this.loading.set(false);
+    }
+
+    if (!pickup || !dropoff) {
+      this.toast.warning('Check your addresses — we couldn\'t find them on the map. Try picking on map.');
       this.touchHaptic();
       return;
     }
+
+    // Auto-fetch estimate if missing
+    if (!this.estimate()) {
+      this.loading.set(true);
+      try {
+        const est = await this.rideService.estimate(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
+        this.estimate.set(est);
+      } catch {
+        this.toast.error('Could not calculate fare estimate. Please try again.');
+        this.loading.set(false);
+        return;
+      }
+      this.loading.set(false);
+    }
+
     this.loading.set(true);
 
     const v = this.form.getRawValue();

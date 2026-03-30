@@ -11,6 +11,7 @@ export interface LocationPin {
 export interface ChatMessage {
   id: string;
   conversationId: string;
+  senderAccountId: string;
   content: string;
   type: MessageType;
   locationPin: LocationPin | null;

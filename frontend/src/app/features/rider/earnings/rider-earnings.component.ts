@@ -30,18 +30,18 @@ import type { Parcel } from '../../../core/models/parcel.models';
       } @else {
         <!-- Summary cards -->
         <div class="stats-grid">
-          <div class="stat-card">
+          <div class="stat-card stat-card--rides">
             <div class="stat-icon rides"><lucide-icon name="bike" [size]="20"></lucide-icon></div>
             <div class="stat-info">
               <span class="label">Total Rides</span>
-              <h3 class="value">{{ rides().length }}</h3>
+              <h3 class="value">{{ rideTotalCount() }}</h3>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card stat-card--parcels">
             <div class="stat-icon parcels"><lucide-icon name="package" [size]="20"></lucide-icon></div>
             <div class="stat-info">
               <span class="label">Deliveries</span>
-              <h3 class="value">{{ parcels().length }}</h3>
+              <h3 class="value">{{ parcelTotalCount() }}</h3>
             </div>
           </div>
           <div class="stat-card highlight">
@@ -139,30 +139,29 @@ import type { Parcel } from '../../../core/models/parcel.models';
     .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
     .stat-card {
       background: var(--clr-bg-card); border-radius: var(--radius-lg); padding: 20px;
-      display: flex; align-items: center; gap: 16px; border: 1px solid var(--clr-border); box-shadow: var(--shadow-card);
-      .stat-icon {
-        width: 44px; height: 44px; border-radius: 12px; display: flex;
-        align-items: center; justify-content: center; color: #fff;
-        background: var(--clr-bg-elevated); color: var(--clr-text-muted);
-        &.rides { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-        &.parcels { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
-        &.gross { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
-        &.payout { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
-      }
-      .label { font-size: 12px; font-weight: 600; color: var(--clr-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-      .value { font-size: 20px; font-weight: 800; color: var(--clr-text); font-family: var(--font-display); margin-top: 2px; }
-      
-      &.highlight { border-color: var(--clr-warning); }
-      &.success { border-color: var(--clr-success); }
+      display: flex; align-items: center; gap: 16px; border: 1px solid var(--clr-border); border-left-width: 4px; box-shadow: var(--shadow-card);
+    }
+    .stat-icon {
+      width: 44px; height: 44px; border-radius: 12px; display: flex;
+      align-items: center; justify-content: center;
+      background: #fff; border: 1px solid var(--clr-border); box-shadow: var(--shadow-card);
+    }
+    .stat-icon.rides, .stat-icon.parcels, .stat-icon.gross, .stat-icon.payout { color: var(--clr-primary); border-color: rgba(34, 197, 94, 0.35); }
+    .stat-card .label { font-size: 12px; font-weight: 600; color: var(--clr-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 20px; font-weight: 800; color: var(--clr-text); font-family: var(--font-display); margin-top: 2px; }
+
+    .stat-card.stat-card--rides, .stat-card.stat-card--parcels, .stat-card.highlight, .stat-card.success {
+      border-color: rgba(34, 197, 94, 0.5);
+      background: linear-gradient(180deg, rgba(34,197,94,0.06), transparent 40%);
     }
 
     .info-banner {
       background: rgba(64, 138, 113, 0.08); border: 1px solid var(--clr-primary);
       border-radius: var(--radius-md); padding: 16px 20px; display: flex; gap: 12px;
       align-items: center; margin-bottom: 32px;
-      p { font-size: 13px; color: var(--clr-text-muted); line-height: 1.5; }
-      lucide-icon { color: var(--clr-primary); flex-shrink: 0; }
     }
+    .info-banner p { font-size: 13px; color: var(--clr-text-muted); line-height: 1.5; }
+    .info-banner lucide-icon { color: var(--clr-primary); flex-shrink: 0; }
 
     .table-card { padding: 0; overflow: hidden; box-shadow: var(--shadow-card); }
     .table-header {
@@ -172,28 +171,26 @@ import type { Parcel } from '../../../core/models/parcel.models';
     }
     .filter-btns {
       display: flex; gap: 8px;
-      .filter-btn {
-        padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
-        color: var(--clr-text-muted); border: 1px solid var(--clr-border);
-        cursor: pointer; transition: all 0.2s;
-        &:hover { border-color: var(--clr-primary); color: var(--clr-primary); }
-        &.active { background: var(--clr-primary); color: #fff; border-color: var(--clr-primary); }
-      }
     }
+    .filter-btn {
+      padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      color: var(--clr-text-muted); border: 1px solid var(--clr-border);
+      cursor: pointer; transition: all 0.2s; background: none;
+    }
+    .filter-btn:hover { border-color: var(--clr-primary); color: var(--clr-primary); }
+    .filter-btn.active { background: var(--clr-primary); color: #fff; border-color: var(--clr-primary); }
 
     .table-wrapper { overflow-x: auto; }
-    table {
-      width: 100%; border-collapse: collapse;
-      th { padding: 16px 24px; text-align: left; font-size: 11px; font-weight: 700; color: var(--clr-text-muted); text-transform: uppercase; letter-spacing: 0.5px; background: var(--clr-bg-elevated); }
-      td { padding: 16px 24px; border-bottom: 1px solid var(--clr-border); font-size: 14px; }
-      tr:last-child td { border-bottom: none; }
-    }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 16px 24px; text-align: left; font-size: 11px; font-weight: 700; color: var(--clr-text-muted); text-transform: uppercase; letter-spacing: 0.5px; background: var(--clr-bg-elevated); }
+    td { padding: 16px 24px; border-bottom: 1px solid var(--clr-border); font-size: 14px; }
+    tr:last-child td { border-bottom: none; }
 
     .type-tag {
       display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
       border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase;
-      background: rgba(168, 85, 247, 0.12); color: #a855f7;
-      &.ride { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+      background: rgba(64, 138, 113, 0.12); color: var(--clr-primary);
+      &.ride { background: rgba(59, 130, 246, 0.12); color: var(--clr-info); }
     }
 
     .route-text { font-weight: 500; color: var(--clr-text); }
@@ -204,7 +201,9 @@ import type { Parcel } from '../../../core/models/parcel.models';
       &.success { background: rgba(34, 197, 94, 0.15); color: var(--clr-success); }
     }
 
-    .empty-state { padding: 60px; text-align: center; color: var(--clr-text-muted); p { margin-top: 16px; font-size: 14px; } .muted { opacity: 0.3; } }
+    .empty-state { padding: 60px; text-align: center; color: var(--clr-text-muted); }
+    .empty-state p { margin-top: 16px; font-size: 14px; }
+    .empty-state .muted { opacity: 0.3; }
 
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -225,15 +224,17 @@ export class RiderEarningsComponent implements OnInit {
   protected readonly loading  = signal(true);
   protected readonly rides    = signal<Ride[]>([]);
   protected readonly parcels  = signal<Parcel[]>([]);
+  protected readonly rideTotalCount = signal(0);
+  protected readonly parcelTotalCount = signal(0);
 
   protected readonly combinedTransactions = computed(() => {
     const rideTx = this.rides().map(r => ({
       id: r.id,
       isRide: true,
       label: `${r.pickupAddress.split(',')[0]} → ${r.dropoffAddress.split(',')[0]}`,
-      gross: r.estimatedFare,
-      net: r.estimatedFare * 0.85,
-      date: r.createdAt
+      gross: r.finalFare ?? r.estimatedFare,
+      net: (r.finalFare ?? r.estimatedFare) * 0.85,
+      date: r.completedAt ?? r.createdAt
     }));
 
     const parcelTx = this.parcels().map(p => ({
@@ -242,7 +243,7 @@ export class RiderEarningsComponent implements OnInit {
       label: p.itemDescription,
       gross: p.deliveryFee,
       net: p.deliveryFee * 0.85,
-      date: p.createdAt
+      date: p.deliveredAt ?? p.createdAt
     }));
 
     return [...rideTx, ...parcelTx].sort((a, b) => 
@@ -251,21 +252,47 @@ export class RiderEarningsComponent implements OnInit {
   });
 
   protected readonly grossEarnings   = computed(() =>
-    this.rides().reduce((s, r) => s + r.estimatedFare, 0) +
+    this.rides().reduce((s, r) => s + (r.finalFare ?? r.estimatedFare), 0) +
     this.parcels().reduce((s, p) => s + p.deliveryFee, 0),
   );
   protected readonly estimatedPayout = computed(() => this.grossEarnings() * 0.85);
 
   async ngOnInit(): Promise<void> {
     try {
-      const [rideRes, parcelRes] = await Promise.all([
-        this.rideService.getMyRides(1, 50, 'COMPLETED'),
-        this.parcelService.getMyParcels(1, 50, 'DELIVERED'),
+      const [rides, parcels] = await Promise.all([
+        this.loadAllCompletedRides(),
+        this.loadAllDeliveredParcels(),
       ]);
-      this.rides.set(rideRes.data);
-      this.parcels.set(parcelRes.data);
+      this.rides.set(rides.items);
+      this.parcels.set(parcels.items);
+      this.rideTotalCount.set(rides.total);
+      this.parcelTotalCount.set(parcels.total);
     } catch { /* silent */ } finally {
       this.loading.set(false);
     }
+  }
+
+  private async loadAllCompletedRides(): Promise<{ items: Ride[]; total: number }> {
+    const first = await this.rideService.getRiderHistory(1, 50, 'COMPLETED');
+    const all = [...first.data];
+    if (first.totalPages > 1) {
+      for (let p = 2; p <= first.totalPages; p++) {
+        const next = await this.rideService.getRiderHistory(p, 50, 'COMPLETED');
+        all.push(...next.data);
+      }
+    }
+    return { items: all, total: first.total };
+  }
+
+  private async loadAllDeliveredParcels(): Promise<{ items: Parcel[]; total: number }> {
+    const first = await this.parcelService.getRiderHistory(1, 50, 'DELIVERED');
+    const all = [...first.data];
+    if (first.totalPages > 1) {
+      for (let p = 2; p <= first.totalPages; p++) {
+        const next = await this.parcelService.getRiderHistory(p, 50, 'DELIVERED');
+        all.push(...next.data);
+      }
+    }
+    return { items: all, total: first.total };
   }
 }

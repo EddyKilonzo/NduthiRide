@@ -10,6 +10,7 @@ export const guestGuard: CanActivateFn = () => {
   if (!auth.isAuth()) return true;
 
   const role = auth.role();
+  if (!role) return router.createUrlTree(['/auth/login']);
   if (role === 'ADMIN')  return router.createUrlTree(['/admin']);
   if (role === 'RIDER')  return router.createUrlTree(['/rider']);
   return router.createUrlTree(['/user']);

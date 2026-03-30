@@ -14,6 +14,7 @@ export class AuthService {
   private readonly api     = inject(AuthApi);
   private readonly usersApi = inject(UsersApi);
   private readonly router  = inject(Router);
+  private readonly isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 
   /** One refresh at a time — parallel 401s (e.g. home rides + parcels) must not rotate the refresh token twice. */
   private refreshChain: Promise<void> | null = null;
@@ -73,7 +74,9 @@ export class AuthService {
   /** Updates password on the server and clears stored refresh token (must match server invalidation). */
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     await this.api.changePassword(currentPassword, newPassword);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    if (this.isBrowser) {
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
   }
 
   async refresh(): Promise<void> {
@@ -90,8 +93,10 @@ export class AuthService {
     if (!refreshToken) throw new Error('No refresh token');
 
     const tokens = await this.api.refresh(refreshToken);
-    localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+    if (this.isBrowser) {
+      localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
+      localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+    }
   }
 
   async logout(): Promise<void> {
@@ -104,10 +109,12 @@ export class AuthService {
   }
 
   getAccessToken(): string | null {
+    if (!this.isBrowser) return null;
     return localStorage.getItem(ACCESS_TOKEN_KEY);
   }
 
   getRefreshToken(): string | null {
+    if (!this.isBrowser) return null;
     return localStorage.getItem(REFRESH_TOKEN_KEY);
   }
 
@@ -116,7 +123,9 @@ export class AuthService {
     if (!current) return;
     const updated = { ...current, ...partial };
     this._user.set(updated);
-    localStorage.setItem(USER_KEY, JSON.stringify(updated));
+    if (this.isBrowser) {
+      localStorage.setItem(USER_KEY, JSON.stringify(updated));
+    }
   }
 
   /** Refreshes the signed-in user from `GET /users/me` (e.g. after external changes). */
@@ -141,25 +150,34 @@ export class AuthService {
   // ─── Private helpers ────────────────────────────────────────────
 
   private persist(data: { accessToken: string; refreshToken: string; user: AuthUser }): void {
-    localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+    if (this.isBrowser) {
+      localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+      localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+    }
     if (!data.user?.id) {
-      localStorage.removeItem(ACCESS_TOKEN_KEY);
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      if (this.isBrowser) {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+      }
       throw new Error('Invalid auth response: missing user');
     }
-    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    if (this.isBrowser) {
+      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    }
     this._user.set(data.user);
   }
 
   private clear(): void {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    if (this.isBrowser) {
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+    }
     this._user.set(null);
   }
 
   private loadUser(): AuthUser | null {
+    if (!this.isBrowser) return null;
     try {
       const raw = localStorage.getItem(USER_KEY);
       return raw ? (JSON.parse(raw) as AuthUser) : null;

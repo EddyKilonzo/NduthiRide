@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { RidersApi } from '../../../core/api/riders.api';
 import { LucideAngularModule } from 'lucide-angular';
 import { AUTH_HERO_LOGIN_URLS } from '../auth-hero.constants';
 
@@ -22,23 +23,19 @@ import { AUTH_HERO_LOGIN_URLS } from '../auth-hero.constants';
 
           <form [formGroup]="form" (ngSubmit)="submit()" class="auth-form-stack auth-form-stack--stagger">
             <div class="auth-field">
-              <label class="auth-label-sr" for="login-email">Email</label>
+              <label class="auth-label-sr" for="login-credential">Email or phone</label>
               <div class="auth-input-pill-wrap">
                 <lucide-icon name="mail" [size]="18" class="auth-input-icon"></lucide-icon>
                 <input
-                  id="login-email"
-                  formControlName="email"
-                  type="email"
-                  autocomplete="email"
-                  placeholder="Email address"
+                  id="login-credential"
+                  formControlName="credential"
+                  type="text"
+                  autocomplete="username"
+                  placeholder="Email or phone number"
                 />
               </div>
-              @if (form.get('email')?.invalid && form.get('email')?.touched) {
-                @if (form.get('email')?.hasError('required')) {
-                  <p class="auth-error">Email is required</p>
-                } @else if (form.get('email')?.hasError('email')) {
-                  <p class="auth-error">Enter a valid email address</p>
-                }
+              @if (form.get('credential')?.invalid && form.get('credential')?.touched) {
+                <p class="auth-error">Email or phone is required</p>
               }
             </div>
 
@@ -152,6 +149,7 @@ export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly ridersApi = inject(RidersApi);
 
   protected readonly loading = signal(false);
   protected readonly showPw = signal(false);
@@ -160,7 +158,7 @@ export class LoginComponent {
   protected readonly heroSrc = signal(AUTH_HERO_LOGIN_URLS[0]);
 
   protected readonly form = inject(FormBuilder).nonNullable.group({
-    email: ['', [Validators.required, Validators.email]],
+    credential: ['', [Validators.required]],
     password: ['', Validators.required],
   });
 
@@ -183,18 +181,27 @@ export class LoginComponent {
     }
     this.loading.set(true);
 
-    const { email, password } = this.form.getRawValue();
+    const { credential, password } = this.form.getRawValue();
     try {
       await this.auth.login({
-        email: email.trim().toLowerCase(),
+        credential: credential.trim(),
         password,
       });
       const role = this.auth.role();
-      const dest =
-        role === 'ADMIN' ? '/admin' : role === 'RIDER' ? '/rider' : '/user';
-      await this.router.navigateByUrl(dest);
-    } catch {
-      // Error toast usually comes from the HTTP interceptor
+      if (role === 'RIDER') {
+        try {
+          const profile = await this.ridersApi.getMyProfile();
+          const isComplete = !!(profile.bikeModel && profile.bikeRegistration && profile.licenseNumber);
+          await this.router.navigateByUrl(isComplete ? '/rider' : '/rider/verify-details');
+        } catch {
+          await this.router.navigateByUrl('/rider/verify-details');
+        }
+      } else {
+        await this.router.navigateByUrl(role === 'ADMIN' ? '/admin' : '/user');
+      }
+    } catch (err: any) {
+      const msg = err?.error?.message ?? 'Invalid email or password';
+      this.toast.error(typeof msg === 'string' ? msg : msg.join(', '));
     } finally {
       this.loading.set(false);
     }

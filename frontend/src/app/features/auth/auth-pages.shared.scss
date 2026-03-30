@@ -124,10 +124,14 @@
 
 .auth-label-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
-.auth-field { position: relative; }
+.auth-field {
+  position: relative;
+  min-width: 0; // Prevent CSS grid overflow when pills/input have intrinsic sizes
+}
 
 .auth-input-pill-wrap {
   position: relative; display: flex; align-items: center; border: 1px solid var(--clr-border);
+  width: 100%;
   border-radius: 9999px; background: var(--clr-bg-card); padding: 0 18px;
   transition: border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-card);
   &:focus-within { border-color: var(--clr-primary); box-shadow: 0 0 0 3px rgba(64, 138, 113, 0.15), var(--shadow-card); }

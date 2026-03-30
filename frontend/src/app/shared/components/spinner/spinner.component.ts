@@ -13,10 +13,10 @@ import { CommonModule } from '@angular/common';
   styles: [`
     .spinner-wrap {
       display: flex; align-items: center; justify-content: center; padding: 32px;
-      &--overlay {
-        position: fixed; inset: 0; background: rgba(0,0,0,.5);
-        z-index: 999;
-      }
+    }
+    .spinner-wrap--overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.5);
+      z-index: 999;
     }
     .spinner {
       border: 3px solid var(--clr-border);

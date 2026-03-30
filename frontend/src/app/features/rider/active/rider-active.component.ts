@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { RideService }   from '../../../core/services/ride.service';
 import { ParcelService } from '../../../core/services/parcel.service';
+import { MediaService }  from '../../../core/services/media.service';
 import { ToastService }  from '../../../core/services/toast.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import type { Ride, RideStatus } from '../../../core/models/ride.models';
@@ -61,7 +62,12 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
                   <div class="trip-badge ride">
                     <lucide-icon name="bike" [size]="14"></lucide-icon> Ride Request
                   </div>
-                  <div class="status-pill" [class]="ride.status.toLowerCase()">{{ ride.status | titlecase }}</div>
+                  <div class="header-actions">
+                    <a [routerLink]="['/rider/chat/ride', ride.id]" class="btn btn--secondary btn--sm btn--pill">
+                      <lucide-icon name="message-square" [size]="14"></lucide-icon> Chat
+                    </a>
+                    <div class="status-pill" [class]="ride.status.toLowerCase()">{{ ride.status | titlecase }}</div>
+                  </div>
                 </div>
 
                 <div class="trip-body">
@@ -132,7 +138,12 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
                   <div class="trip-badge parcel">
                     <lucide-icon name="package" [size]="14"></lucide-icon> Parcel Delivery
                   </div>
-                  <div class="status-pill" [class]="parcel.status.toLowerCase()">{{ parcel.status | titlecase }}</div>
+                  <div class="header-actions">
+                    <a [routerLink]="['/rider/chat/parcel', parcel.id]" class="btn btn--secondary btn--sm btn--pill">
+                      <lucide-icon name="message-square" [size]="14"></lucide-icon> Chat
+                    </a>
+                    <div class="status-pill" [class]="parcel.status.toLowerCase()">{{ parcel.status | titlecase }}</div>
+                  </div>
                 </div>
 
                 <div class="trip-body">
@@ -266,7 +277,11 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
               <lucide-icon name="shield-check" [size]="32"></lucide-icon>
               <h4>Safe Ride Support</h4>
               <p>Having trouble? Our support team is available 24/7 to assist you.</p>
-              <button class="btn btn--danger btn--sm btn--pill mt-12">Emergency SOS</button>
+              <a [routerLink]="['/rider/support']" 
+                 [queryParams]="{ subject: 'Issue with Active ' + (activeRide() ? 'Ride ' + activeRide()!.id.slice(0,8) : 'Parcel ' + activeParcel()!.id.slice(0,8)) }" 
+                 class="btn btn--secondary btn--sm btn--pill mt-12">
+                Report an Issue
+              </a>
             </div>
           </div>
         </div>
@@ -280,9 +295,9 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
     .page-header {
       display: flex; justify-content: space-between; align-items: flex-end;
       margin-bottom: 32px;
-      h1 { font-family: var(--font-display); font-size: 28px; font-weight: 800; color: var(--clr-text); }
-      p { color: var(--clr-text-muted); font-size: 15px; margin-top: 4px; }
     }
+    .page-header h1 { font-family: var(--font-display); font-size: 28px; font-weight: 800; color: var(--clr-text); }
+    .page-header p { color: var(--clr-text-muted); font-size: 15px; margin-top: 4px; }
 
     .modern-shadow { box-shadow: var(--shadow-card); }
     .mt-24 { margin-top: 24px; }
@@ -290,30 +305,34 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
 
     .empty-state-card {
       padding: 80px 40px; text-align: center; max-width: 600px; margin: 0 auto;
-      .empty-icon-wrap { width: 100px; height: 100px; background: rgba(64, 138, 113, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 32px; color: var(--clr-primary); }
-      h3 { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
-      p { color: var(--clr-text-muted); line-height: 1.6; }
     }
+    .empty-icon-wrap { width: 100px; height: 100px; background: rgba(64, 138, 113, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 32px; color: var(--clr-primary); }
+    .empty-state-card h3 { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+    .empty-state-card p { color: var(--clr-text-muted); line-height: 1.6; }
 
     .trip-grid { display: grid; grid-template-columns: 1fr 300px; gap: 32px; align-items: start; }
 
     .trip-card { padding: 0; overflow: hidden; }
     .card-header { padding: 20px 24px; border-bottom: 1px solid var(--clr-border); display: flex; justify-content: space-between; align-items: center; }
+    .header-actions { display: flex; align-items: center; gap: 12px; }
     .trip-badge {
       display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase;
       padding: 6px 12px; border-radius: 20px;
-      &.ride { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
-      &.parcel { background: rgba(168, 85, 247, 0.12); color: #a855f7; }
     }
+    .trip-badge.ride { background: rgba(59, 130, 246, 0.12); color: var(--clr-info); }
+    .trip-badge.parcel { background: rgba(64, 138, 113, 0.12); color: var(--clr-primary); }
+    
     .status-pill {
       font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 6px;
       background: var(--clr-bg-elevated); color: var(--clr-text-muted);
-      &.accepted { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
-      &.in_progress, &.in_transit { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
     }
+    .status-pill.accepted { background: rgba(245, 158, 11, 0.15); color: var(--clr-warning); }
+    .status-pill.in_progress, .status-pill.in_transit { background: rgba(34, 197, 94, 0.15); color: var(--clr-success); }
 
     .trip-body { padding: 24px; }
-    .fare-section { margin-bottom: 32px; .label { font-size: 13px; color: var(--clr-text-muted); font-weight: 600; } .fare-value { font-size: 32px; font-weight: 800; color: var(--clr-primary); font-family: var(--font-display); margin-top: 4px; } }
+    .fare-section { margin-bottom: 32px; }
+    .fare-section .label { font-size: 13px; color: var(--clr-text-muted); font-weight: 600; }
+    .fare-section .fare-value { font-size: 32px; font-weight: 800; color: var(--clr-primary); font-family: var(--font-display); margin-top: 4px; }
 
     .route-display {
       background: var(--clr-bg-elevated); border-radius: var(--radius-lg); padding: 20px;
@@ -322,56 +341,61 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
     .route-stop { display: flex; gap: 16px; position: relative; z-index: 2; }
     .stop-marker {
       width: 14px; height: 14px; border-radius: 50%; border: 3px solid #fff; margin-top: 4px; flex-shrink: 0;
-      &.start { background: var(--clr-primary); }
-      &.end { background: #3b82f6; }
     }
+    .stop-marker.start { background: var(--clr-primary); }
+    .stop-marker.end { background: var(--clr-info); }
+    
     .route-connector {
       position: absolute; left: 26px; top: 38px; bottom: 38px; width: 2px;
       background: repeating-linear-gradient(to bottom, var(--clr-border) 0, var(--clr-border) 6px, transparent 6px, transparent 12px);
     }
-    .stop-content {
-      label { font-size: 11px; font-weight: 700; color: var(--clr-text-muted); text-transform: uppercase; display: block; margin-bottom: 4px; }
-      p { font-size: 15px; font-weight: 500; color: var(--clr-text); line-height: 1.4; }
-    }
+    .stop-content label { font-size: 11px; font-weight: 700; color: var(--clr-text-muted); text-transform: uppercase; display: block; margin-bottom: 4px; }
+    .stop-content p { font-size: 15px; font-weight: 500; color: var(--clr-text); line-height: 1.4; }
+    
     .route-stop:first-child { margin-bottom: 32px; }
 
     .details-section, .details-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-    .detail-item {
-      display: flex; gap: 12px;
-      .item-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--clr-bg-elevated); display: flex; align-items: center; justify-content: center; color: var(--clr-text-muted); flex-shrink: 0; }
-      label { font-size: 11px; font-weight: 700; color: var(--clr-text-muted); text-transform: uppercase; display: block; }
-      p, .contact-link { font-size: 14px; font-weight: 600; color: var(--clr-text); }
-      .contact-link { color: var(--clr-primary); }
-    }
+    .detail-item { display: flex; gap: 12px; }
+    .detail-item .item-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--clr-bg-elevated); display: flex; align-items: center; justify-content: center; color: var(--clr-text-muted); flex-shrink: 0; }
+    .detail-item label { font-size: 11px; font-weight: 700; color: var(--clr-text-muted); text-transform: uppercase; display: block; }
+    .detail-item p, .detail-item .contact-link { font-size: 14px; font-weight: 600; color: var(--clr-text); }
+    .detail-item .contact-link { color: var(--clr-primary); }
 
     .upload-box {
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
       padding: 32px; border: 2px dashed var(--clr-border); border-radius: var(--radius-lg);
       cursor: pointer; transition: all 0.3s; color: var(--clr-text-muted);
-      &:hover { border-color: var(--clr-primary); color: var(--clr-primary); background: rgba(64, 138, 113, 0.05); }
-      &.uploaded { border-style: solid; border-color: var(--clr-success); background: rgba(34, 197, 94, 0.05); color: var(--clr-success); }
-      span { font-size: 14px; font-weight: 600; }
     }
+    .upload-box:hover { border-color: var(--clr-primary); color: var(--clr-primary); background: rgba(64, 138, 113, 0.05); }
+    .upload-box.uploaded { border-style: solid; border-color: var(--clr-success); background: rgba(34, 197, 94, 0.05); color: var(--clr-success); }
+    .upload-box span { font-size: 14px; font-weight: 600; }
 
     .card-footer { padding: 24px; border-top: 1px solid var(--clr-border); background: var(--clr-bg-elevated); }
     .action-btn { gap: 12px; height: 60px; font-size: 18px; }
     .error-hint { font-size: 12px; color: var(--clr-error); text-align: center; margin-top: 12px; font-weight: 600; }
     .completion-message { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--clr-success); font-weight: 700; font-size: 18px; }
 
-    .stepper-card { padding: 24px; margin-bottom: 24px; h3 { font-size: 16px; font-weight: 700; margin-bottom: 24px; } }
+    .stepper-card { padding: 24px; margin-bottom: 24px; }
+    .stepper-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 24px; }
     .stepper { display: flex; flex-direction: column; gap: 32px; padding-left: 8px; }
     .step {
       display: flex; align-items: center; gap: 16px; position: relative;
-      .step-line { position: absolute; left: 13px; top: 28px; width: 2px; height: 32px; background: var(--clr-border); }
-      &:last-child .step-line { display: none; }
-      .step-circle { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--clr-border); display: flex; align-items: center; justify-content: center; color: transparent; background: var(--clr-bg-card); transition: all 0.3s; z-index: 2; }
-      .step-label { font-size: 13px; font-weight: 600; color: var(--clr-text-muted); transition: all 0.3s; }
-      
-      &.completed { .step-circle { background: var(--clr-primary); border-color: var(--clr-primary); color: #fff; } .step-label { color: var(--clr-text); } .step-line { background: var(--clr-primary); } }
-      &.active { .step-circle { border-color: var(--clr-primary); background: rgba(64, 138, 113, 0.1); } .step-label { color: var(--clr-primary); font-weight: 700; } }
     }
+    .step .step-line { position: absolute; left: 13px; top: 28px; width: 2px; height: 32px; background: var(--clr-border); }
+    .step:last-child .step-line { display: none; }
+    .step .step-circle { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--clr-border); display: flex; align-items: center; justify-content: center; color: transparent; background: var(--clr-bg-card); transition: all 0.3s; z-index: 2; }
+    .step .step-label { font-size: 13px; font-weight: 600; color: var(--clr-text-muted); transition: all 0.3s; }
+    
+    .step.completed .step-circle { background: var(--clr-primary); border-color: var(--clr-primary); color: #fff; }
+    .step.completed .step-label { color: var(--clr-text); }
+    .step.completed .step-line { background: var(--clr-primary); }
+    .step.active .step-circle { border-color: var(--clr-primary); background: rgba(64, 138, 113, 0.1); }
+    .step.active .step-label { color: var(--clr-primary); font-weight: 700; }
 
-    .support-card { padding: 24px; background: var(--clr-bg-card); border: 1px solid var(--clr-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); text-align: center; lucide-icon { color: var(--clr-primary); margin-bottom: 16px; } h4 { font-size: 15px; font-weight: 700; margin-bottom: 8px; } p { font-size: 12px; color: var(--clr-text-muted); line-height: 1.5; } }
+    .support-card { padding: 24px; background: var(--clr-bg-card); border: 1px solid var(--clr-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); text-align: center; }
+    .support-card lucide-icon { color: var(--clr-primary); margin-bottom: 16px; }
+    .support-card h4 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .support-card p { font-size: 12px; color: var(--clr-text-muted); line-height: 1.5; }
 
     .spinning { animation: spin 1s linear infinite; }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -393,6 +417,7 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
 export class RiderActiveComponent implements OnInit, OnDestroy {
   private readonly rideService   = inject(RideService);
   private readonly parcelService = inject(ParcelService);
+  private readonly mediaService  = inject(MediaService);
   private readonly toast         = inject(ToastService);
 
   protected readonly activeRide   = signal<Ride | null>(null);
@@ -472,16 +497,15 @@ export class RiderActiveComponent implements OnInit, OnDestroy {
 
     this.proofUploading.set(true);
     try {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async () => {
-        await this.parcelService.uploadProof(parcelId, reader.result as string);
-        this.proofUploaded.set(true);
-        this.proofUploading.set(false);
-        this.toast.success('Proof uploaded!');
-      };
-    } catch {
-      this.toast.error('Upload failed');
+      this.toast.info('Uploading delivery proof...');
+      const imageUrl = await this.mediaService.uploadImage(file);
+      await this.parcelService.uploadProof(parcelId, imageUrl);
+      this.proofUploaded.set(true);
+      this.toast.success('Proof uploaded!');
+    } catch (error) {
+      console.error('Proof upload failed:', error);
+      this.toast.error('Upload failed. Please try again.');
+    } finally {
       this.proofUploading.set(false);
     }
   }

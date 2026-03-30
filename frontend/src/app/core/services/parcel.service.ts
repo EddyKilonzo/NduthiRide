@@ -22,6 +22,22 @@ export class ParcelService {
     }
   }
 
+  async getRiderHistory(page = 1, limit = 10, status?: ParcelStatus): Promise<{ data: Parcel[]; total: number; totalPages: number }> {
+    try {
+      return await this.api.getRiderHistory(page, limit, status);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getNearby(lat?: number, lng?: number, radiusKm?: number): Promise<Parcel[]> {
+    try {
+      return await this.api.getNearby(lat, lng, radiusKm);
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async getById(id: string): Promise<Parcel> {
     try {
       return await this.api.getById(id);
@@ -62,7 +78,7 @@ export class ParcelService {
     }
   }
 
-  async estimate(dto: { pickupLat: number; pickupLng: number; dropoffLat: number; dropoffLng: number; weightKg: number }): Promise<{ deliveryFee: number; distanceKm: number }> {
+  async estimate(dto: { pickupLat: number; pickupLng: number; dropoffLat: number; dropoffLng: number; weightKg: number }): Promise<{ deliveryFee: number; distanceKm: number; baseFee?: number; perKmRate?: number; weightSurcharge?: number }> {
     try {
       return await this.api.estimate(dto);
     } catch (error) {

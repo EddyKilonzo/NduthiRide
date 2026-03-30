@@ -102,6 +102,15 @@ export class ChatService implements OnDestroy {
 
   // ─── REST fallback (Secure async/await) ──────────────────────────
 
+  async getMyConversations(): Promise<any[]> {
+    try {
+      const res = await lastValueFrom(this.http.get<ApiResponse<any[]>>(`${this.base}/conversations`));
+      return res.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async getConversationByRide(rideId: string): Promise<Conversation> {
     try {
       const res = await lastValueFrom(this.http.get<ApiResponse<Conversation>>(`${this.base}/conversation/ride/${rideId}`));

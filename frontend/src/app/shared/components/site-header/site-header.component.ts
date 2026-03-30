@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { ThemeService } from '../../../core/services/theme.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { NotificationsService } from '../../../core/services/notifications.service';
 
 @Component({
   selector: 'app-site-header',
@@ -14,8 +15,10 @@ import { AuthService } from '../../../core/services/auth.service';
 export class SiteHeaderComponent implements AfterViewInit {
   private readonly themeSvc = inject(ThemeService);
   protected readonly auth = inject(AuthService);
+  protected readonly notificationsSvc = inject(NotificationsService);
 
   readonly isDark = this.themeSvc.theme;
+  readonly unreadNotifications = this.notificationsSvc.unreadCount;
 
   /** Home route for the signed-in role (shell + public pages with a session). */
   protected readonly dashboardPath = computed(() => {

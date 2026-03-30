@@ -22,6 +22,22 @@ export class RideService {
     }
   }
 
+  async getRiderHistory(page = 1, limit = 10, status?: RideStatus): Promise<{ data: Ride[]; total: number; totalPages: number }> {
+    try {
+      return await this.api.getRiderHistory(page, limit, status);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getNearby(lat?: number, lng?: number, radiusKm?: number): Promise<Ride[]> {
+    try {
+      return await this.api.getNearby(lat, lng, radiusKm);
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async getById(id: string): Promise<Ride> {
     try {
       return await this.api.getById(id);

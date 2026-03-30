@@ -17,6 +17,20 @@ export class RidesApi extends BaseApiService {
     return this.get<{ data: Ride[]; total: number; totalPages: number }>(this.path, params);
   }
 
+  async getRiderHistory(page = 1, limit = 10, status?: RideStatus): Promise<{ data: Ride[]; total: number; totalPages: number }> {
+    let params = new HttpParams().set('page', page).set('limit', limit);
+    if (status) params = params.set('status', status);
+    return this.get<{ data: Ride[]; total: number; totalPages: number }>(`${this.path}/rider/history`, params);
+  }
+
+  async getNearby(lat?: number, lng?: number, radiusKm?: number): Promise<Ride[]> {
+    let params = new HttpParams();
+    if (lat !== undefined) params = params.set('lat', lat);
+    if (lng !== undefined) params = params.set('lng', lng);
+    if (radiusKm !== undefined) params = params.set('radiusKm', radiusKm);
+    return this.get<Ride[]>(`${this.path}/nearby`, params);
+  }
+
   async getById(id: string): Promise<Ride> {
     return this.get<Ride>(`${this.path}/${id}`);
   }

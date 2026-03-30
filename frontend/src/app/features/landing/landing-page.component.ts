@@ -11,8 +11,6 @@ import { TextTypeComponent } from '../../shared/components/text-type/text-type.c
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule } from 'lucide-angular';
 
-gsap.registerPlugin(ScrollTrigger);
-
 @Component({
   selector: 'app-landing-page',
   standalone: true,
@@ -22,7 +20,9 @@ gsap.registerPlugin(ScrollTrigger);
 })
 export class LandingPageComponent implements AfterViewInit, OnDestroy {
   private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
   private revealObserver: IntersectionObserver | null = null;
+  private scrollHandler: (() => void) | null = null;
 
   readonly heroTypewriterLines = [
     'Ride & Deliver',
@@ -167,6 +167,8 @@ export class LandingPageComponent implements AfterViewInit, OnDestroy {
   ];
 
   ngAfterViewInit(): void {
+    if (!this.isBrowser) return;
+    gsap.registerPlugin(ScrollTrigger);
     this.initHeroGridReveal();
     this.initHeroGSAPAnimation();
     // Two rAFs: wait until the browser paints after *ngFor / child components.
@@ -178,6 +180,10 @@ export class LandingPageComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.revealObserver?.disconnect();
     this.revealObserver = null;
+    if (this.scrollHandler && this.isBrowser) {
+      window.removeEventListener('scroll', this.scrollHandler);
+      this.scrollHandler = null;
+    }
   }
 
   toggleFaq(index: number): void {
@@ -255,12 +261,13 @@ export class LandingPageComponent implements AfterViewInit, OnDestroy {
     gsap.to('.orb-1', { y: 30, x: 20, duration: 4, repeat: -1, yoyo: true, ease: 'sine.inOut' });
     gsap.to('.orb-2', { y: -25, x: -15, duration: 5, repeat: -1, yoyo: true, ease: 'sine.inOut', delay: 0.5 });
 
-    window.addEventListener('scroll', () => {
+    this.scrollHandler = () => {
       const scrolled = window.scrollY;
       if (scrolled < 1000) {
         gsap.to('.orb-1', { y: scrolled * 0.1, duration: 0.5 });
         gsap.to('.orb-2', { y: -scrolled * 0.08, duration: 0.5 });
       }
-    });
+    };
+    window.addEventListener('scroll', this.scrollHandler);
   }
 }

@@ -125,7 +125,7 @@
   font-size: clamp(40px, 6vw, 80px);
   font-weight: 800;
   line-height: 1.1;
-  color: #000;
+  color: var(--clr-text);
   letter-spacing: -0.03em;
   margin-bottom: 24px;
 }
@@ -134,7 +134,7 @@
 .hero__title-line {
   display: block;
   margin-bottom: 0.06em;
-  color: #000;
+  color: var(--clr-text);
 }
 
 .hero__typewriter {
@@ -142,14 +142,14 @@
   margin-top: 0.04em;
   min-height: 1.25em;
   font-size: clamp(24px, 3.5vw, 42px);
-  color: #000;
+  color: var(--clr-text);
 }
 
 /* Dark mode - light text for hero title */
 :host-context(html.dark) .hero__title,
 :host-context(html.dark) .hero__title-line,
 :host-context(html.dark) .hero__typewriter {
-  color: #fff;
+  color: var(--clr-text);
 }
 
 .hero__subtitle {

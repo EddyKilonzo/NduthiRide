@@ -20,6 +20,12 @@ import {
   Globe, Wind, Building2, Lock, Heart,
   // Auth additions
   Eye, EyeOff, UserPlus, Send, UploadCloud, Image,
+  // Additional icons
+  FileText, Camera, Plus, CircleX,
+  // Missing icons identified from components
+  RotateCw, UserCog, FileSearch, ShieldOff, ShieldCheck, UserX, UserCheck,
+  PieChart, Banknote, Gauge, ZoomIn, ImageOff, HelpCircle, ImagePlus,
+  TriangleAlert, Info, Filter,
 } from 'lucide-angular';
 
 export const appConfig: ApplicationConfig = {
@@ -46,6 +52,10 @@ export const appConfig: ApplicationConfig = {
         Layers, Twitter, Facebook, Instagram, Navigation, Award,
         Globe, Wind, Building2, Lock, Heart,
         Eye, EyeOff, UserPlus, Send, UploadCloud, Image,
+        FileText, Camera, Plus, CircleX,
+        RotateCw, UserCog, FileSearch, ShieldOff, ShieldCheck, UserX, UserCheck,
+        PieChart, Banknote, Gauge, ZoomIn, ImageOff, HelpCircle, ImagePlus,
+        TriangleAlert, Info, Filter,
       }),
     },
   ]

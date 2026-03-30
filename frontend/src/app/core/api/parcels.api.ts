@@ -17,6 +17,20 @@ export class ParcelsApi extends BaseApiService {
     return this.get<{ data: Parcel[]; total: number; totalPages: number }>(this.path, params);
   }
 
+  async getRiderHistory(page = 1, limit = 10, status?: ParcelStatus): Promise<{ data: Parcel[]; total: number; totalPages: number }> {
+    let params = new HttpParams().set('page', page).set('limit', limit);
+    if (status) params = params.set('status', status);
+    return this.get<{ data: Parcel[]; total: number; totalPages: number }>(`${this.path}/rider/history`, params);
+  }
+
+  async getNearby(lat?: number, lng?: number, radiusKm?: number): Promise<Parcel[]> {
+    let params = new HttpParams();
+    if (lat !== undefined) params = params.set('lat', lat);
+    if (lng !== undefined) params = params.set('lng', lng);
+    if (radiusKm !== undefined) params = params.set('radiusKm', radiusKm);
+    return this.get<Parcel[]>(`${this.path}/nearby`, params);
+  }
+
   async getById(id: string): Promise<Parcel> {
     return this.get<Parcel>(`${this.path}/${id}`);
   }
@@ -37,12 +51,12 @@ export class ParcelsApi extends BaseApiService {
     return this.patch<Parcel>(`${this.path}/${id}/proof`, { imageUrl });
   }
 
-  async estimate(dto: { pickupLat: number; pickupLng: number; dropoffLat: number; dropoffLng: number; weightKg: number }): Promise<{ deliveryFee: number; distanceKm: number }> {
+  async estimate(dto: { pickupLat: number; pickupLng: number; dropoffLat: number; dropoffLng: number; weightKg: number }): Promise<{ deliveryFee: number; distanceKm: number; baseFee?: number; perKmRate?: number; weightSurcharge?: number }> {
     const params = new HttpParams()
       .set('pickupLat', dto.pickupLat).set('pickupLng', dto.pickupLng)
       .set('dropoffLat', dto.dropoffLat).set('dropoffLng', dto.dropoffLng)
       .set('weightKg', dto.weightKg);
-    return this.get<{ deliveryFee: number; distanceKm: number }>(`${this.path}/estimate`, params);
+    return this.get<{ deliveryFee: number; distanceKm: number; baseFee?: number; perKmRate?: number; weightSurcharge?: number }>(`${this.path}/estimate`, params);
   }
 
   async rate(id: string, score: number, comment?: string): Promise<void> {

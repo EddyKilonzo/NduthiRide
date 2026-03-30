@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../../../core/services/auth.service';
+import { MediaService } from '../../../core/services/media.service';
 import { ToastService } from '../../../core/services/toast.service';
 import type { AccountProfile, UpdateProfileRequest } from '../../../core/api/users.api';
 import { SpinnerComponent } from '../spinner/spinner.component';
@@ -146,6 +147,7 @@ export class AccountProfileEditorComponent implements OnInit {
   protected readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly toast = inject(ToastService);
+  private readonly mediaService = inject(MediaService);
 
   readonly profileLoaded = output<AccountProfile>();
 
@@ -156,9 +158,10 @@ export class AccountProfileEditorComponent implements OnInit {
   /**
    * `undefined` = use server avatar only;
    * `null` = user chose remove (save sends avatarUrl: null);
-   * `string` = new data URL to save.
+   * `string` = new data URL preview to show.
    */
   protected readonly avatarDraft = signal<string | null | undefined>(undefined);
+  private readonly newFile = signal<File | null>(null);
 
   protected readonly avatarPreview = computed(() => {
     const draft = this.avatarDraft();
@@ -211,6 +214,7 @@ export class AccountProfileEditorComponent implements OnInit {
       });
       this.form.patchValue({ fullName: p.fullName, phone: p.phone });
       this.avatarDraft.set(undefined);
+      this.newFile.set(null);
       this.profileLoaded.emit(p);
     } catch {
       const u = this.auth.user();
@@ -242,6 +246,7 @@ export class AccountProfileEditorComponent implements OnInit {
     try {
       const dataUrl = await this.imageToJpegDataUrl(file);
       this.avatarDraft.set(dataUrl);
+      this.newFile.set(file);
     } catch {
       this.toast.error('Could not process that image — try another file');
     } finally {
@@ -301,6 +306,7 @@ export class AccountProfileEditorComponent implements OnInit {
 
   protected removePhoto(): void {
     this.avatarDraft.set(null);
+    this.newFile.set(null);
   }
 
   protected async saveProfile(): Promise<void> {
@@ -314,13 +320,26 @@ export class AccountProfileEditorComponent implements OnInit {
       fullName: v.fullName.trim(),
       phone: v.phone,
     };
+    
     const draft = this.avatarDraft();
-    if (draft !== undefined) {
-      body.avatarUrl = draft;
+    const fileToUpload = this.newFile();
+
+    if (draft === null) {
+      body.avatarUrl = null;
+    } else if (draft !== undefined && fileToUpload) {
+      try {
+        this.toast.info('Uploading photo...');
+        body.avatarUrl = await this.mediaService.uploadImage(fileToUpload);
+      } catch (error) {
+        this.toast.error('Cloudinary upload failed. Using compressed image instead.');
+        body.avatarUrl = draft;
+      }
     }
+
     try {
       const p = await this.auth.updateProfile(body);
       this.avatarDraft.set(undefined);
+      this.newFile.set(null);
       this.toast.success('Profile updated');
       this.profileLoaded.emit(p);
     } finally {

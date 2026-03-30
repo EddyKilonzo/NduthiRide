@@ -45,11 +45,9 @@ import { ChangePasswordFormComponent } from '../../../shared/components/change-p
   `,
   styles: [`
     .user-profile { animation: fadeIn 0.45s ease-out; }
-    .page-head {
-      margin-bottom: 28px;
-      h1 { font-size: 22px; font-weight: 700; color: var(--clr-text); }
-      p { color: var(--clr-text-muted); font-size: 14px; margin-top: 4px; }
-    }
+    .page-head { margin-bottom: 28px; }
+    .page-head h1 { font-size: 22px; font-weight: 700; color: var(--clr-text); }
+    .page-head p { color: var(--clr-text-muted); font-size: 14px; margin-top: 4px; }
     .profile-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -83,9 +81,9 @@ import { ChangePasswordFormComponent } from '../../../shared/components/change-p
       display: flex; justify-content: space-between; gap: 12px;
       font-size: 14px; padding: 12px 0; border-bottom: 1px solid var(--clr-border);
       color: var(--clr-text-muted);
-      &:last-child { border-bottom: none; }
-      strong { color: var(--clr-text); font-weight: 600; text-align: right; word-break: break-all; }
     }
+    .info-row:last-child { border-bottom: none; }
+    .info-row strong { color: var(--clr-text); font-weight: 600; text-align: right; word-break: break-all; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @media (max-width: 899px) {
       .panel--editor { grid-column: 1 / -1; grid-row: auto; }

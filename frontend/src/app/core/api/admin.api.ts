@@ -49,4 +49,43 @@ export class AdminApi extends BaseApiService {
     if (method) params = params.set('method', method);
     return this.get<PaginatedResult<Payment>>(`${this.path}/payments`, params);
   }
+
+  // ─── Settings ───────────────────────────────────────────
+
+  async getSettings(): Promise<Record<string, string>> {
+    return this.get<Record<string, string>>(`${this.path}/settings`);
+  }
+
+  async updateSettings(settings: Record<string, string>): Promise<void> {
+    return this.patch<void>(`${this.path}/settings`, settings);
+  }
+
+  // ─── Payouts ────────────────────────────────────────────
+
+  async listPayouts(page = 1, limit = 20): Promise<PaginatedResult<any>> {
+    const params = new HttpParams().set('page', page).set('limit', limit);
+    return this.get<PaginatedResult<any>>(`${this.path}/payouts`, params);
+  }
+
+  async updatePayoutStatus(id: string, status: string, reference?: string): Promise<any> {
+    return this.patch<any>(`${this.path}/payouts/${id}`, { status, reference });
+  }
+
+  // ─── Support ────────────────────────────────────────────
+
+  async listSupportTickets(page = 1, limit = 20): Promise<PaginatedResult<any>> {
+    const params = new HttpParams().set('page', page).set('limit', limit);
+    return this.get<PaginatedResult<any>>(`${this.path}/support/tickets`, params);
+  }
+
+  async updateTicketStatus(id: string, status: string): Promise<any> {
+    return this.patch<any>(`${this.path}/support/tickets/${id}`, { status });
+  }
+
+  // ─── Audit Logs ─────────────────────────────────────────
+
+  async listAuditLogs(page = 1, limit = 20): Promise<PaginatedResult<any>> {
+    const params = new HttpParams().set('page', page).set('limit', limit);
+    return this.get<PaginatedResult<any>>(`${this.path}/audit-logs`, params);
+  }
 }

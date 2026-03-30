@@ -70,7 +70,12 @@ import type { Parcel } from '../../../core/models/parcel.models';
           <!-- Rider card -->
           @if (parcel()!.rider) {
             <div class="card">
-              <h3 class="card-title">Your Rider</h3>
+              <div class="card-header-with-action">
+                <h3 class="card-title">Your Rider</h3>
+                <a [routerLink]="['/user/chat/parcel', parcel()!.id]" class="btn btn--secondary btn--sm">
+                  <lucide-icon name="message-square" [size]="14"></lucide-icon> Chat
+                </a>
+              </div>
               <div class="rider-info">
                 <div class="avatar">{{ parcel()!.rider!.account.fullName.charAt(0) }}</div>
                 <div>
@@ -120,6 +125,15 @@ import type { Parcel } from '../../../core/models/parcel.models';
                 (click)="submitRating()">Submit Rating</button>
             </div>
           }
+
+          <!-- Support action -->
+          <div class="card support-box">
+            <h3 class="card-title">Need Help?</h3>
+            <p class="support-text">Having trouble with this delivery? Our support team is here to help.</p>
+            <a [routerLink]="['/user/support']" [queryParams]="{ subject: 'Issue with Parcel ' + parcel()!.id.slice(0,8) }" class="btn btn--secondary btn--full">
+              <lucide-icon name="help-circle" [size]="18"></lucide-icon> Report an Issue
+            </a>
+          </div>
         </div>
       }
     </div>
@@ -127,13 +141,16 @@ import type { Parcel } from '../../../core/models/parcel.models';
   styles: [`
     .detail-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; }
     .card-title { font-size: 13px; font-weight: 600; color: var(--clr-text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 16px; }
+    .card-header-with-action { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .card-header-with-action .card-title { margin-bottom: 0; }
     .route-item { display: flex; align-items: flex-start; gap: 12px; }
     .route-line { width: 2px; height: 20px; background: var(--clr-border); margin: 4px 6px; }
     .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
     .dot--pickup { background: var(--clr-primary); }
     .dot--drop   { background: var(--clr-success); }
     .route-label { font-size: 11px; color: var(--clr-text-muted); text-transform: uppercase; }
-    .info-row { display: flex; justify-content: space-between; font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--clr-border); &:last-child { border: none; } color: var(--clr-text-muted); }
+    .info-row { display: flex; justify-content: space-between; font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--clr-border); color: var(--clr-text-muted); }
+    .info-row:last-child { border: none; }
     .rider-info { display: flex; align-items: flex-start; gap: 12px; }
     .avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--clr-primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; flex-shrink: 0; }
     .rider-name { font-weight: 600; }
@@ -146,9 +163,11 @@ import type { Parcel } from '../../../core/models/parcel.models';
     .star-btn {
       padding: 4px; color: var(--clr-text-dim); cursor: pointer; transition: color var(--transition), transform 0.15s ease;
       border-radius: 8px;
-      &:hover { color: var(--clr-warning); transform: scale(1.06); }
     }
+    .star-btn:hover { color: var(--clr-warning); transform: scale(1.06); }
     .star-btn--active { color: var(--clr-warning); }
+    .support-box { background: rgba(var(--clr-primary-rgb), 0.03); border-style: dashed; }
+    .support-text { font-size: 13px; color: var(--clr-text-muted); margin-bottom: 16px; }
     @media (max-width: 640px) {
       .detail-grid { grid-template-columns: 1fr; }
     }

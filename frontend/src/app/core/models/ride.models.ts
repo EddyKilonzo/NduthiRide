@@ -60,4 +60,6 @@ export interface FareEstimate {
   distanceKm: number;
   estimatedMins: number;
   estimatedFare: number;
+  baseFare?: number;
+  perKmRate?: number;
 }

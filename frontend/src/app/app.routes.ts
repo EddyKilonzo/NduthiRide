@@ -1,9 +1,10 @@
 import { inject } from '@angular/core';
 import { Routes } from '@angular/router';
 
-import { authGuard }  from './core/guards/auth.guard';
-import { guestGuard } from './core/guards/guest.guard';
-import { roleGuard }  from './core/guards/role.guard';
+import { authGuard }         from './core/guards/auth.guard';
+import { guestGuard }        from './core/guards/guest.guard';
+import { roleGuard }         from './core/guards/role.guard';
+import { riderProfileGuard } from './core/guards/rider-profile.guard';
 import { AuthService } from './core/services/auth.service';
 
 import { ShellComponent }           from './features/shell/shell.component';
@@ -29,11 +30,22 @@ import { ParcelDetailComponent }    from './features/user/parcels/parcel-detail.
 import { UserProfileComponent }     from './features/user/profile/user-profile.component';
 
 // Rider
-import { RiderDashboardComponent }  from './features/rider/dashboard/rider-dashboard.component';
-import { RiderActiveComponent }     from './features/rider/active/rider-active.component';
-import { RiderHistoryComponent }    from './features/rider/history/rider-history.component';
-import { RiderEarningsComponent }   from './features/rider/earnings/rider-earnings.component';
-import { RiderProfileComponent }    from './features/rider/profile/rider-profile.component';
+import { RiderDashboardComponent }      from './features/rider/dashboard/rider-dashboard.component';
+import { RiderActiveComponent }         from './features/rider/active/rider-active.component';
+import { RiderHistoryComponent }        from './features/rider/history/rider-history.component';
+import { RiderEarningsComponent }       from './features/rider/earnings/rider-earnings.component';
+import { RiderProfileComponent }        from './features/rider/profile/rider-profile.component';
+import { RiderVerifyDetailsComponent }  from './features/rider/verify-details/rider-verify-details.component';
+
+// Chat
+import { ChatComponent } from './features/chat/chat.component';
+import { ChatListComponent } from './features/chat/chat-list.component';
+
+// Notifications
+import { NotificationsComponent } from './features/notifications/notifications.component';
+
+// Support
+import { SupportComponent } from './features/support/support.component';
 
 // Admin
 import { AdminDashboardComponent }  from './features/admin/dashboard/admin-dashboard.component';
@@ -41,7 +53,11 @@ import { AdminAccountsComponent }   from './features/admin/accounts/admin-accoun
 import { AdminRidesComponent }      from './features/admin/rides/admin-rides.component';
 import { AdminParcelsComponent }    from './features/admin/parcels/admin-parcels.component';
 import { AdminPaymentsComponent }   from './features/admin/payments/admin-payments.component';
-import { AdminProfileComponent }      from './features/admin/profile/admin-profile.component';
+import { AdminPayoutsComponent }    from './features/admin/payouts/admin-payouts.component';
+import { AdminSettingsComponent }   from './features/admin/settings/admin-settings.component';
+import { AdminAuditLogsComponent }  from './features/admin/audit-logs/admin-audit-logs.component';
+import { AdminProfileComponent }    from './features/admin/profile/admin-profile.component';
+
 
 export const routes: Routes = [
 
@@ -86,14 +102,27 @@ export const routes: Routes = [
       { path: 'parcels',     component: MyParcelsComponent },
       { path: 'parcels/:id', component: ParcelDetailComponent },
       { path: 'profile',     component: UserProfileComponent },
+      { path: 'notifications', component: NotificationsComponent },
+      { path: 'support',       component: SupportComponent },
+      { path: 'chat',          component: ChatListComponent },
+      { path: 'chat/ride/:rideId',   component: ChatComponent },
+      { path: 'chat/parcel/:parcelId', component: ChatComponent },
     ],
+  },
+
+  // ── Rider: profile completion (standalone, no shell) ────────────────────
+  {
+    path: 'rider/verify-details',
+    component: RiderVerifyDetailsComponent,
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['RIDER'] },
   },
 
   // ── Rider shell ─────────────────────────────────────────────────────────
   {
     path: 'rider',
     component: ShellComponent,
-    canActivate: [authGuard, roleGuard],
+    canActivate: [authGuard, roleGuard, riderProfileGuard],
     data: { roles: ['RIDER'] },
     children: [
       { path: '',         component: RiderDashboardComponent },
@@ -101,6 +130,11 @@ export const routes: Routes = [
       { path: 'history',  component: RiderHistoryComponent },
       { path: 'earnings', component: RiderEarningsComponent },
       { path: 'profile',  component: RiderProfileComponent },
+      { path: 'notifications', component: NotificationsComponent },
+      { path: 'support',       component: SupportComponent },
+      { path: 'chat',          component: ChatListComponent },
+      { path: 'chat/ride/:rideId',   component: ChatComponent },
+      { path: 'chat/parcel/:parcelId', component: ChatComponent },
     ],
   },
 
@@ -116,7 +150,12 @@ export const routes: Routes = [
       { path: 'rides',     component: AdminRidesComponent },
       { path: 'parcels',   component: AdminParcelsComponent },
       { path: 'payments',  component: AdminPaymentsComponent },
+      { path: 'payouts',   component: AdminPayoutsComponent },
+      { path: 'settings',  component: AdminSettingsComponent },
+      { path: 'audit-logs', component: AdminAuditLogsComponent },
       { path: 'profile',   component: AdminProfileComponent },
+      { path: 'notifications', component: NotificationsComponent },
+      { path: 'support',       component: SupportComponent },
     ],
   },
 

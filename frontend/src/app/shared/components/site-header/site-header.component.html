@@ -18,6 +18,14 @@
     </div>
 
     <div class="nav__actions">
+      @if (auth.isAuth()) {
+        <button class="nav__notif-btn" type="button" [routerLink]="[dashboardPath(), 'notifications']" aria-label="Notifications">
+          <lucide-icon name="bell" [size]="18"></lucide-icon>
+          @if (unreadNotifications() > 0) {
+            <span class="nav__notif-badge">{{ unreadNotifications() > 9 ? '9+' : unreadNotifications() }}</span>
+          }
+        </button>
+      }
       <button class="theme-toggle" type="button" (click)="toggleTheme()" aria-label="Toggle theme">
         <lucide-icon [name]="isDark() ? 'sun' : 'moon'" [size]="18"></lucide-icon>
       </button>

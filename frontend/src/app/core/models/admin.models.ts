@@ -6,6 +6,7 @@ export interface DashboardStats {
   totalParcels: number;
   totalRevenue: number;
   activeRides: number;
+  suspiciousCount?: number;
   verifiedRiders?: number;
   availableRiders?: number;
   completedRides?: number;

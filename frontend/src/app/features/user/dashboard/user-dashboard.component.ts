@@ -121,11 +121,10 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
       display: flex; align-items: center; gap: 20px; padding: 24px;
       border-radius: var(--radius-lg); border: 1px solid var(--clr-border);
       transition: all var(--transition); text-decoration: none; box-shadow: var(--shadow-card);
-      &:hover { transform: translateY(-4px); border-color: var(--clr-primary); }
-      
-      &--primary { background: linear-gradient(135deg, rgba(255,107,0,.1) 0%, rgba(255,107,0,.05) 100%); }
-      &--secondary { background: linear-gradient(135deg, rgba(59,130,246,.1) 0%, rgba(59,130,246,.05) 100%); }
     }
+    .action-card:hover { transform: translateY(-4px); border-color: var(--clr-primary); }
+    .action-card--primary { background: linear-gradient(135deg, color-mix(in srgb, var(--clr-primary) 18%, transparent) 0%, color-mix(in srgb, var(--clr-primary-dark) 10%, transparent) 100%); }
+    .action-card--secondary { background: linear-gradient(135deg, color-mix(in srgb, var(--clr-primary-light) 26%, transparent) 0%, color-mix(in srgb, var(--clr-primary) 10%, transparent) 100%); }
     .action-icon {
       width: 64px; height: 64px; flex-shrink: 0;
       background: var(--clr-bg-card); border-radius: var(--radius-md);
@@ -146,8 +145,8 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
       border-radius: var(--radius-md); padding: 16px; cursor: pointer;
       transition: background var(--transition), transform 0.2s ease;
       box-shadow: var(--shadow-card);
-      &:hover { background: var(--clr-bg-elevated); transform: translateY(-2px); }
     }
+    .job-card:hover { background: var(--clr-bg-elevated); transform: translateY(-2px); }
     .job-info { margin: 12px 0; }
     .address { font-size: 13px; color: var(--clr-text); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .item { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
@@ -159,8 +158,8 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
       background: var(--clr-bg-card); border: 1px dashed var(--clr-border);
       border-radius: var(--radius-md); padding: 40px; text-align: center; color: var(--clr-text-muted);
       box-shadow: var(--shadow-card);
-      .empty-icon { margin-bottom: 12px; opacity: .35; display: flex; justify-content: center; color: var(--clr-text-dim); }
     }
+    .empty-card .empty-icon { margin-bottom: 12px; opacity: .35; display: flex; justify-content: center; color: var(--clr-text-dim); }
     .section-loader { padding: 40px; display: flex; justify-content: center; }
   `],
 })

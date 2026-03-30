@@ -13,10 +13,19 @@ export interface AuthUser {
   avatarUrl: string | null;
   role: Role;
   isActive: boolean;
+  rider?: {
+    isVerified: boolean;
+    isAvailable: boolean;
+    ratingAverage: number;
+    totalRides: number;
+    licenseNumber: string | null;
+    bikeRegistration: string | null;
+    bikeModel: string | null;
+  } | null;
 }
 
 export interface LoginDto {
-  email: string;
+  credential: string;
   password: string;
 }
 

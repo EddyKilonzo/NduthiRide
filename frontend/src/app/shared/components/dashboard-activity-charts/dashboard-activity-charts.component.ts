@@ -36,28 +36,19 @@ interface BarSpec {
       </div>
 
       <div class="analysis-grid">
-        <div class="analysis-card modern-shadow">
-          <lucide-icon name="banknote" [size]="20" class="analysis-card__icon"></lucide-icon>
+        <div class="analysis-card modern-shadow analysis-card--revenue">
+          <span class="analysis-card__icon-wrap">
+            <lucide-icon name="banknote" [size]="20" class="analysis-card__icon"></lucide-icon>
+          </span>
           <span class="analysis-card__label">{{ copy().amount7d }}</span>
           <strong class="analysis-card__value">KES {{ analysis().weekAmount | number:'1.0-0' }}</strong>
         </div>
-        <div class="analysis-card modern-shadow">
-          <lucide-icon name="layers" [size]="20" class="analysis-card__icon"></lucide-icon>
+        <div class="analysis-card modern-shadow analysis-card--jobs">
+          <span class="analysis-card__icon-wrap">
+            <lucide-icon name="layers" [size]="20" class="analysis-card__icon"></lucide-icon>
+          </span>
           <span class="analysis-card__label">{{ copy().jobsLabel }}</span>
           <strong class="analysis-card__value">{{ analysis().weekJobs }}</strong>
-        </div>
-        <div class="analysis-card modern-shadow">
-          <lucide-icon name="gauge" [size]="20" class="analysis-card__icon"></lucide-icon>
-          <span class="analysis-card__label">{{ copy().avgLabel }}</span>
-          <strong class="analysis-card__value">KES {{ analysis().avgPerJob | number:'1.0-0' }}</strong>
-        </div>
-        <div class="analysis-card modern-shadow">
-          <lucide-icon name="bike" [size]="20" class="analysis-card__icon"></lucide-icon>
-          <span class="analysis-card__label">{{ copy().rideShareLabel }}</span>
-          <strong class="analysis-card__value">{{ analysis().rideSharePct | number:'1.0-0' }}%</strong>
-          <div class="mix-bar" aria-hidden="true">
-            <div class="mix-bar__rides" [style.width.%]="analysis().rideSharePct"></div>
-          </div>
         </div>
       </div>
 
@@ -71,16 +62,22 @@ interface BarSpec {
             </div>
           </div>
           <div class="chart-svg-wrap">
-            <svg viewBox="0 0 340 150" class="performance-chart" preserveAspectRatio="xMidYMid meet">
-              @for (g of yGridLines(); track $index) {
-                <line [attr.x1]="36" [attr.y1]="g" x2="328" [attr.y2]="g" class="chart-grid-line" />
-              }
-              @for (b of barSpecs(); track $index) {
-                <rect [attr.x]="b.ride.x" [attr.y]="b.ride.y" [attr.width]="b.ride.w" [attr.height]="b.ride.h" class="bar bar-ride" rx="3" />
-                <rect [attr.x]="b.parcel.x" [attr.y]="b.parcel.y" [attr.width]="b.parcel.w" [attr.height]="b.parcel.h" class="bar bar-parcel" rx="3" />
-                <text [attr.x]="b.labelX" y="142" class="chart-label">{{ b.label }}</text>
-              }
-            </svg>
+            @if (barSpecs().length === 0 && !chartsLoading()) {
+              <div class="chart-empty">
+                <span class="chart-empty__text">No activity data yet</span>
+              </div>
+            } @else {
+              <svg viewBox="0 0 340 150" class="performance-chart" preserveAspectRatio="xMidYMid meet">
+                @for (g of yGridLines(); track $index) {
+                  <line [attr.x1]="36" [attr.y1]="g" x2="328" [attr.y2]="g" class="chart-grid-line" />
+                }
+                @for (b of barSpecs(); track $index) {
+                  <rect [attr.x]="b.ride.x" [attr.y]="b.ride.y" [attr.width]="b.ride.w" [attr.height]="b.ride.h" class="bar bar-ride" rx="3" />
+                  <rect [attr.x]="b.parcel.x" [attr.y]="b.parcel.y" [attr.width]="b.parcel.w" [attr.height]="b.parcel.h" class="bar bar-parcel" rx="3" />
+                  <text [attr.x]="b.labelX" y="142" class="chart-label">{{ b.label }}</text>
+                }
+              </svg>
+            }
           </div>
         </div>
 
@@ -93,15 +90,15 @@ interface BarSpec {
             <svg viewBox="0 0 340 150" class="performance-chart" preserveAspectRatio="xMidYMid meet">
               <defs>
                 <linearGradient [attr.id]="gradientId()" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#408A71" stop-opacity="0.45" />
-                  <stop offset="100%" stop-color="#408A71" stop-opacity="0" />
+                  <stop offset="0%" stop-color="var(--clr-primary)" stop-opacity="0.45" />
+                  <stop offset="100%" stop-color="var(--clr-primary)" stop-opacity="0" />
                 </linearGradient>
               </defs>
               @for (g of lineYGrid(); track $index) {
                 <line [attr.x1]="28" [attr.y1]="g.y" x2="312" [attr.y2]="g.y" class="chart-grid-line" />
                 <text x="4" [attr.y]="g.y + 4" class="chart-axis-label">{{ g.label }}</text>
               }
-              @if (amountLine().areaD) {
+              @if (amountLine().areaD && !chartsLoading()) {
                 <path [attr.d]="amountLine().areaD" [attr.fill]="'url(#' + gradientId() + ')'" class="chart-area-fill" />
                 <path [attr.d]="amountLine().lineD" class="chart-line-path" fill="none" />
               }
@@ -116,7 +113,13 @@ interface BarSpec {
     </section>
   `,
   styles: [`
-    .activity-charts-root { margin-top: 0; }
+    .activity-charts-root {
+      margin-top: 0;
+      background: linear-gradient(180deg, rgba(64,138,113,0.06), transparent 22%);
+      border: 1px solid var(--clr-border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+    }
     .section-title {
       font-size: 16px;
       font-weight: 700;
@@ -147,10 +150,12 @@ interface BarSpec {
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 16px;
       margin-bottom: 24px;
+      width: 100%;
     }
     .analysis-card {
       background: var(--clr-bg-card);
       border: 1px solid var(--clr-border);
+      border-left-width: 4px;
       border-radius: var(--radius-lg);
       padding: 18px 16px;
       display: flex;
@@ -158,7 +163,27 @@ interface BarSpec {
       gap: 6px;
       box-shadow: var(--shadow-card);
     }
-    .analysis-card__icon { color: var(--clr-primary); opacity: 0.9; }
+    .analysis-card__icon-wrap {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--clr-bg-card);
+      border: 1px solid var(--clr-border);
+      box-shadow: var(--shadow-card);
+      margin-bottom: 2px;
+    }
+    .analysis-card__icon { color: var(--clr-primary); opacity: 0.95; }
+    .analysis-card--revenue { border-color: color-mix(in srgb, var(--clr-primary-dark) 55%, var(--clr-border)); }
+    .analysis-card--jobs { border-color: color-mix(in srgb, var(--clr-primary) 55%, var(--clr-border)); }
+    .analysis-card--avg { border-color: color-mix(in srgb, var(--clr-primary-light) 75%, var(--clr-border)); }
+    .analysis-card--mix { border-color: color-mix(in srgb, var(--clr-primary) 45%, var(--clr-border)); }
+    .analysis-card--revenue .analysis-card__icon-wrap { border-color: color-mix(in srgb, var(--clr-primary-dark) 50%, var(--clr-border)); }
+    .analysis-card--jobs .analysis-card__icon-wrap { border-color: color-mix(in srgb, var(--clr-primary) 50%, var(--clr-border)); }
+    .analysis-card--avg .analysis-card__icon-wrap { border-color: color-mix(in srgb, var(--clr-primary-light) 70%, var(--clr-border)); }
+    .analysis-card--mix .analysis-card__icon-wrap { border-color: color-mix(in srgb, var(--clr-primary) 40%, var(--clr-border)); }
     .analysis-card__label {
       font-size: 11px;
       font-weight: 600;
@@ -167,10 +192,13 @@ interface BarSpec {
       letter-spacing: 0.04em;
     }
     .analysis-card__value {
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 800;
       font-family: var(--font-display);
       color: var(--clr-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .mix-bar {
       height: 6px;
@@ -181,7 +209,7 @@ interface BarSpec {
     }
     .mix-bar__rides {
       height: 100%;
-      background: linear-gradient(90deg, var(--clr-primary), #285a48);
+      background: linear-gradient(90deg, var(--clr-primary), var(--clr-primary-dark));
       border-radius: 3px;
       transition: width 0.4s ease;
     }
@@ -210,7 +238,15 @@ interface BarSpec {
       min-height: 160px;
       aspect-ratio: 340 / 150;
       max-height: 220px;
+      position: relative;
     }
+    .chart-empty {
+      width: 100%; height: 100%; min-height: 160px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--clr-bg-elevated); border-radius: var(--radius-md);
+      border: 1px dashed var(--clr-border);
+    }
+    .chart-empty__text { font-size: 13px; color: var(--clr-text-muted); }
     .chart-svg-wrap--line { min-height: 170px; }
     .performance-chart { width: 100%; height: 100%; display: block; overflow: visible; }
     .chart-grid-line {
@@ -221,7 +257,7 @@ interface BarSpec {
     }
     .bar { transition: height 0.45s ease, y 0.45s ease; }
     .bar-ride { fill: var(--clr-primary); opacity: 0.88; }
-    .bar-parcel { fill: #3b82f6; opacity: 0.88; }
+    .bar-parcel { fill: var(--clr-primary-dark); opacity: 0.88; }
     .chart-label {
       fill: var(--clr-text-muted);
       font-size: 9px;
@@ -248,7 +284,7 @@ interface BarSpec {
     }
     .legend-item .dot { width: 8px; height: 8px; border-radius: 50%; }
     .legend-item .dot.rides { background: var(--clr-primary); }
-    .legend-item .dot.parcels { background: #3b82f6; }
+    .legend-item .dot.parcels { background: var(--clr-primary-dark); }
     @media (max-width: 900px) {
       .charts-grid { grid-template-columns: 1fr; }
       .analysis-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -256,6 +292,7 @@ interface BarSpec {
     @media (max-width: 768px) {
       .section-header-flex { flex-wrap: wrap; gap: 12px; }
       .analysis-grid { grid-template-columns: 1fr; }
+      .activity-charts-root { padding: 14px; }
     }
   `],
 })

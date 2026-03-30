@@ -19,7 +19,13 @@ export class AuthApi extends BaseApiService {
   }
 
   async refresh(refreshToken: string): Promise<AuthTokens> {
-    return this.post<AuthTokens>(`${this.path}/refresh`, { refreshToken });
+    return this.request<AuthTokens>(
+      this.http.post<any>(
+        `${this.apiUrl}${this.path}/refresh`,
+        {},
+        { headers: { Authorization: `Bearer ${refreshToken}` } }
+      )
+    );
   }
 
   async logout(): Promise<void> {

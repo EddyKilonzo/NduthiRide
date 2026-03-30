@@ -19,13 +19,13 @@ import { CommonModule } from '@angular/common';
   styles: [`
     .logo { display: flex; align-items: center; gap: 12px; }
     .logo__circle {
-      width: 40px; height: 40px; background: var(--primary);
+      width: 40px; height: 40px; background: var(--clr-primary);
       border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      padding: 8px; box-shadow: 0 4px 12px rgba(232, 75, 14, 0.3);
+      padding: 8px; box-shadow: 0 4px 12px rgba(64, 138, 113, 0.3);
     }
     .logo__text {
       font-family: var(--font-display); font-size: 22px; font-weight: 800;
-      color: #fff; letter-spacing: -0.5px;
+      color: var(--clr-text); letter-spacing: -0.5px;
     }
     svg { width: 100%; height: 100%; }
   `]

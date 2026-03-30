@@ -65,4 +65,32 @@ export class AdminService {
       throw error;
     }
   }
+
+  async getSettings(): Promise<Record<string, string>> {
+    return this.api.getSettings();
+  }
+
+  async updateSettings(settings: Record<string, string>): Promise<void> {
+    return this.api.updateSettings(settings);
+  }
+
+  async listPayouts(page = 1, limit = 20): Promise<PaginatedResult<any>> {
+    return this.api.listPayouts(page, limit);
+  }
+
+  async updatePayoutStatus(id: string, status: string, reference?: string): Promise<any> {
+    return this.api.updatePayoutStatus(id, status, reference);
+  }
+
+  async listSupportTickets(page = 1, limit = 20): Promise<PaginatedResult<any>> {
+    return this.api.listSupportTickets(page, limit);
+  }
+
+  async updateTicketStatus(id: string, status: string): Promise<any> {
+    return this.api.updateTicketStatus(id, status);
+  }
+
+  async listAuditLogs(page = 1, limit = 20): Promise<PaginatedResult<any>> {
+    return this.api.listAuditLogs(page, limit);
+  }
 }

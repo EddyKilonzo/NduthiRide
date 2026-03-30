@@ -14,10 +14,10 @@ import { ToastService } from '../../../core/services/toast.service';
           <div class="toast__content">
             <span class="toast__icon" aria-hidden="true">
               @switch (toast.type) {
-                @case ('success') { <lucide-icon name="circle-check" [size]="20"></lucide-icon> }
-                @case ('error') { <lucide-icon name="circle-x" [size]="20"></lucide-icon> }
-                @case ('warning') { <lucide-icon name="triangle-alert" [size]="20"></lucide-icon> }
-                @default { <lucide-icon name="info" [size]="20"></lucide-icon> }
+                @case ('success') { <lucide-icon name="check" [size]="18"></lucide-icon> }
+                @case ('error') { <lucide-icon name="x" [size]="18"></lucide-icon> }
+                @case ('warning') { <lucide-icon name="triangle-alert" [size]="18"></lucide-icon> }
+                @default { <lucide-icon name="info" [size]="18"></lucide-icon> }
               }
             </span>
             <span class="toast__msg">{{ toast.message }}</span>
@@ -54,27 +54,26 @@ import { ToastService } from '../../../core/services/toast.service';
         transform: translateY(-2px);
         background: rgba(255, 255, 255, 0.95);
       }
-
-      &--success {
-        border-left: 4px solid #22c55e;
-        .toast__icon { color: #22c55e; }
-        .toast__timer-bar { background: #22c55e; }
-      }
-      &--error {
-        border-left: 4px solid #ef4444;
-        .toast__icon { color: #ef4444; }
-        .toast__timer-bar { background: #ef4444; }
-      }
-      &--warning {
-        border-left: 4px solid #f59e0b;
-        .toast__icon { color: #f59e0b; }
-        .toast__timer-bar { background: #f59e0b; }
-      }
-      &--info {
-        border-left: 4px solid #3b82f6;
-        .toast__icon { color: #3b82f6; }
-        .toast__timer-bar { background: #3b82f6; }
-      }
+    }
+    .toast--success {
+      border-left: 4px solid var(--clr-success);
+      .toast__icon { color: var(--clr-success); }
+      .toast__timer-bar { background: var(--clr-success); }
+    }
+    .toast--error {
+      border-left: 4px solid var(--clr-error);
+      .toast__icon { color: var(--clr-error); }
+      .toast__timer-bar { background: var(--clr-error); }
+    }
+    .toast--warning {
+      border-left: 4px solid var(--clr-warning);
+      .toast__icon { color: var(--clr-warning); }
+      .toast__timer-bar { background: var(--clr-warning); }
+    }
+    .toast--info {
+      border-left: 4px solid var(--clr-info);
+      .toast__icon { color: var(--clr-info); }
+      .toast__timer-bar { background: var(--clr-info); }
     }
     .toast__content {
       display: flex; align-items: center; gap: 12px;
@@ -87,7 +86,7 @@ import { ToastService } from '../../../core/services/toast.service';
       border-radius: 50%;
     }
     .toast__msg {
-      font-size: 14px; font-weight: 500; color: #1f2937;
+      font-size: 14px; font-weight: 500; color: var(--clr-text);
       line-height: 1.4;
     }
     .toast__timer {

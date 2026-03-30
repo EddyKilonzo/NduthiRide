@@ -51,7 +51,7 @@ interface NavItem { label: string; route: string; icon: string; }
   `,
   styles: [`
     .sidebar {
-      width: 240px; height: 100vh; position: sticky; top: 0;
+      width: 240px; height: calc(100vh - 90px); position: sticky; top: 90px;
       background: var(--clr-bg-card); border-right: 1px solid var(--clr-border);
       display: flex; flex-direction: column; flex-shrink: 0;
     }
@@ -63,9 +63,9 @@ interface NavItem { label: string; route: string; icon: string; }
       border-radius: var(--radius-md); color: var(--clr-text-muted);
       font-size: 14px; font-weight: 500; transition: all var(--transition);
       text-decoration: none;
-      &:hover { background: var(--clr-bg-elevated); color: var(--clr-text); }
-      &--active { background: rgba(232,75,14,.12); color: var(--clr-primary); }
     }
+    .nav-item:hover { background: var(--clr-bg-elevated); color: var(--clr-text); }
+    .nav-item--active { background: rgba(64,138,113,.12); color: var(--clr-primary); font-weight: 600; }
     .nav-icon { flex-shrink: 0; }
 
     /* Footer */
@@ -98,8 +98,8 @@ interface NavItem { label: string; route: string; icon: string; }
       border-radius: var(--radius-md); color: var(--clr-text-muted);
       font-size: 13px; font-weight: 500; cursor: pointer;
       transition: all var(--transition); width: 100%;
-      &:hover { background: rgba(239,68,68,.1); color: var(--clr-error); }
     }
+    .logout-btn:hover { background: rgba(239,68,68,.1); color: var(--clr-error); }
 
     @media (max-width: 900px) {
       .sidebar {
@@ -153,7 +153,8 @@ export class SidebarComponent {
   });
 
   protected initial(): string {
-    return this.auth.user()?.fullName?.charAt(0).toUpperCase() ?? '?';
+    const name = this.auth.user()?.fullName?.trim();
+    return (name ? name.charAt(0) : '?').toUpperCase();
   }
 
   protected navItems(): NavItem[] {
@@ -164,6 +165,10 @@ export class SidebarComponent {
       { label: 'Rides',     route: '/admin/rides',    icon: 'bike' },
       { label: 'Parcels',   route: '/admin/parcels',  icon: 'package' },
       { label: 'Payments',  route: '/admin/payments', icon: 'credit-card' },
+      { label: 'Payouts',   route: '/admin/payouts',  icon: 'banknote' },
+      { label: 'Audit Logs',route: '/admin/audit-logs', icon: 'shield-check' },
+      { label: 'Settings',  route: '/admin/settings', icon: 'settings' },
+      { label: 'Support',   route: '/admin/support',  icon: 'help-circle' },
       { label: 'Profile',   route: '/admin/profile',  icon: 'user' },
     ];
     if (role === 'RIDER') return [
@@ -171,14 +176,19 @@ export class SidebarComponent {
       { label: 'Active Ride',route: '/rider/active',   icon: 'bike' },
       { label: 'History',    route: '/rider/history',  icon: 'history' },
       { label: 'Earnings',   route: '/rider/earnings', icon: 'wallet' },
+      { label: 'Messages',   route: '/rider/chat',     icon: 'message-square' },
+      { label: 'Support',    route: '/rider/support',  icon: 'help-circle' },
       { label: 'Profile',    route: '/rider/profile',  icon: 'user' },
     ];
     return [
       { label: 'Home',        route: '/user',            icon: 'house' },
       { label: 'Book Ride',   route: '/user/book-ride',  icon: 'bike' },
       { label: 'Send Parcel', route: '/user/book-parcel',icon: 'package' },
-      { label: 'My Rides',    route: '/user/rides',      icon: 'list' },
-      { label: 'My Parcels',  route: '/user/parcels',    icon: 'truck' },
+      { label: 'Rides',       route: '/user/rides',      icon: 'bike' },
+      { label: 'Parcels',     route: '/user/parcels',    icon: 'package' },
+      { label: 'Messages',    route: '/user/chat',       icon: 'message-square' },
+      { label: 'Support',     route: '/user/support',    icon: 'help-circle' },
+
       { label: 'Profile',     route: '/user/profile',    icon: 'user' },
     ];
   }

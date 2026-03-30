@@ -139,8 +139,8 @@ const USER_CHART_COPY = {
       background: var(--clr-bg-card); border: 1px solid var(--clr-border); border-radius: var(--radius-lg);
       padding: 28px 24px; text-decoration: none; transition: all var(--transition);
       display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-card);
-      &:hover { border-color: var(--clr-primary); transform: translateY(-2px); }
     }
+    .action-card:hover { border-color: var(--clr-primary); transform: translateY(-2px); }
     .action-icon {
       width: 52px; height: 52px; border-radius: var(--radius-md); background: var(--clr-bg-elevated);
       display: flex; align-items: center; justify-content: center; color: var(--clr-primary);
@@ -153,8 +153,8 @@ const USER_CHART_COPY = {
     .ride-item {
       background: var(--clr-bg-card); padding: 14px 16px; text-decoration: none;
       display: flex; flex-direction: column; gap: 6px; transition: background var(--transition);
-      &:hover { background: var(--clr-bg-elevated); }
     }
+    .ride-item:hover { background: var(--clr-bg-elevated); }
     .ride-route { display: flex; align-items: center; gap: 8px; }
     .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .dot--pickup { background: var(--clr-primary); }
@@ -171,6 +171,7 @@ export class UserHomeComponent implements OnInit {
   private readonly auth         = inject(AuthService);
   private readonly rideService  = inject(RideService);
   private readonly parcelService = inject(ParcelService);
+  private chartsLoadAttempt = 0;
 
   protected readonly userChartCopy = USER_CHART_COPY;
   protected readonly recentRides   = signal<Ride[]>([]);
@@ -181,30 +182,49 @@ export class UserHomeComponent implements OnInit {
   protected readonly chartsLoading = signal(true);
 
   protected firstName(): string {
-    return this.auth.user()?.fullName?.split(' ')[0] ?? 'there';
+    const fullName = this.auth.user()?.fullName?.trim();
+    return (fullName ? fullName.split(' ')[0] : '') || 'there';
   }
 
   ngOnInit(): void {
     void this.rideService.getMyRides(1, 3).then(
       (res) => { this.recentRides.set(res.data); this.loadingRides.set(false); },
-    ).catch(() => this.loadingRides.set(false));
+    ).catch((err) => { 
+      console.error('Error loading recent rides', err);
+      this.loadingRides.set(false); 
+    });
 
     void this.parcelService.getMyParcels(1, 3).then(
       (res) => { this.recentParcels.set(res.data); this.loadingParcels.set(false); },
-    ).catch(() => this.loadingParcels.set(false));
+    ).catch((err) => {
+      console.error('Error loading recent parcels', err);
+      this.loadingParcels.set(false);
+    });
 
+    void this.loadChartsWithRetry();
+  }
+
+  private async loadChartsWithRetry(): Promise<void> {
+    this.chartsLoadAttempt++;
     this.chartsLoading.set(true);
-    void Promise.all([
-      this.rideService.getMyRides(1, 250, 'COMPLETED'),
-      this.parcelService.getMyParcels(1, 250, 'DELIVERED'),
-    ])
-      .then(([rideRes, parcelRes]) => {
-        const points = ridesAndParcelsToActivityPoints(rideRes.data, parcelRes.data);
-        const { current } = buildWeeklyChartBuckets(points);
-        this.chartSeries.set(current);
-      })
-      .catch(() => { /* silent */ })
-      .finally(() => this.chartsLoading.set(false));
+    let hadError = false;
+    try {
+      const [rideRes, parcelRes] = await Promise.all([
+        this.rideService.getMyRides(1, 50, 'COMPLETED'),
+        this.parcelService.getMyParcels(1, 50, 'DELIVERED'),
+      ]);
+      const points = ridesAndParcelsToActivityPoints(rideRes.data, parcelRes.data);
+      const { current } = buildWeeklyChartBuckets(points);
+      this.chartSeries.set(current);
+    } catch (err) {
+      hadError = true;
+      console.error('Error loading user home charts', err);
+      if (this.chartsLoadAttempt < 2) {
+        setTimeout(() => void this.loadChartsWithRetry(), 400);
+      }
+    } finally {
+      this.chartsLoading.set(false);
+    }
   }
 
   protected statusBadge(status: string): string {
