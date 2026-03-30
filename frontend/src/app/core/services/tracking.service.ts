@@ -96,6 +96,29 @@ export class TrackingService implements OnDestroy {
     this.socket?.off('parcel:new-request', cb);
   }
 
+  // ─── Payment status updates ──────────────────────────────────
+
+  subscribeToPayment(paymentId: string): void {
+    this.socket?.emit('payment:subscribe', { paymentId });
+  }
+
+  unsubscribeFromPayment(paymentId: string): void {
+    this.socket?.emit('payment:unsubscribe', { paymentId });
+  }
+
+  onPaymentUpdate(cb: (data: {
+    status: string;
+    amount?: number;
+    mpesaReceiptNumber?: string | null;
+    completedAt?: string;
+  }) => void): void {
+    this.socket?.on('payment:updated', cb);
+  }
+
+  offPaymentUpdate(cb: (data: unknown) => void): void {
+    this.socket?.off('payment:updated', cb);
+  }
+
   ngOnDestroy(): void {
     this.disconnect();
   }

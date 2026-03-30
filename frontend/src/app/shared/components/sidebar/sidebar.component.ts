@@ -1,10 +1,11 @@
-import { Component, inject, computed } from '@angular/core';
+import { Component, inject, computed, OnInit } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../../../core/services/auth.service';
+import { ChatService } from '../../../core/services/chat.service';
 
-interface NavItem { label: string; route: string; icon: string; }
+interface NavItem { label: string; route: string; icon: string; badge?: boolean; }
 
 @Component({
   selector: 'app-sidebar',
@@ -23,6 +24,9 @@ interface NavItem { label: string; route: string; icon: string; }
           >
             <lucide-icon class="nav-icon" [name]="item.icon" [size]="18" />
             <span>{{ item.label }}</span>
+            @if (item.badge && unreadCount() > 0) {
+              <span class="nav-badge">{{ unreadCount() > 99 ? '99+' : unreadCount() }}</span>
+            }
           </a>
         }
       </nav>
@@ -67,6 +71,11 @@ interface NavItem { label: string; route: string; icon: string; }
     .nav-item:hover { background: var(--clr-bg-elevated); color: var(--clr-text); }
     .nav-item--active { background: rgba(64,138,113,.12); color: var(--clr-primary); font-weight: 600; }
     .nav-icon { flex-shrink: 0; }
+    .nav-badge {
+      margin-left: auto; min-width: 20px; height: 20px; padding: 0 5px;
+      background: var(--clr-primary); color: #fff; border-radius: 10px;
+      font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    }
 
     /* Footer */
     .sidebar__footer {
@@ -133,8 +142,15 @@ interface NavItem { label: string; route: string; icon: string; }
     }
   `],
 })
-export class SidebarComponent {
-  protected readonly auth = inject(AuthService);
+export class SidebarComponent implements OnInit {
+  protected readonly auth        = inject(AuthService);
+  private  readonly chatService  = inject(ChatService);
+
+  protected readonly unreadCount = this.chatService.totalUnread;
+
+  ngOnInit(): void {
+    void this.chatService.loadUnreadCount();
+  }
 
   /** Safe URL for sidebar thumbnail (https, http, data:image, or same-origin path). */
   protected readonly avatarSrc = computed(() => {
@@ -176,7 +192,7 @@ export class SidebarComponent {
       { label: 'Active Ride',route: '/rider/active',   icon: 'bike' },
       { label: 'History',    route: '/rider/history',  icon: 'history' },
       { label: 'Earnings',   route: '/rider/earnings', icon: 'wallet' },
-      { label: 'Messages',   route: '/rider/chat',     icon: 'message-square' },
+      { label: 'Messages',   route: '/rider/chat',     icon: 'message-square', badge: true },
       { label: 'Support',    route: '/rider/support',  icon: 'help-circle' },
       { label: 'Profile',    route: '/rider/profile',  icon: 'user' },
     ];
@@ -186,7 +202,7 @@ export class SidebarComponent {
       { label: 'Send Parcel', route: '/user/book-parcel',icon: 'package' },
       { label: 'Rides',       route: '/user/rides',      icon: 'bike' },
       { label: 'Parcels',     route: '/user/parcels',    icon: 'package' },
-      { label: 'Messages',    route: '/user/chat',       icon: 'message-square' },
+      { label: 'Messages',    route: '/user/chat',       icon: 'message-square', badge: true },
       { label: 'Support',     route: '/user/support',    icon: 'help-circle' },
 
       { label: 'Profile',     route: '/user/profile',    icon: 'user' },

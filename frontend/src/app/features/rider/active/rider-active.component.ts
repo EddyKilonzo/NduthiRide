@@ -2,10 +2,11 @@ import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { RideService }   from '../../../core/services/ride.service';
-import { ParcelService } from '../../../core/services/parcel.service';
-import { MediaService }  from '../../../core/services/media.service';
-import { ToastService }  from '../../../core/services/toast.service';
+import { RideService }     from '../../../core/services/ride.service';
+import { ParcelService }   from '../../../core/services/parcel.service';
+import { MediaService }    from '../../../core/services/media.service';
+import { ToastService }    from '../../../core/services/toast.service';
+import { TrackingService } from '../../../core/services/tracking.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import type { Ride, RideStatus } from '../../../core/models/ride.models';
 import type { Parcel, ParcelStatus } from '../../../core/models/parcel.models';
@@ -117,11 +118,17 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
                     <button
                       class="btn btn--primary btn--full btn--lg btn--pill action-btn"
                       (click)="advanceRide(ride.id, next.status)"
-                      [disabled]="updating()">
+                      [disabled]="updating() || (next.status === 'COMPLETED' && ridePaymentPending(ride))">
                       <lucide-icon [name]="next.icon" [size]="20" *ngIf="!updating()"></lucide-icon>
                       <app-spinner *ngIf="updating()"></app-spinner>
                       <span>{{ updating() ? 'Processing...' : next.label }}</span>
                     </button>
+                    @if (next.status === 'COMPLETED' && ridePaymentPending(ride)) {
+                      <p class="error-hint">
+                        <lucide-icon name="alert-circle" [size]="14"></lucide-icon>
+                        Waiting for M-Pesa payment confirmation before completing the ride.
+                      </p>
+                    }
                   } @else {
                     <div class="completion-message">
                       <lucide-icon name="check-circle" [size]="24"></lucide-icon>
@@ -234,39 +241,81 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
                 @if (activeRide(); as ride) {
                   <div class="step" [class.active]="ride.status === 'ACCEPTED'" [class.completed]="['EN_ROUTE_TO_PICKUP','ARRIVED_AT_PICKUP','IN_PROGRESS','COMPLETED'].includes(ride.status)">
                     <div class="step-line"></div>
-                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <div class="step-circle">
+                      @if (['EN_ROUTE_TO_PICKUP','ARRIVED_AT_PICKUP','IN_PROGRESS','COMPLETED'].includes(ride.status)) {
+                        <lucide-icon name="check" [size]="12"></lucide-icon>
+                      } @else if (ride.status === 'ACCEPTED') {
+                        <span class="step-active-dot"></span>
+                      }
+                    </div>
                     <span class="step-label">Accepted</span>
                   </div>
                   <div class="step" [class.active]="ride.status === 'EN_ROUTE_TO_PICKUP'" [class.completed]="['ARRIVED_AT_PICKUP','IN_PROGRESS','COMPLETED'].includes(ride.status)">
                     <div class="step-line"></div>
-                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <div class="step-circle">
+                      @if (['ARRIVED_AT_PICKUP','IN_PROGRESS','COMPLETED'].includes(ride.status)) {
+                        <lucide-icon name="check" [size]="12"></lucide-icon>
+                      } @else if (ride.status === 'EN_ROUTE_TO_PICKUP') {
+                        <span class="step-active-dot"></span>
+                      }
+                    </div>
                     <span class="step-label">En-route</span>
                   </div>
                   <div class="step" [class.active]="ride.status === 'ARRIVED_AT_PICKUP'" [class.completed]="['IN_PROGRESS','COMPLETED'].includes(ride.status)">
                     <div class="step-line"></div>
-                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <div class="step-circle">
+                      @if (['IN_PROGRESS','COMPLETED'].includes(ride.status)) {
+                        <lucide-icon name="check" [size]="12"></lucide-icon>
+                      } @else if (ride.status === 'ARRIVED_AT_PICKUP') {
+                        <span class="step-active-dot"></span>
+                      }
+                    </div>
                     <span class="step-label">At Pickup</span>
                   </div>
                   <div class="step" [class.active]="ride.status === 'IN_PROGRESS'" [class.completed]="ride.status === 'COMPLETED'">
                     <div class="step-line"></div>
-                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <div class="step-circle">
+                      @if (ride.status === 'COMPLETED') {
+                        <lucide-icon name="check" [size]="12"></lucide-icon>
+                      } @else if (ride.status === 'IN_PROGRESS') {
+                        <span class="step-active-dot"></span>
+                      }
+                    </div>
                     <span class="step-label">In Transit</span>
                   </div>
                 }
                 @if (activeParcel(); as parcel) {
                   <div class="step" [class.active]="parcel.status === 'ACCEPTED'" [class.completed]="['PICKED_UP','IN_TRANSIT','DELIVERED'].includes(parcel.status)">
                     <div class="step-line"></div>
-                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <div class="step-circle">
+                      @if (['PICKED_UP','IN_TRANSIT','DELIVERED'].includes(parcel.status)) {
+                        <lucide-icon name="check" [size]="12"></lucide-icon>
+                      } @else if (parcel.status === 'ACCEPTED') {
+                        <span class="step-active-dot"></span>
+                      }
+                    </div>
                     <span class="step-label">Accepted</span>
                   </div>
                   <div class="step" [class.active]="parcel.status === 'PICKED_UP'" [class.completed]="['IN_TRANSIT','DELIVERED'].includes(parcel.status)">
                     <div class="step-line"></div>
-                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <div class="step-circle">
+                      @if (['IN_TRANSIT','DELIVERED'].includes(parcel.status)) {
+                        <lucide-icon name="check" [size]="12"></lucide-icon>
+                      } @else if (parcel.status === 'PICKED_UP') {
+                        <span class="step-active-dot"></span>
+                      }
+                    </div>
                     <span class="step-label">Picked Up</span>
                   </div>
                   <div class="step" [class.active]="parcel.status === 'IN_TRANSIT'" [class.completed]="parcel.status === 'DELIVERED'">
                     <div class="step-line"></div>
-                    <div class="step-circle"><lucide-icon name="check" [size]="12"></lucide-icon></div>
+                    <div class="step-circle">
+                      @if (parcel.status === 'DELIVERED') {
+                        <lucide-icon name="check" [size]="12"></lucide-icon>
+                      } @else if (parcel.status === 'IN_TRANSIT') {
+                        <span class="step-active-dot"></span>
+                      }
+                    </div>
                     <span class="step-label">In Transit</span>
                   </div>
                 }
@@ -372,7 +421,7 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
 
     .card-footer { padding: 24px; border-top: 1px solid var(--clr-border); background: var(--clr-bg-elevated); }
     .action-btn { gap: 12px; height: 60px; font-size: 18px; }
-    .error-hint { font-size: 12px; color: var(--clr-error); text-align: center; margin-top: 12px; font-weight: 600; }
+    .error-hint { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--clr-error); text-align: center; margin-top: 12px; font-weight: 600; }
     .completion-message { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--clr-success); font-weight: 700; font-size: 18px; }
 
     .stepper-card { padding: 24px; margin-bottom: 24px; }
@@ -383,7 +432,8 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
     }
     .step .step-line { position: absolute; left: 13px; top: 28px; width: 2px; height: 32px; background: var(--clr-border); }
     .step:last-child .step-line { display: none; }
-    .step .step-circle { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--clr-border); display: flex; align-items: center; justify-content: center; color: transparent; background: var(--clr-bg-card); transition: all 0.3s; z-index: 2; }
+    .step .step-circle { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--clr-border); display: flex; align-items: center; justify-content: center; background: var(--clr-bg-card); transition: all 0.3s; z-index: 2; }
+    .step-active-dot { width: 8px; height: 8px; background: var(--clr-primary); border-radius: 50%; }
     .step .step-label { font-size: 13px; font-weight: 600; color: var(--clr-text-muted); transition: all 0.3s; }
     
     .step.completed .step-circle { background: var(--clr-primary); border-color: var(--clr-primary); color: #fff; }
@@ -415,10 +465,11 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
   `],
 })
 export class RiderActiveComponent implements OnInit, OnDestroy {
-  private readonly rideService   = inject(RideService);
-  private readonly parcelService = inject(ParcelService);
-  private readonly mediaService  = inject(MediaService);
-  private readonly toast         = inject(ToastService);
+  private readonly rideService     = inject(RideService);
+  private readonly parcelService   = inject(ParcelService);
+  private readonly mediaService    = inject(MediaService);
+  private readonly toast           = inject(ToastService);
+  private readonly trackingService = inject(TrackingService);
 
   protected readonly activeRide   = signal<Ride | null>(null);
   protected readonly activeParcel = signal<Parcel | null>(null);
@@ -427,15 +478,40 @@ export class RiderActiveComponent implements OnInit, OnDestroy {
   protected readonly proofUploading = signal(false);
   protected readonly proofUploaded  = signal(false);
 
-  private pollTimer: any = null;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private geoWatchId: number | null = null;
+  private initialLoaded = false;
 
   async ngOnInit(): Promise<void> {
+    this.trackingService.connect();
     await this.refresh();
-    this.pollTimer = setInterval(() => void this.refresh(), 30_000);
+    this.pollTimer = setInterval(() => void this.silentRefresh(), 30_000);
+    this.startLocationBroadcast();
   }
 
   ngOnDestroy(): void {
     if (this.pollTimer) clearInterval(this.pollTimer);
+    if (this.geoWatchId !== null) navigator.geolocation?.clearWatch(this.geoWatchId);
+    this.trackingService.disconnect();
+  }
+
+  /** Watch GPS and forward position to the server every time it changes (browser debounces ~5 s). */
+  private startLocationBroadcast(): void {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+
+    this.geoWatchId = navigator.geolocation.watchPosition(
+      ({ coords }) => {
+        if (this.activeRide() || this.activeParcel()) {
+          this.trackingService.sendLocation(
+            coords.latitude,
+            coords.longitude,
+            coords.speed ?? undefined,
+          );
+        }
+      },
+      () => { /* silently ignore — user may have denied location */ },
+      { enableHighAccuracy: true, maximumAge: 5_000 },
+    );
   }
 
   async refresh(): Promise<void> {
@@ -450,11 +526,28 @@ export class RiderActiveComponent implements OnInit, OnDestroy {
       if (!parcel || parcel.status !== 'IN_TRANSIT') {
         this.proofUploaded.set(false);
       }
+      this.initialLoaded = true;
     } catch {
       this.toast.error('Could not load active trip');
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /** Background refresh used by the poll timer — does not trigger the full-page spinner. */
+  private async silentRefresh(): Promise<void> {
+    if (!this.initialLoaded) return;
+    try {
+      const [ride, parcel] = await Promise.all([
+        this.rideService.getActive(),
+        this.parcelService.getActive(),
+      ]);
+      this.activeRide.set(ride);
+      this.activeParcel.set(parcel);
+      if (!parcel || parcel.status !== 'IN_TRANSIT') {
+        this.proofUploaded.set(false);
+      }
+    } catch { /* silently ignore poll errors */ }
   }
 
   async advanceRide(rideId: string, newStatus: RideStatus): Promise<void> {
@@ -512,4 +605,10 @@ export class RiderActiveComponent implements OnInit, OnDestroy {
 
   protected rideNext(status: RideStatus) { return RIDE_NEXT[status] ?? null; }
   protected parcelNext(status: ParcelStatus) { return PARCEL_NEXT[status] ?? null; }
+
+  /** True when the ride is MPESA and payment hasn't been confirmed yet. */
+  protected ridePaymentPending(ride: Ride): boolean {
+    if (ride.paymentMethod !== 'MPESA') return false;
+    return ride.payment?.status !== 'COMPLETED';
+  }
 }

@@ -4,7 +4,7 @@ import { lastValueFrom } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
-import type { ChatMessage, Conversation, SendMessageDto } from '../models/chat.models';
+import type { ChatMessage, Conversation, ConversationPreview, SendMessageDto } from '../models/chat.models';
 
 interface ApiResponse<T> { success: boolean; data: T; }
 
@@ -16,9 +16,11 @@ export class ChatService implements OnDestroy {
   private socket: Socket | null = null;
 
   // Live message stream for the currently open conversation
-  readonly messages = signal<ChatMessage[]>([]);
-  readonly isTyping = signal<boolean>(false);
-  readonly isClosed = signal<boolean>(false);
+  readonly messages   = signal<ChatMessage[]>([]);
+  readonly isTyping   = signal<boolean>(false);
+  readonly isClosed   = signal<boolean>(false);
+  /** Total unread messages across all conversations. Refresh via loadUnreadCount(). */
+  readonly totalUnread = signal<number>(0);
 
   // ─── WebSocket lifecycle ─────────────────────────────────────────
 
@@ -102,12 +104,23 @@ export class ChatService implements OnDestroy {
 
   // ─── REST fallback (Secure async/await) ──────────────────────────
 
-  async getMyConversations(): Promise<any[]> {
+  async getMyConversations(): Promise<ConversationPreview[]> {
     try {
-      const res = await lastValueFrom(this.http.get<ApiResponse<any[]>>(`${this.base}/conversations`));
+      const res = await lastValueFrom(this.http.get<ApiResponse<ConversationPreview[]>>(`${this.base}/conversations`));
       return res.data;
     } catch (error) {
       throw error;
+    }
+  }
+
+  /** Fetches conversations and updates the totalUnread signal. Safe to call on any page. */
+  async loadUnreadCount(): Promise<void> {
+    try {
+      const convs = await this.getMyConversations();
+      const total = convs.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
+      this.totalUnread.set(total);
+    } catch {
+      // Silently swallow — badge just won't update
     }
   }
 

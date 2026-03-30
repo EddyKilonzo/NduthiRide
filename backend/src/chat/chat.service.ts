@@ -135,6 +135,13 @@ export class ChatService {
               },
             },
           },
+          _count: {
+            select: {
+              messages: {
+                where: { isRead: false, senderAccountId: { not: accountId } },
+              },
+            },
+          },
           ride: {
             select: {
               pickupAddress: true,
@@ -184,6 +191,7 @@ export class ChatService {
           context: conv.ride ? `Ride: ${conv.ride.pickupAddress.slice(0, 20)}...` : `Parcel: ${conv.parcel?.itemDescription}`,
           rideId: conv.rideId,
           parcelId: conv.parcelId,
+          unreadCount: (conv as any)._count?.messages ?? 0,
         };
       });
     } catch (error) {

@@ -39,7 +39,6 @@ import { RiderVerifyDetailsComponent }  from './features/rider/verify-details/ri
 
 // Chat
 import { ChatComponent } from './features/chat/chat.component';
-import { ChatListComponent } from './features/chat/chat-list.component';
 
 // Notifications
 import { NotificationsComponent } from './features/notifications/notifications.component';
@@ -104,7 +103,7 @@ export const routes: Routes = [
       { path: 'profile',     component: UserProfileComponent },
       { path: 'notifications', component: NotificationsComponent },
       { path: 'support',       component: SupportComponent },
-      { path: 'chat',          component: ChatListComponent },
+      { path: 'chat',          component: ChatComponent },
       { path: 'chat/ride/:rideId',   component: ChatComponent },
       { path: 'chat/parcel/:parcelId', component: ChatComponent },
     ],
@@ -132,7 +131,7 @@ export const routes: Routes = [
       { path: 'profile',  component: RiderProfileComponent },
       { path: 'notifications', component: NotificationsComponent },
       { path: 'support',       component: SupportComponent },
-      { path: 'chat',          component: ChatListComponent },
+      { path: 'chat',          component: ChatComponent },
       { path: 'chat/ride/:rideId',   component: ChatComponent },
       { path: 'chat/parcel/:parcelId', component: ChatComponent },
     ],

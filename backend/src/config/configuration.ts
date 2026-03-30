@@ -53,6 +53,15 @@ export default () => {
     senderId: process.env.SMS_SENDER_ID ?? 'NduthiRide',
   },
 
+  firebase: {
+    /**
+     * Full Firebase service-account JSON, base64-encoded or as a raw JSON string.
+     * Set FIREBASE_SERVICE_ACCOUNT in your environment.
+     * When absent, FCM push notifications are silently disabled.
+     */
+    serviceAccount: process.env.FIREBASE_SERVICE_ACCOUNT,
+  },
+
   mail: {
     host: process.env.MAIL_HOST ?? process.env.SMTP_HOST ?? 'smtp.mailtrap.io',
     port: parseInt(process.env.MAIL_PORT ?? process.env.SMTP_PORT ?? '587', 10),

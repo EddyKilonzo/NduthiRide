@@ -35,6 +35,14 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 export class RidesController {
   constructor(private readonly ridesService: RidesService) {}
 
+  @Get('nearby')
+  @UseGuards(RolesGuard)
+  @Roles(Role.RIDER)
+  @ApiOperation({ summary: 'List nearby pending ride requests (rider only)' })
+  getNearbyRides(@Query() query: RideQueryDto) {
+    return this.ridesService.getNearbyPendingRides(query);
+  }
+
   // ─── User endpoints ─────────────────────────────────────
 
   @Post()
@@ -112,14 +120,6 @@ export class RidesController {
   @ApiOperation({ summary: 'List my assigned rides (rider only)' })
   getRiderHistory(@CurrentUser() user: Account, @Query() query: RideQueryDto) {
     return this.ridesService.getRiderRides(user.id, query);
-  }
-
-  @Get('nearby')
-  @UseGuards(RolesGuard)
-  @Roles(Role.RIDER)
-  @ApiOperation({ summary: 'List nearby pending ride requests (rider only)' })
-  getNearbyRides(@Query() query: RideQueryDto) {
-    return this.ridesService.getNearbyPendingRides(query);
   }
 
   @Patch(':id/accept')

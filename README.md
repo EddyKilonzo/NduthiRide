@@ -40,7 +40,7 @@ NduthiRide is a comprehensive motorcycle-taxi (boda-boda) and parcel delivery pl
 
 ### Frontend
 - **Framework:** [Angular 20+](https://angular.io/)
-- **Maps:** [Mapbox GL JS](https://www.mapbox.com/)
+- **Maps:** [Leaflet](https://leafletjs.com/) with [OpenStreetMap](https://www.openstreetmap.org/)
 - **Styling:** Vanilla CSS/SCSS for high-performance, responsive UI
 - **Real-Time:** Socket.io-client
 - **Progressive Web App:** Service workers for offline capabilities and push notifications
@@ -79,7 +79,6 @@ NduthiRide/
 - Node.js (v18 or later)
 - PostgreSQL
 - [Lipana](https://lipana.dev) account for M-Pesa test keys
-- [Mapbox](https://mapbox.com) access token
 
 ### 1. Database Setup
 ```bash

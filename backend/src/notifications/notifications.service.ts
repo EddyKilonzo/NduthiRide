@@ -6,15 +6,32 @@ import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class NotificationsService implements OnModuleInit {
   private readonly logger = new Logger(NotificationsService.name);
-  private firebaseApp: admin.app.App;
+  private firebaseApp: admin.app.App | null = null;
 
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
   ) {}
 
-  onModuleInit() {
-    // ... (onModuleInit unchanged)
+  onModuleInit(): void {
+    try {
+      const serviceAccountJson = this.config.get<string>('firebase.serviceAccount');
+      if (!serviceAccountJson) {
+        this.logger.warn('FIREBASE_SERVICE_ACCOUNT not configured — FCM push notifications disabled');
+        return;
+      }
+
+      const serviceAccount = JSON.parse(serviceAccountJson) as admin.ServiceAccount;
+
+      // Guard against duplicate initialisation (e.g. hot-reload in dev)
+      this.firebaseApp = admin.apps.length
+        ? admin.apps[0]!
+        : admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+
+      this.logger.log('Firebase Admin SDK initialised');
+    } catch (error) {
+      this.logger.error('Firebase Admin SDK initialisation failed — FCM disabled', (error as Error).message);
+    }
   }
 
   async sendPushNotification(
@@ -24,13 +41,26 @@ export class NotificationsService implements OnModuleInit {
     data?: Record<string, string>,
     accountId?: string,
     type = 'SYSTEM',
-  ) {
+  ): Promise<void> {
     if (accountId) {
       await this.createInAppNotification(accountId, title, body, type, data);
     }
 
     if (!this.firebaseApp) return;
-    // ... (rest of push notification logic unchanged)
+
+    try {
+      await admin.messaging(this.firebaseApp).send({
+        token,
+        notification: { title, body },
+        data: data ?? {},
+      });
+      this.logger.debug(`FCM push sent — token: ${token.slice(0, 12)}...`);
+    } catch (error) {
+      // Log but don't throw — a failed push should never break the caller
+      this.logger.error(
+        `FCM push failed — token: ${token.slice(0, 12)}... — ${(error as Error).message}`,
+      );
+    }
   }
 
   async createInAppNotification(

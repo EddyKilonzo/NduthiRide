@@ -202,6 +202,24 @@ export class TrackingGateway
         timestamp: new Date().toISOString(),
       });
     }
+
+    // Also push to the parcel sender if the rider is on an active parcel delivery
+    const activeParcel = await this.prisma.parcel.findFirst({
+      where: {
+        riderId: rider.id,
+        status: { in: ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'] },
+      },
+    });
+
+    if (activeParcel) {
+      this.server.to(`account:${activeParcel.userId}`).emit('tracking:location', {
+        riderId: rider.id,
+        lat: payload.lat,
+        lng: payload.lng,
+        speed: payload.speed,
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 
   /**

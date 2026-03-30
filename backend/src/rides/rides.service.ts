@@ -470,6 +470,18 @@ export class RidesService {
         );
       }
 
+      // For MPESA rides, require a completed payment before marking the ride done
+      if (newStatus === RideStatus.COMPLETED && ride.paymentMethod === 'MPESA') {
+        const payment = await this.prisma.payment.findFirst({
+          where: { rideId, status: 'COMPLETED' },
+        });
+        if (!payment) {
+          throw new BadRequestException(
+            'Payment has not been confirmed yet. Ask the passenger to complete M-Pesa payment before finishing the ride.',
+          );
+        }
+      }
+
       const data: Record<string, unknown> = { status: newStatus };
       if (newStatus === RideStatus.COMPLETED) {
         data.completedAt = new Date();
@@ -653,6 +665,7 @@ export class RidesService {
         },
         include: {
           user: { select: { fullName: true, phone: true, avatarUrl: true } },
+          payment: { select: { status: true } },
         },
       });
     } catch (error) {

@@ -32,6 +32,23 @@ export interface Conversation {
   closedAt: string | null;
 }
 
+export interface ConversationPreview {
+  id: string;
+  status: ConversationStatus;
+  updatedAt: string;
+  lastMessage: {
+    content: string;
+    createdAt: string;
+    senderName: string;
+  } | null;
+  otherPartyName: string;
+  otherPartyAvatar: string | null;
+  context: string;
+  rideId: string | null;
+  parcelId: string | null;
+  unreadCount: number;
+}
+
 export interface SendMessageDto {
   content: string;
   type?: MessageType;

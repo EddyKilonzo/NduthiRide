@@ -19,7 +19,6 @@ import { TrackingGateway } from '../tracking/tracking.gateway';
 import { ChatService } from '../chat/chat.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { haversineKm } from '../common/utils/geo';
-import { haversineKm } from '../common/utils/geo';
 import { MapService } from '../map/map.service';
 
 // Delivery fee: base + per-km rate + weight surcharge per kg over 1kg

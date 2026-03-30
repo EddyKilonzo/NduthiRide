@@ -162,6 +162,27 @@ export type RouteMapPoint = { lng: number; lat: number };
       70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
       100% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0); }
     }
+    :host ::ng-deep .rider-live-marker {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    :host ::ng-deep .rider-live-dot {
+      width: 18px;
+      height: 18px;
+      background: #F97316;
+      border: 3px solid white;
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(249,115,22,0.5);
+      animation: rider-pulse 1.8s infinite;
+    }
+    @keyframes rider-pulse {
+      0%   { box-shadow: 0 0 0 0px rgba(249,115,22,0.5); }
+      70%  { box-shadow: 0 0 0 10px rgba(249,115,22,0); }
+      100% { box-shadow: 0 0 0 0px rgba(249,115,22,0); }
+    }
     `],
     })
     export class RoutePickerMapComponent implements AfterViewInit, OnDestroy {
@@ -179,11 +200,14 @@ export type RouteMapPoint = { lng: number; lat: number };
     /** Optional initial center when no markers yet [lng, lat]. */
     readonly defaultCenter = input<[number, number]>([36.8219, -1.2921]);
     readonly defaultZoom = input(12);
+    /** Live rider position — when provided, a pulsing bike marker is shown and updated in real time. */
+    readonly riderPosition = input<RouteMapPoint | null>(null);
 
     private map: L.Map | null = null;
     private pickupMarker: L.Marker | null = null;
     private dropoffMarker: L.Marker | null = null;
     private userMarker: L.Marker | null = null;
+    private riderMarker: L.Marker | null = null;
     private routeLine: L.Polyline | null = null;
     private resizeObserver: ResizeObserver | null = null;
     protected loadingRoute = false;
@@ -198,6 +222,11 @@ export type RouteMapPoint = { lng: number; lat: number };
     effect(() => {
       const mode = this.pickMode();
       this.applyPickCursor(mode);
+    });
+
+    effect(() => {
+      const pos = this.riderPosition();
+      this.updateRiderMarker(pos);
     });
     }
 
@@ -286,6 +315,27 @@ export type RouteMapPoint = { lng: number; lat: number };
       container.style.cursor = 'crosshair';
     } else {
       container.style.cursor = '';
+    }
+  }
+
+  private updateRiderMarker(pos: RouteMapPoint | null): void {
+    if (!this.map) return;
+    if (!pos) {
+      if (this.riderMarker) { this.map.removeLayer(this.riderMarker); this.riderMarker = null; }
+      return;
+    }
+    if (this.riderMarker) {
+      this.riderMarker.setLatLng([pos.lat, pos.lng]);
+    } else {
+      this.riderMarker = L.marker([pos.lat, pos.lng], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div class="rider-live-marker"><div class="rider-live-dot"></div></div>',
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        }),
+        zIndexOffset: 2000,
+      }).addTo(this.map);
     }
   }
 

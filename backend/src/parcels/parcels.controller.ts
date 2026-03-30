@@ -34,6 +34,14 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 export class ParcelsController {
   constructor(private readonly parcelsService: ParcelsService) {}
 
+  @Get('nearby')
+  @UseGuards(RolesGuard)
+  @Roles(Role.RIDER)
+  @ApiOperation({ summary: 'List nearby pending parcel requests (rider only)' })
+  getNearbyParcels(@Query() query: ParcelQueryDto) {
+    return this.parcelsService.getNearbyPendingParcels(query);
+  }
+
   @Post()
   @UseGuards(RolesGuard)
   @Roles(Role.USER)
@@ -96,14 +104,6 @@ export class ParcelsController {
   @ApiOperation({ summary: 'List my assigned parcels (rider only)' })
   getRiderHistory(@CurrentUser() user: Account, @Query() query: ParcelQueryDto) {
     return this.parcelsService.getRiderParcels(user.id, query);
-  }
-
-  @Get('nearby')
-  @UseGuards(RolesGuard)
-  @Roles(Role.RIDER)
-  @ApiOperation({ summary: 'List nearby pending parcel requests (rider only)' })
-  getNearbyParcels(@Query() query: ParcelQueryDto) {
-    return this.parcelsService.getNearbyPendingParcels(query);
   }
 
   @Patch(':id/accept')

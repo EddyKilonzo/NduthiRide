@@ -78,20 +78,28 @@ const USER_CHART_COPY = {
             <p>Book your first ride to get started</p>
           </div>
         } @else {
-          <div class="ride-list">
+          <div class="item-grid">
             @for (ride of recentRides(); track ride.id) {
-              <a [routerLink]="['/user/rides', ride.id]" class="ride-item">
-                <div class="ride-route">
-                  <span class="dot dot--pickup"></span>
-                  <span class="address">{{ ride.pickupAddress }}</span>
+              <a [routerLink]="['/user/rides', ride.id]" class="item-card">
+                <div class="item-card__head">
+                  <span class="badge badge--{{ statusBadge(ride.status) }}">{{ ride.status | titlecase }}</span>
+                  <span class="item-fare">KES {{ ride.estimatedFare | number:'1.0-0' }}</span>
                 </div>
-                <div class="ride-route">
-                  <span class="dot dot--drop"></span>
-                  <span class="address">{{ ride.dropoffAddress }}</span>
+                <div class="item-route">
+                  <div class="route-row">
+                    <span class="route-dot route-dot--pickup"></span>
+                    <span class="route-addr">{{ ride.pickupAddress }}</span>
+                  </div>
+                  <div class="route-connector"></div>
+                  <div class="route-row">
+                    <span class="route-dot route-dot--drop"></span>
+                    <span class="route-addr">{{ ride.dropoffAddress }}</span>
+                  </div>
                 </div>
-                <div class="ride-meta">
-                  <span class="badge badge--{{ statusBadge(ride.status) }}">{{ ride.status }}</span>
-                  <span class="fare">KES {{ ride.estimatedFare | number:'1.0-0' }}</span>
+                <div class="item-card__foot">
+                  <lucide-icon name="bike" [size]="13" class="item-type-icon"></lucide-icon>
+                  <span>Ride · {{ ride.distanceKm | number:'1.1-1' }} km</span>
+                  <lucide-icon name="chevron-right" [size]="14" class="item-arrow"></lucide-icon>
                 </div>
               </a>
             }
@@ -115,13 +123,28 @@ const USER_CHART_COPY = {
             <p>Send your first parcel to get started</p>
           </div>
         } @else {
-          <div class="ride-list">
+          <div class="item-grid">
             @for (parcel of recentParcels(); track parcel.id) {
-              <a [routerLink]="['/user/parcels', parcel.id]" class="ride-item">
-                <p class="parcel-desc">{{ parcel.itemDescription }}</p>
-                <div class="ride-meta">
-                  <span class="badge badge--{{ statusBadge(parcel.status) }}">{{ parcel.status }}</span>
-                  <span class="fare">KES {{ parcel.deliveryFee | number:'1.0-0' }}</span>
+              <a [routerLink]="['/user/parcels', parcel.id]" class="item-card">
+                <div class="item-card__head">
+                  <span class="badge badge--{{ statusBadge(parcel.status) }}">{{ parcel.status | titlecase }}</span>
+                  <span class="item-fare">KES {{ parcel.deliveryFee | number:'1.0-0' }}</span>
+                </div>
+                <div class="item-route">
+                  <div class="route-row">
+                    <span class="route-dot route-dot--pickup"></span>
+                    <span class="route-addr">{{ parcel.pickupAddress }}</span>
+                  </div>
+                  <div class="route-connector"></div>
+                  <div class="route-row">
+                    <span class="route-dot route-dot--drop"></span>
+                    <span class="route-addr">{{ parcel.dropoffAddress }}</span>
+                  </div>
+                </div>
+                <div class="item-card__foot">
+                  <lucide-icon name="package" [size]="13" class="item-type-icon"></lucide-icon>
+                  <span>{{ parcel.itemDescription }}</span>
+                  <lucide-icon name="chevron-right" [size]="14" class="item-arrow"></lucide-icon>
                 </div>
               </a>
             }
@@ -149,20 +172,45 @@ const USER_CHART_COPY = {
     .action-card p  { font-size: 13px; color: var(--clr-text-muted); }
     .section { margin-bottom: 32px; }
     .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; h2 { font-size: 17px; font-weight: 700; } a { font-size: 13px; } }
-    .ride-list { display: flex; flex-direction: column; gap: 1px; background: var(--clr-border); border-radius: var(--radius-lg); overflow: hidden; }
-    .ride-item {
-      background: var(--clr-bg-card); padding: 14px 16px; text-decoration: none;
-      display: flex; flex-direction: column; gap: 6px; transition: background var(--transition);
+
+    /* Item cards grid */
+    .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+    .item-card {
+      background: var(--clr-bg-card); border: 1px solid var(--clr-border); border-radius: var(--radius-lg);
+      padding: 16px; text-decoration: none; display: flex; flex-direction: column; gap: 12px;
+      transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+      box-shadow: var(--shadow-card);
     }
-    .ride-item:hover { background: var(--clr-bg-elevated); }
-    .ride-route { display: flex; align-items: center; gap: 8px; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .dot--pickup { background: var(--clr-primary); }
-    .dot--drop   { background: var(--clr-success); }
-    .address { font-size: 13px; color: var(--clr-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ride-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
-    .fare { font-size: 14px; font-weight: 600; }
-    .parcel-desc { font-size: 13px; font-weight: 500; }
+    .item-card:hover {
+      border-color: var(--clr-primary); transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(64,138,113,0.12);
+    }
+    .item-card__head { display: flex; justify-content: space-between; align-items: center; }
+    .item-fare { font-size: 15px; font-weight: 700; color: var(--clr-text); }
+
+    /* Route inside card */
+    .item-route { position: relative; display: flex; flex-direction: column; gap: 0; }
+    .route-row { display: flex; align-items: flex-start; gap: 10px; padding: 4px 0; }
+    .route-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+    .route-dot--pickup { background: var(--clr-primary); }
+    .route-dot--drop   { background: var(--clr-success); }
+    .route-connector {
+      width: 2px; height: 12px; background: var(--clr-border);
+      margin-left: 4px;
+    }
+    .route-addr {
+      font-size: 12px; color: var(--clr-text-muted); line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+
+    /* Card footer */
+    .item-card__foot {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--clr-text-dim); border-top: 1px solid var(--clr-border-subtle); padding-top: 10px;
+    }
+    .item-type-icon { color: var(--clr-text-dim); flex-shrink: 0; }
+    .item-arrow { margin-left: auto; color: var(--clr-text-dim); }
+
     .empty-icon { display: flex; justify-content: center; color: var(--clr-text-dim); opacity: 0.5; margin-bottom: 8px; }
     .user-home-charts { display: block; margin-bottom: 32px; }
   `],

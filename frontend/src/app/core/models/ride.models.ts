@@ -1,5 +1,16 @@
 import type { AuthUser } from './auth.models';
 
+export type PaymentStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+export interface RidePayment {
+  id: string;
+  status: PaymentStatus;
+  amount: number;
+  mpesaReceiptNumber: string | null;
+  completedAt: string | null;
+  checkoutRequestId: string | null;
+}
+
 export type RideStatus =
   | 'PENDING'
   | 'ACCEPTED'
@@ -43,6 +54,8 @@ export interface Ride {
   mpesaPhone: string | null;
   createdAt: string;
   completedAt: string | null;
+  payment?: RidePayment | null;
+  rating?: { score: number } | null;
 }
 
 export interface CreateRideDto {
