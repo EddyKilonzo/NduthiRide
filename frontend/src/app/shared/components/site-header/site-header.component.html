@@ -46,9 +46,40 @@
           </button>
         </div>
       } @else {
-        <a routerLink="/auth/login" class="btn btn--ghost">Sign In</a>
-        <a routerLink="/auth/register" class="btn btn--primary">Get Started</a>
+        <a routerLink="/auth/login" class="btn btn--ghost nav__desktop-only">Sign In</a>
+        <a routerLink="/auth/register" class="btn btn--primary nav__desktop-only">Get Started</a>
       }
+
+      <!-- Hamburger — mobile only -->
+      <button
+        class="nav__hamburger"
+        type="button"
+        (click)="toggleMenu()"
+        [attr.aria-expanded]="menuOpen()"
+        aria-label="Toggle navigation menu"
+      >
+        <lucide-icon [name]="menuOpen() ? 'x' : 'menu'" [size]="22"></lucide-icon>
+      </button>
     </div>
   </div>
 </nav>
+
+<!-- Mobile menu drawer -->
+<div class="nav__drawer" [class.nav__drawer--open]="menuOpen()" (click)="toggleMenu()">
+  <div class="nav__drawer-panel" (click)="$event.stopPropagation()">
+    <div class="nav__drawer-links">
+      <a href="/#how-it-works" (click)="toggleMenu()">How It Works</a>
+      <a href="/#features" (click)="toggleMenu()">Features</a>
+      <a href="/#about" (click)="toggleMenu()">About</a>
+      <a href="/#account-types" (click)="toggleMenu()">Accounts</a>
+      <a href="/#faq" (click)="toggleMenu()">FAQ</a>
+    </div>
+
+    @if (!auth.isAuth()) {
+      <div class="nav__drawer-actions">
+        <a routerLink="/auth/login" class="btn btn--ghost btn--full" (click)="toggleMenu()">Sign In</a>
+        <a routerLink="/auth/register" class="btn btn--primary btn--full" (click)="toggleMenu()">Get Started</a>
+      </div>
+    }
+  </div>
+</div>

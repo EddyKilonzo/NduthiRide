@@ -1,5 +1,5 @@
-import { Component, HostListener, AfterViewInit, inject, computed } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, HostListener, AfterViewInit, inject, computed, signal } from '@angular/core';
+import { RouterLink, Router, NavigationEnd } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { ThemeService } from '../../../core/services/theme.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -14,13 +14,14 @@ import { NotificationsService } from '../../../core/services/notifications.servi
 })
 export class SiteHeaderComponent implements AfterViewInit {
   private readonly themeSvc = inject(ThemeService);
+  private readonly router = inject(Router);
   protected readonly auth = inject(AuthService);
   protected readonly notificationsSvc = inject(NotificationsService);
 
   readonly isDark = this.themeSvc.theme;
   readonly unreadNotifications = this.notificationsSvc.unreadCount;
+  readonly menuOpen = signal(false);
 
-  /** Home route for the signed-in role (shell + public pages with a session). */
   protected readonly dashboardPath = computed(() => {
     const r = this.auth.role();
     if (r === 'ADMIN') return '/admin';
@@ -37,6 +38,10 @@ export class SiteHeaderComponent implements AfterViewInit {
 
   ngAfterViewInit(): void {
     this.syncScrollState();
+    // Close menu on route change
+    this.router.events.subscribe(e => {
+      if (e instanceof NavigationEnd) this.menuOpen.set(false);
+    });
   }
 
   @HostListener('window:scroll')
@@ -44,11 +49,18 @@ export class SiteHeaderComponent implements AfterViewInit {
     this.syncScrollState();
   }
 
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    if (window.innerWidth > 992) this.menuOpen.set(false);
+  }
+
   private syncScrollState(): void {
     const next = window.scrollY > 60;
-    if (this.navScrolled !== next) {
-      this.navScrolled = next;
-    }
+    if (this.navScrolled !== next) this.navScrolled = next;
+  }
+
+  toggleMenu(): void {
+    this.menuOpen.update(v => !v);
   }
 
   toggleTheme(): void {
