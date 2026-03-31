@@ -2,26 +2,57 @@ services:
   - type: web
     name: nduthiride-backend
     runtime: node
-    rootDir: backend
-    buildCommand: npm install && npm run build
-    startCommand: node dist/main
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && node dist/main
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3000
+
+      # ── Database ──────────────────────────────────────────
       - key: DATABASE_URL
         sync: false
+
+      # ── App URLs ──────────────────────────────────────────
       - key: FRONTEND_URL
         sync: false
-      - key: JWT_ACCESS_SECRET
+      - key: BACKEND_URL
         sync: false
-      - key: JWT_REFRESH_SECRET
+      - key: CORS_ORIGINS
         sync: false
-      - key: JWT_ACCESS_EXPIRES_IN
-        value: 15m
-      - key: JWT_REFRESH_EXPIRES_IN
+
+      # ── JWT ───────────────────────────────────────────────
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
         value: 7d
+
+      # ── Cloudinary ────────────────────────────────────────
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+      # ── SMTP (Brevo) ──────────────────────────────────────
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SENDER_EMAIL
+        sync: false
+      - key: OTP_EXPIRES_MINS
+        value: 10
+
+      # ── M-Pesa ────────────────────────────────────────────
       - key: MPESA_CONSUMER_KEY
         sync: false
       - key: MPESA_CONSUMER_SECRET
@@ -36,30 +67,12 @@ services:
         sync: false
       - key: LIPANA_WEBHOOK_SECRET
         sync: false
-      - key: CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
-      - key: MAIL_HOST
-        sync: false
-      - key: MAIL_PORT
-        sync: false
-      - key: MAIL_SECURE
-        sync: false
-      - key: MAIL_USER
-        sync: false
-      - key: MAIL_PASS
-        sync: false
-      - key: MAIL_FROM_NAME
-        sync: false
-      - key: MAIL_FROM_ADDRESS
-        sync: false
-      - key: OTP_EXPIRES_MINS
-        value: 10
+
+      # ── Firebase (push notifications) ─────────────────────
       - key: FIREBASE_SERVICE_ACCOUNT
         sync: false
+
+      # ── SMS ───────────────────────────────────────────────
       - key: SMS_API_KEY
         sync: false
       - key: SMS_USERNAME
