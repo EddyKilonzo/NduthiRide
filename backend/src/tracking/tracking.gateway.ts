@@ -27,7 +27,15 @@ const connectedClients = new Map<string, string>();
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL ?? 'https://nduthi-ride-r479.vercel.app',
+    origin: (origin: string, callback: (err: Error | null, allow?: boolean) => void) => {
+      const allowed = (
+        process.env.CORS_ORIGINS ??
+        process.env.FRONTEND_URL ??
+        'https://nduthi-ride-r479.vercel.app'
+      ).split(',').map(o => o.trim());
+      if (!origin || allowed.includes(origin)) callback(null, true);
+      else callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
     credentials: true,
   },
   namespace: '/tracking',

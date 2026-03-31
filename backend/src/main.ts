@@ -17,9 +17,21 @@ async function bootstrap(): Promise<void> {
   // ── Security headers (helmet) ───────────────────────────
   app.use(helmet());
 
-  // ── CORS — allow the Angular frontend ──────────────────
+  // ── CORS — allow configured origins ────────────────────
+  const allowedOrigins = (
+    process.env.CORS_ORIGINS ??
+    process.env.FRONTEND_URL ??
+    'https://nduthi-ride-r479.vercel.app'
+  ).split(',').map(o => o.trim());
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL ?? 'https://nduthi-ride-r479.vercel.app',
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
     credentials: true,
   });
 
