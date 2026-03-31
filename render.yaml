@@ -1,0 +1,68 @@
+services:
+  - type: web
+    name: nduthiride-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: node dist/main
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: MPESA_CONSUMER_KEY
+        sync: false
+      - key: MPESA_CONSUMER_SECRET
+        sync: false
+      - key: MPESA_SHORTCODE
+        sync: false
+      - key: MPESA_PASSKEY
+        sync: false
+      - key: MPESA_CALLBACK_URL
+        sync: false
+      - key: MPESA_API_URL
+        sync: false
+      - key: LIPANA_WEBHOOK_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_PORT
+        sync: false
+      - key: MAIL_SECURE
+        sync: false
+      - key: MAIL_USER
+        sync: false
+      - key: MAIL_PASS
+        sync: false
+      - key: MAIL_FROM_NAME
+        sync: false
+      - key: MAIL_FROM_ADDRESS
+        sync: false
+      - key: OTP_EXPIRES_MINS
+        value: 10
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      - key: SMS_API_KEY
+        sync: false
+      - key: SMS_USERNAME
+        sync: false
+      - key: SMS_SENDER_ID
+        value: NduthiRide
