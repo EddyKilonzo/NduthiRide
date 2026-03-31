@@ -17,7 +17,7 @@ export default () => {
   app: {
     nodeEnv: process.env.NODE_ENV ?? 'development',
     port: parseInt(process.env.PORT ?? '3000', 10),
-    frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:4200',
+    frontendUrl: process.env.FRONTEND_URL ?? 'https://nduthi-ride-r479.vercel.app',
   },
 
   database: {

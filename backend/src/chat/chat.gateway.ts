@@ -18,7 +18,7 @@ import { SendMessageDto } from './dto/send-message.dto';
 @WebSocketGateway({
   namespace: '/chat',
   cors: {
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:4200',
+    origin: process.env.FRONTEND_URL ?? 'https://nduthi-ride-r479.vercel.app',
     credentials: true,
   },
 })

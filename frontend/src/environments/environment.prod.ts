@@ -1,7 +1,7 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://nduthiride-api.onrender.com/api/v1',
-  wsUrl: 'https://nduthiride-api.onrender.com',
+  apiUrl: 'https://nduthiride.onrender.com/api/v1',
+  wsUrl: 'https://nduthiride.onrender.com',
   cloudinaryCloudName: 'duymwzfhj',
   cloudinaryPreset: 'uploads',
   firebase: {

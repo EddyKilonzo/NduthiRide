@@ -27,7 +27,7 @@ const connectedClients = new Map<string, string>();
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:4200',
+    origin: process.env.FRONTEND_URL ?? 'https://nduthi-ride-r479.vercel.app',
     credentials: true,
   },
   namespace: '/tracking',

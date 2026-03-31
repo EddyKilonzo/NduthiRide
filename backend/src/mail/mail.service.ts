@@ -15,7 +15,7 @@ export class MailService {
     private readonly config: ConfigService,
   ) {
     this.appUrl =
-      this.config.get<string>('app.frontendUrl') ?? 'http://localhost:4200';
+      this.config.get<string>('app.frontendUrl') ?? 'https://nduthi-ride-r479.vercel.app';
     this.fromName = this.config.get<string>('mail.fromName') ?? 'NduthiRide';
     this.fromAddress =
       this.config.get<string>('mail.fromAddress') ??

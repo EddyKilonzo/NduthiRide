@@ -19,7 +19,7 @@ async function bootstrap(): Promise<void> {
 
   // ── CORS — allow the Angular frontend ──────────────────
   app.enableCors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:4200',
+    origin: process.env.FRONTEND_URL ?? 'https://nduthi-ride-r479.vercel.app',
     credentials: true,
   });
 
