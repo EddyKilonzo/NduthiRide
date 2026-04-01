@@ -185,10 +185,12 @@ export class LoginComponent {
         credential: credential.trim(),
         password,
       });
+      this.toast.success('Welcome back!');
       const role = this.auth.role();
       const dest = role === 'RIDER' ? '/rider' : role === 'ADMIN' ? '/admin' : '/user';
       await this.router.navigateByUrl(dest);
     } catch (err: any) {
+      if (err?.status !== 401) return; // error interceptor already showed the toast
       const msg = err?.error?.message ?? 'Invalid email or password';
       this.toast.error(typeof msg === 'string' ? msg : msg.join(', '));
     } finally {
