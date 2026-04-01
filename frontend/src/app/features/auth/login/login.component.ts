@@ -1,8 +1,9 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
+import { AuthApi } from '../../../core/api/auth.api';
 import { ToastService } from '../../../core/services/toast.service';
 import { LucideAngularModule } from 'lucide-angular';
 import { AUTH_HERO_LOGIN_URLS } from '../auth-hero.constants';
@@ -144,8 +145,9 @@ import { AUTH_HERO_LOGIN_URLS } from '../auth-hero.constants';
   `,
   styleUrls: ['../auth-pages.shared.scss'],
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   private readonly auth = inject(AuthService);
+  private readonly authApi = inject(AuthApi);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
 
@@ -159,6 +161,10 @@ export class LoginComponent {
     credential: ['', [Validators.required]],
     password: ['', Validators.required],
   });
+
+  ngOnInit(): void {
+    this.authApi.warmUp();
+  }
 
   protected onHeroImgError(): void {
     this.heroUrlIndex++;

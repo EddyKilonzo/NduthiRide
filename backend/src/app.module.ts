@@ -4,6 +4,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
 import configuration from './config/configuration';
+import { HealthController } from './health.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -20,6 +21,7 @@ import { SupportModule } from './support/support.module';
 import { MediaModule } from './media/media.module';
 
 @Module({
+  controllers: [HealthController],
   imports: [
     // Load and validate environment variables from .env — available globally
     ConfigModule.forRoot({

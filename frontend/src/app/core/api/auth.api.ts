@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { lastValueFrom } from 'rxjs';
 import { BaseApiService } from './base-api.service';
 import { LoginDto, RegisterDto, RegisterRiderDto, AuthTokens, AuthUser } from '../models/auth.models';
 
@@ -57,5 +58,10 @@ export class AuthApi extends BaseApiService {
       currentPassword,
       newPassword,
     });
+  }
+
+  /** Fire-and-forget ping to wake Render from cold start before the user submits a form. */
+  warmUp(): void {
+    lastValueFrom(this.http.get(`${this.apiUrl}/health`)).catch(() => {});
   }
 }

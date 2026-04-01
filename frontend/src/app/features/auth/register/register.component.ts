@@ -6,6 +6,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
+import { AuthApi } from '../../../core/api/auth.api';
 import { ToastService } from '../../../core/services/toast.service';
 import { LucideAngularModule } from 'lucide-angular';
 import { matchPassword } from '../auth-validators';
@@ -237,6 +238,7 @@ type Strength = 'weak' | 'medium' | 'strong' | null;
 })
 export class RegisterComponent implements OnInit {
   private readonly auth = inject(AuthService);
+  private readonly authApi = inject(AuthApi);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
@@ -268,6 +270,8 @@ export class RegisterComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.authApi.warmUp();
+
     if (this.route.snapshot.queryParamMap.get('type') === 'rider') {
       this.form.patchValue({ accountType: 'rider' });
     }
