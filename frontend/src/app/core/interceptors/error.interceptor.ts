@@ -15,9 +15,10 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
     retry({
       count: 2,
       delay: (error, retryCount) => {
-        if (error instanceof HttpErrorResponse && error.status === 504) {
-          toast.info(`Server is starting up, please wait... (attempt ${retryCount + 1}/3)`);
-          return timer(3000);
+        if (error instanceof HttpErrorResponse && (error.status === 504 || error.status === 0)) {
+          const wait = retryCount === 1 ? 10000 : 20000;
+          toast.info(`Server is waking up, please wait ${wait / 1000}s... (attempt ${retryCount + 1}/3)`);
+          return timer(wait);
         }
         return throwError(() => error);
       },
