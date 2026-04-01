@@ -17,7 +17,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
       delay: (error, retryCount) => {
         if (error instanceof HttpErrorResponse && error.status === 504) {
           toast.info(`Server is starting up, please wait... (attempt ${retryCount + 1}/3)`);
-          return timer(6000);
+          return timer(3000);
         }
         return throwError(() => error);
       },

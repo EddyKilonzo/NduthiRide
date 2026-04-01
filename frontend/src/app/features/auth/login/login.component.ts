@@ -4,7 +4,6 @@ import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { RidersApi } from '../../../core/api/riders.api';
 import { LucideAngularModule } from 'lucide-angular';
 import { AUTH_HERO_LOGIN_URLS } from '../auth-hero.constants';
 
@@ -149,7 +148,6 @@ export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
-  private readonly ridersApi = inject(RidersApi);
 
   protected readonly loading = signal(false);
   protected readonly showPw = signal(false);
@@ -188,17 +186,8 @@ export class LoginComponent {
         password,
       });
       const role = this.auth.role();
-      if (role === 'RIDER') {
-        try {
-          const profile = await this.ridersApi.getMyProfile();
-          const isComplete = !!(profile.bikeModel && profile.bikeRegistration && profile.licenseNumber);
-          await this.router.navigateByUrl(isComplete ? '/rider' : '/rider/verify-details');
-        } catch {
-          await this.router.navigateByUrl('/rider/verify-details');
-        }
-      } else {
-        await this.router.navigateByUrl(role === 'ADMIN' ? '/admin' : '/user');
-      }
+      const dest = role === 'RIDER' ? '/rider' : role === 'ADMIN' ? '/admin' : '/user';
+      await this.router.navigateByUrl(dest);
     } catch (err: any) {
       const msg = err?.error?.message ?? 'Invalid email or password';
       this.toast.error(typeof msg === 'string' ? msg : msg.join(', '));
