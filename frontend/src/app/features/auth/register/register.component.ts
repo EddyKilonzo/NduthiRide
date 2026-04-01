@@ -337,13 +337,19 @@ export class RegisterComponent implements OnInit {
       this.toast.success('Account created! Welcome to NduthiRide.');
       void this.router.navigate(['/auth/verify-email']);
     } catch (err) {
-      // 409 means the account was already created (e.g. a previous request
-      // succeeded on the server but timed out before the response reached us).
-      // Treat it as success and send the user to login.
-      if (err instanceof HttpErrorResponse && err.status === 409) {
-        this.toast.info('Account already exists — please sign in.');
-        void this.router.navigate(['/auth/login']);
-        return;
+      if (err instanceof HttpErrorResponse) {
+        // 409 — account was created on a previous attempt that timed out
+        if (err.status === 409) {
+          this.toast.info('Account already exists — please sign in.');
+          void this.router.navigate(['/auth/login']);
+          return;
+        }
+        // 504 — all retries exhausted; first attempt may have succeeded on the server
+        if (err.status === 504 || err.status === 0) {
+          this.toast.warning('Registration timed out — your account may have been created. Try signing in.');
+          void this.router.navigate(['/auth/login']);
+          return;
+        }
       }
       this.loading.set(false);
     }
