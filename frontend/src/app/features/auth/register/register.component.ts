@@ -4,6 +4,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { LucideAngularModule } from 'lucide-angular';
@@ -333,8 +334,17 @@ export class RegisterComponent implements OnInit {
           email: raw.email,
         });
       }
+      this.toast.success('Account created! Welcome to NduthiRide.');
       void this.router.navigate(['/auth/verify-email']);
-    } catch {
+    } catch (err) {
+      // 409 means the account was already created (e.g. a previous request
+      // succeeded on the server but timed out before the response reached us).
+      // Treat it as success and send the user to login.
+      if (err instanceof HttpErrorResponse && err.status === 409) {
+        this.toast.info('Account already exists — please sign in.');
+        void this.router.navigate(['/auth/login']);
+        return;
+      }
       this.loading.set(false);
     }
   }
