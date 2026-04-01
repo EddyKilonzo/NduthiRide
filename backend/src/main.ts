@@ -22,7 +22,7 @@ async function bootstrap(): Promise<void> {
     process.env.CORS_ORIGINS ??
     process.env.FRONTEND_URL ??
     'https://nduthi-ride-r479.vercel.app'
-  ).split(',').map(o => o.trim());
+  ).split(',').map(o => o.trim().replace(/\/$/, ''));
 
   app.enableCors({
     origin: (origin, callback) => {
