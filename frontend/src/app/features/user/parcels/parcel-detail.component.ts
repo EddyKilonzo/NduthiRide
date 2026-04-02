@@ -1,11 +1,14 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { ParcelService } from '../../../core/services/parcel.service';
+import { PaymentService } from '../../../core/services/payment.service';
+import { TrackingService } from '../../../core/services/tracking.service';
 import { ToastService }  from '../../../core/services/toast.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import type { Parcel } from '../../../core/models/parcel.models';
+import type { RidePayment } from '../../../core/models/ride.models';
 
 @Component({
   selector: 'app-parcel-detail',
@@ -99,6 +102,40 @@ import type { Parcel } from '../../../core/models/parcel.models';
             </div>
           }
 
+          <!-- Payment card -->
+          @if (parcel()!.paymentMethod === 'MPESA') {
+            <div class="card payment-card">
+              <h3 class="card-title">Payment</h3>
+              @if (payment(); as p) {
+                <div class="payment-status payment-status--{{ p.status.toLowerCase() }}">
+                  <lucide-icon [name]="paymentIcon(p.status)" [size]="20"></lucide-icon>
+                  <div>
+                    <p class="payment-status-label">{{ paymentLabel(p.status) }}</p>
+                    @if (p.mpesaReceiptNumber) {
+                      <p class="payment-receipt">Receipt: {{ p.mpesaReceiptNumber }}</p>
+                    }
+                    @if (p.status === 'PROCESSING') {
+                      <p class="payment-hint">Check your phone for the M-Pesa prompt.</p>
+                    }
+                  </div>
+                </div>
+                @if (p.status === 'FAILED') {
+                  <p class="payment-hint" style="margin-top:10px">The M-Pesa prompt was not completed. You can resend it below.</p>
+                  <button class="btn btn--primary btn--full" style="margin-top:8px" (click)="resendPayment()" [disabled]="payingNow()">
+                    @if (payingNow()) { <app-spinner [size]="16" /> Sending... }
+                    @else { <lucide-icon name="refresh-cw" [size]="16"></lucide-icon> Resend M-Pesa Prompt }
+                  </button>
+                }
+              } @else if (canPay()) {
+                <p class="payment-hint">Pay via M-Pesa STK push to {{ parcel()!.mpesaPhone }}.</p>
+                <button class="btn btn--primary btn--full" (click)="initiatePayment()" [disabled]="payingNow()">
+                  @if (payingNow()) { <app-spinner [size]="16" /> Sending prompt... }
+                  @else { Pay KES {{ parcel()!.deliveryFee | number:'1.0-0' }} via M-Pesa }
+                </button>
+              }
+            </div>
+          }
+
           <!-- Cancel action -->
           @if (['PENDING', 'ACCEPTED'].includes(parcel()!.status)) {
             <div class="card actions-card">
@@ -168,15 +205,30 @@ import type { Parcel } from '../../../core/models/parcel.models';
     .star-btn--active { color: var(--clr-warning); }
     .support-box { background: rgba(var(--clr-primary-rgb), 0.03); border-style: dashed; }
     .support-text { font-size: 13px; color: var(--clr-text-muted); margin-bottom: 16px; }
+    .payment-hint { font-size: 13px; color: var(--clr-text-muted); margin-bottom: 14px; }
+    .payment-status {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px; border-radius: var(--radius-md); margin-bottom: 4px;
+      border: 1px solid var(--clr-border);
+    }
+    .payment-status--completed { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25); color: var(--clr-success); }
+    .payment-status--failed    { background: rgba(239,68,68,0.08);  border-color: rgba(239,68,68,0.25);  color: var(--clr-error); }
+    .payment-status--processing,.payment-status--pending {
+      background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.25); color: var(--clr-warning);
+    }
+    .payment-status-label { font-weight: 700; font-size: 14px; }
+    .payment-receipt { font-size: 12px; margin-top: 4px; opacity: 0.85; }
     @media (max-width: 640px) {
       .detail-grid { grid-template-columns: 1fr; }
     }
   `],
 })
-export class ParcelDetailComponent implements OnInit {
-  private readonly route         = inject(ActivatedRoute);
-  private readonly parcelService = inject(ParcelService);
-  private readonly toast         = inject(ToastService);
+export class ParcelDetailComponent implements OnInit, OnDestroy {
+  private readonly route          = inject(ActivatedRoute);
+  private readonly parcelService  = inject(ParcelService);
+  private readonly paymentService = inject(PaymentService);
+  private readonly trackingService = inject(TrackingService);
+  private readonly toast          = inject(ToastService);
 
   protected readonly parcel         = signal<Parcel | null>(null);
   protected readonly loading        = signal(true);
@@ -184,16 +236,86 @@ export class ParcelDetailComponent implements OnInit {
   protected readonly rated          = signal(false);
   protected readonly selectedRating = signal(0);
 
+  protected readonly payment   = signal<RidePayment | null>(null);
+  protected readonly payingNow = signal(false);
+
+  private subscribedPaymentId: string | null = null;
+  private paymentUpdateCb: ((d: unknown) => void) | null = null;
+
+  protected canPay(): boolean {
+    const p = this.parcel();
+    return !!p && p.paymentMethod === 'MPESA' && !this.payment()
+      && ['PENDING', 'ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'].includes(p.status);
+  }
+
   async ngOnInit(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('id')!;
     try {
       const p = await this.parcelService.getById(id);
       this.parcel.set(p);
+      if (p.payment) this.payment.set(p.payment as RidePayment);
+      if (p.rating) this.rated.set(true);
+      if (p.payment?.checkoutRequestId && p.payment.status === 'PROCESSING') {
+        this.subscribePaymentSocket(p.payment.id);
+      }
     } catch {
       this.toast.error('Could not load parcel');
     } finally {
       this.loading.set(false);
     }
+  }
+
+  ngOnDestroy(): void {
+    if (this.subscribedPaymentId) {
+      this.trackingService.unsubscribeFromPayment(this.subscribedPaymentId);
+    }
+    if (this.paymentUpdateCb) {
+      this.trackingService.offPaymentUpdate(this.paymentUpdateCb as (d: unknown) => void);
+    }
+  }
+
+  protected async initiatePayment(): Promise<void> {
+    const p = this.parcel();
+    if (!p || !p.mpesaPhone) return;
+    this.payingNow.set(true);
+    try {
+      const result = await this.paymentService.initiateForParcel(p.id, p.mpesaPhone, 'MPESA');
+      this.payment.set({
+        id: result.paymentId,
+        status: 'PROCESSING',
+        amount: p.deliveryFee,
+        mpesaReceiptNumber: null,
+        completedAt: null,
+        checkoutRequestId: result.checkoutRequestId ?? null,
+      });
+      this.toast.info('Check your phone for the M-Pesa prompt.');
+      this.trackingService.connect();
+      this.subscribePaymentSocket(result.paymentId);
+    } catch {
+      this.toast.error('Could not initiate payment. Try again.');
+    } finally {
+      this.payingNow.set(false);
+    }
+  }
+
+  protected async resendPayment(): Promise<void> {
+    this.payment.set(null);
+    await this.initiatePayment();
+  }
+
+  private subscribePaymentSocket(paymentId: string): void {
+    this.subscribedPaymentId = paymentId;
+    this.trackingService.subscribeToPayment(paymentId);
+    this.paymentUpdateCb = (data: unknown) => {
+      const d = data as { status: string; mpesaReceiptNumber?: string | null; completedAt?: string };
+      this.payment.update((p) => p
+        ? { ...p, status: d.status as RidePayment['status'], mpesaReceiptNumber: d.mpesaReceiptNumber ?? p.mpesaReceiptNumber, completedAt: d.completedAt ?? p.completedAt }
+        : p,
+      );
+      if (d.status === 'COMPLETED') this.toast.success('Payment confirmed!');
+      if (d.status === 'FAILED') this.toast.error('Payment failed. Please try again.');
+    };
+    this.trackingService.onPaymentUpdate(this.paymentUpdateCb as (d: { status: string; amount?: number; mpesaReceiptNumber?: string | null; completedAt?: string }) => void);
   }
 
   protected async cancel(): Promise<void> {
@@ -228,5 +350,15 @@ export class ParcelDetailComponent implements OnInit {
       PENDING: 'pending', DELIVERED: 'active', CANCELLED: 'closed', IN_TRANSIT: 'info',
     };
     return map[status] ?? 'info';
+  }
+
+  protected paymentIcon(status: string): string {
+    const icons: Record<string, string> = { COMPLETED: 'check-circle', FAILED: 'x-circle', PROCESSING: 'loader', PENDING: 'clock' };
+    return icons[status] ?? 'credit-card';
+  }
+
+  protected paymentLabel(status: string): string {
+    const labels: Record<string, string> = { COMPLETED: 'Payment confirmed', FAILED: 'Payment failed', PROCESSING: 'Awaiting M-Pesa confirmation', PENDING: 'Payment pending' };
+    return labels[status] ?? status;
   }
 }

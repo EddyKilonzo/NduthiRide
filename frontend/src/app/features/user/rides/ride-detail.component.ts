@@ -137,6 +137,13 @@ const ACTIVE_STATUSES: Ride['status'][] = [
                     }
                   </div>
                 </div>
+                @if (p.status === 'FAILED') {
+                  <p class="payment-hint" style="margin-top:10px">The M-Pesa prompt was not completed. You can resend it below.</p>
+                  <button class="btn btn--primary btn--full" style="margin-top:8px" (click)="resendPayment()" [disabled]="payingNow()">
+                    @if (payingNow()) { <app-spinner [size]="16" /> Sending... }
+                    @else { <lucide-icon name="refresh-cw" [size]="16"></lucide-icon> Resend M-Pesa Prompt }
+                  </button>
+                }
               } @else if (canPay()) {
                 <p class="payment-hint">Pay via M-Pesa STK push to {{ ride()!.mpesaPhone }}.</p>
                 <button class="btn btn--primary btn--full" (click)="initiatePayment()" [disabled]="payingNow()">
@@ -319,6 +326,7 @@ export class RideDetailComponent implements OnInit, OnDestroy {
     void this.rideService.getById(id).then((r) => {
       this.ride.set(r);
       if (r.payment) this.payment.set(r.payment as RidePayment);
+      if (r.rating) this.rated.set(true);
       this.loading.set(false);
 
       // Start live tracking for active rides
@@ -369,6 +377,14 @@ export class RideDetailComponent implements OnInit, OnDestroy {
     } finally {
       this.payingNow.set(false);
     }
+  }
+
+  protected async resendPayment(): Promise<void> {
+    const r = this.ride();
+    if (!r || !r.mpesaPhone) return;
+    // Clear the failed payment so the pay button logic re-runs via initiatePayment
+    this.payment.set(null);
+    await this.initiatePayment();
   }
 
   private subscribePaymentSocket(paymentId: string): void {

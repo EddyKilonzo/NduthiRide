@@ -288,8 +288,12 @@ button, input, select, textarea { font: inherit; outline: none; border: none; ba
 .page { min-height: 100vh; display: flex; flex-direction: column; }
 .page-header {
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;
+  flex-wrap: wrap; gap: 12px;
   h1 { font-size: 22px; font-weight: 700; font-family: var(--font-body); text-transform: none; letter-spacing: normal; }
   p  { font-size: 14px; color: var(--clr-text-muted); margin-top: 2px; }
+  @media (max-width: 600px) {
+    h1 { font-size: 18px; }
+  }
 }
 
 // ─── Table ────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild, ElementRef, AfterViewChecked, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild, ElementRef, AfterViewChecked, effect, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -17,7 +17,7 @@ import type { ChatMessage, Conversation, ConversationPreview } from '../../core/
     <div class="chat-page app-page">
       <div class="chat-layout modern-shadow">
         <!-- Sidebar: Chat List -->
-        <div class="chat-sidebar">
+        <div class="chat-sidebar" [class.show-sidebar]="!conversationId">
           <div class="sidebar-header">
             <h2>Messages</h2>
           </div>
@@ -60,7 +60,7 @@ import type { ChatMessage, Conversation, ConversationPreview } from '../../core/
         </div>
 
         <!-- Main: Messages Area -->
-        <div class="chat-main">
+        <div class="chat-main" [class.show-main]="!!conversationId || loading()">
           @if (!conversationId && !loading()) {
             <div class="no-selection">
               <div class="selection-illustration">
@@ -72,10 +72,21 @@ import type { ChatMessage, Conversation, ConversationPreview } from '../../core/
           } @else {
             <!-- Header -->
             <div class="chat-header">
+              <button class="back-btn" type="button" (click)="goBack()" aria-label="Back to conversations">
+                <lucide-icon name="arrow-left" [size]="18"></lucide-icon>
+              </button>
               <div class="header-info">
                 <h3>{{ title() }}</h3>
                 <p class="status-text" [class.online]="!isClosed()">
-                  {{ isClosed() ? 'Conversation Closed' : (isTyping() ? 'Typing...' : 'Active Now') }}
+                  @if (isClosed()) {
+                    Conversation Closed
+                  } @else if (isTyping()) {
+                    Typing...
+                  } @else if (lastSeen()) {
+                    Last seen {{ lastSeen() | date:'shortTime' }}
+                  } @else {
+                    Active
+                  }
                 </p>
               </div>
               <div class="header-actions">
@@ -96,7 +107,16 @@ import type { ChatMessage, Conversation, ConversationPreview } from '../../core/
                 </div>
               } @else {
                 @for (msg of messages(); track msg.id) {
-                  <div class="message-row" [class.own-message]="isOwnMessage(msg)">
+                  <div class="message-row" [class.own-message]="isOwnMessage(msg)" [class.system-row]="msg.type === 'SYSTEM'">
+                    @if (msg.type !== 'SYSTEM' && !isOwnMessage(msg)) {
+                      <div class="msg-avatar">
+                        @if (msg.senderAvatar) {
+                          <img [src]="msg.senderAvatar" [alt]="msg.senderName" />
+                        } @else {
+                          <div class="msg-avatar-placeholder">{{ msg.senderName?.charAt(0) ?? '?' }}</div>
+                        }
+                      </div>
+                    }
                     <div class="message-bubble" [class.system]="msg.type === 'SYSTEM'">
                       @if (msg.type !== 'SYSTEM' && !isOwnMessage(msg)) {
                         <span class="sender-name">{{ msg.senderName }}</span>
@@ -104,6 +124,15 @@ import type { ChatMessage, Conversation, ConversationPreview } from '../../core/
                       <p class="message-content">{{ msg.content }}</p>
                       <span class="message-time">{{ msg.createdAt | date:'shortTime' }}</span>
                     </div>
+                    @if (msg.type !== 'SYSTEM' && isOwnMessage(msg)) {
+                      <div class="msg-avatar own-avatar">
+                        @if (currentUserAvatar()) {
+                          <img [src]="currentUserAvatar()!" [alt]="currentUserName()" />
+                        } @else {
+                          <div class="msg-avatar-placeholder">{{ currentUserName()?.charAt(0) ?? '?' }}</div>
+                        }
+                      </div>
+                    }
                   </div>
                 }
               }
@@ -188,17 +217,41 @@ import type { ChatMessage, Conversation, ConversationPreview } from '../../core/
     .chat-loader { display: flex; justify-content: center; padding: 40px; }
     .empty-chat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--clr-text-dim); height: 100%; opacity: 0.6; }
 
-    .message-row { display: flex; width: 100%; }
+    .message-row { display: flex; width: 100%; align-items: flex-end; gap: 8px; }
     .message-row.own-message { justify-content: flex-end; }
+    .message-row.system-row { justify-content: center; }
+
+    /* Per-message avatars */
+    .msg-avatar {
+      width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+      overflow: hidden; border: 2px solid var(--clr-border);
+    }
+    .msg-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .msg-avatar-placeholder {
+      width: 100%; height: 100%; background: rgba(var(--clr-primary-rgb), 0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: var(--clr-primary);
+    }
+    .own-avatar { border-color: var(--clr-primary); }
+
     .message-bubble {
-      max-width: 75%; padding: 10px 14px; border-radius: 18px; position: relative;
+      max-width: 70%; padding: 10px 14px; border-radius: 18px; position: relative;
       background: var(--clr-bg-elevated); border: 1px solid var(--clr-border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    /* Tail for other's message */
+    .message-row:not(.own-message):not(.system-row) .message-bubble {
+      border-bottom-left-radius: 4px;
+    }
+    /* Tail for own message */
+    .own-message .message-bubble {
+      border-bottom-right-radius: 4px;
     }
     .message-bubble .sender-name { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--clr-primary); display: block; margin-bottom: 4px; }
     .message-bubble .message-content { font-size: 14px; color: var(--clr-text); line-height: 1.4; word-break: break-word; }
     .message-bubble .message-time { font-size: 9px; color: var(--clr-text-dim); display: block; text-align: right; margin-top: 4px; }
-    
-    .message-bubble.system { background: transparent; border: none; width: 100%; max-width: 100%; text-align: center; }
+
+    .message-bubble.system { background: rgba(var(--clr-primary-rgb), 0.06); border: 1px solid rgba(var(--clr-primary-rgb), 0.15); max-width: 80%; text-align: center; border-radius: 99px; padding: 6px 16px; }
     .message-bubble.system .message-content { font-style: italic; color: var(--clr-text-dim); font-size: 12px; }
     .message-bubble.system .message-time { display: none; }
 
@@ -221,6 +274,15 @@ import type { ChatMessage, Conversation, ConversationPreview } from '../../core/
     .empty-side { text-align: center; padding: 40px; color: var(--clr-text-dim); opacity: 0.6; }
     .empty-side p { font-size: 14px; margin-top: 8px; }
 
+    .back-btn {
+      display: none; align-items: center; justify-content: center;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--clr-bg-card); border: 1px solid var(--clr-border);
+      color: var(--clr-text); cursor: pointer; flex-shrink: 0;
+      transition: all 0.2s;
+      &:hover { border-color: var(--clr-primary); color: var(--clr-primary); }
+    }
+
     @media (max-width: 900px) {
       .chat-layout { grid-template-columns: 80px 1fr; }
       .sidebar-header, .conv-info { display: none; }
@@ -230,6 +292,10 @@ import type { ChatMessage, Conversation, ConversationPreview } from '../../core/
     @media (max-width: 640px) {
       .chat-layout { grid-template-columns: 1fr; }
       .chat-sidebar { display: none; }
+      .chat-sidebar.show-sidebar { display: flex; }
+      .chat-main { display: none; }
+      .chat-main.show-main { display: flex; }
+      .back-btn { display: flex; }
     }
   `],
 })
@@ -248,14 +314,30 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     content: ['', [Validators.required, Validators.maxLength(500)]],
   });
 
-  protected readonly messages = this.chatService.messages;
-  protected readonly isTyping = this.chatService.isTyping;
-  protected readonly isClosed = this.chatService.isClosed;
-  protected readonly loading = signal(false);
+  protected readonly messages   = this.chatService.messages;
+  protected readonly isTyping   = this.chatService.isTyping;
+  protected readonly isClosed   = this.chatService.isClosed;
+  protected readonly loading    = signal(false);
   protected readonly loadingList = signal(true);
-  protected readonly sending = signal(false);
-  protected readonly title = signal('Select a Chat');
+  protected readonly sending    = signal(false);
+  protected readonly title      = signal('Select a Chat');
   protected readonly conversations = signal<ConversationPreview[]>([]);
+
+  protected readonly currentUserAvatar = computed(() => this.auth.user()?.avatarUrl ?? null);
+  protected readonly currentUserName   = computed(() => this.auth.user()?.fullName ?? 'Me');
+
+  /** Time of the last message from the OTHER party — used as "last seen". */
+  protected readonly lastSeen = computed<string | null>(() => {
+    const me = this.auth.user();
+    if (!me) return null;
+    const msgs = this.messages();
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].senderAccountId !== me.id && msgs[i].type !== 'SYSTEM') {
+        return msgs[i].createdAt;
+      }
+    }
+    return null;
+  });
 
   protected conversationId: string | null = null;
   private typingTimer: any = null;
@@ -388,6 +470,16 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     const user = this.auth.user();
     if (!user) return false;
     return msg.senderAccountId === user.id;
+  }
+
+  protected goBack(): void {
+    if (this.conversationId) {
+      this.chatService.leaveConversation(this.conversationId);
+    }
+    this.conversationId = null;
+    this.chatService.reset();
+    const role = window.location.pathname.startsWith('/rider') ? 'rider' : 'user';
+    void this.router.navigate([`/${role}/chat`]);
   }
 
   protected getChatLink(conv: ConversationPreview): any[] {

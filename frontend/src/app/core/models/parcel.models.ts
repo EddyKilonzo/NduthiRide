@@ -1,5 +1,5 @@
 import type { AuthUser } from './auth.models';
-import type { PaymentMethod, RiderSummary } from './ride.models';
+import type { PaymentMethod, RiderSummary, RidePayment } from './ride.models';
 
 export type ParcelStatus =
   | 'PENDING'
@@ -33,6 +33,8 @@ export interface Parcel {
   mpesaPhone: string | null;
   createdAt: string;
   deliveredAt: string | null;
+  payment?: RidePayment | null;
+  rating?: { score: number } | null;
 }
 
 export interface CreateParcelDto {

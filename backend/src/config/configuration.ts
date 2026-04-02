@@ -31,13 +31,9 @@ export default () => {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   },
 
-  mpesa: {
-    consumerKey: process.env.MPESA_CONSUMER_KEY,
-    consumerSecret: process.env.MPESA_CONSUMER_SECRET,
-    shortcode: process.env.MPESA_SHORTCODE,
-    passkey: process.env.MPESA_PASSKEY,
-    callbackUrl: process.env.MPESA_CALLBACK_URL,
-    apiUrl: process.env.MPESA_API_URL ?? 'https://sandbox.safaricom.co.ke',
+  lipana: {
+    secretKey: process.env.LIPANA_SECRET_KEY,
+    publishableKey: process.env.LIPANA_PUBLISHABLE_KEY,
     webhookSecret: process.env.LIPANA_WEBHOOK_SECRET,
   },
 

@@ -39,17 +39,27 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
                 <div class="form-group">
                   <label>Service Commission (%)</label>
                   <p class="field-desc">The percentage NduthRide takes from every trip.</p>
-                  <input type="number" formControlName="COMMISSION_PCT" placeholder="e.g. 15" />
+                  <input type="number" formControlName="COMMISSION_PERCENTAGE" placeholder="e.g. 15" />
                 </div>
                 <div class="form-group">
-                  <label>Base Fare (KES)</label>
+                  <label>Ride Base Fare (KES)</label>
                   <p class="field-desc">Minimum starting price for any ride.</p>
-                  <input type="number" formControlName="BASE_FARE" placeholder="e.g. 100" />
+                  <input type="number" formControlName="MIN_FARE" placeholder="e.g. 50" />
                 </div>
                 <div class="form-group">
-                  <label>Rate per KM (KES)</label>
-                  <p class="field-desc">Additional charge per kilometer traveled.</p>
-                  <input type="number" formControlName="RATE_PER_KM" placeholder="e.g. 35" />
+                  <label>Ride Rate per KM (KES)</label>
+                  <p class="field-desc">Additional charge per kilometer for rides.</p>
+                  <input type="number" formControlName="PER_KM_RATE" placeholder="e.g. 30" />
+                </div>
+                <div class="form-group">
+                  <label>Parcel Base Fee (KES)</label>
+                  <p class="field-desc">Minimum starting price for parcel deliveries.</p>
+                  <input type="number" formControlName="PARCEL_BASE_FEE" placeholder="e.g. 80" />
+                </div>
+                <div class="form-group">
+                  <label>Parcel Rate per KM (KES)</label>
+                  <p class="field-desc">Additional charge per kilometer for deliveries.</p>
+                  <input type="number" formControlName="PARCEL_PER_KM" placeholder="e.g. 25" />
                 </div>
               </div>
             </div>
@@ -135,9 +145,11 @@ export class AdminSettingsComponent implements OnInit {
   protected readonly saving = signal(false);
 
   protected readonly settingsForm = this.fb.group({
-    COMMISSION_PCT: [15, [Validators.required, Validators.min(0), Validators.max(100)]],
-    BASE_FARE: [100, [Validators.required, Validators.min(0)]],
-    RATE_PER_KM: [35, [Validators.required, Validators.min(0)]],
+    COMMISSION_PERCENTAGE: [15, [Validators.required, Validators.min(0), Validators.max(100)]],
+    MIN_FARE: [50, [Validators.required, Validators.min(0)]],
+    PER_KM_RATE: [30, [Validators.required, Validators.min(0)]],
+    PARCEL_BASE_FEE: [80, [Validators.required, Validators.min(0)]],
+    PARCEL_PER_KM: [25, [Validators.required, Validators.min(0)]],
     MIN_PAYOUT_AMOUNT: [500, [Validators.required, Validators.min(0)]],
     MAX_RIDER_DISTANCE_KM: [5, [Validators.required, Validators.min(1), Validators.max(50)]],
   });

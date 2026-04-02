@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   Logger,
   ForbiddenException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentStatus } from '@prisma/client';
@@ -17,7 +18,7 @@ import { TrackingGateway } from '../tracking/tracking.gateway';
 import PDFDocument from 'pdfkit';
 
 @Injectable()
-export class PaymentsService {
+export class PaymentsService implements OnModuleInit {
   private readonly logger = new Logger(PaymentsService.name);
   private lipana: Lipana | null = null;
 
@@ -54,6 +55,11 @@ export class PaymentsService {
     private readonly trackingGateway: TrackingGateway,
   ) {}
 
+  onModuleInit() {
+    // Eagerly validate Lipana config so missing keys fail at startup, not on first payment
+    this.getLipana();
+  }
+
   /**
    * Lazily initialize the Lipana SDK.
    * This allows testing without the SDK being instantiated during DI.
@@ -61,10 +67,10 @@ export class PaymentsService {
   private getLipana(): Lipana {
     try {
       if (!this.lipana) {
+        const apiKey = this.config.getOrThrow<string>('lipana.secretKey');
         this.lipana = new Lipana({
-          apiKey: this.config.getOrThrow<string>('LIPANA_SECRET_KEY'),
-          environment:
-            process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+          apiKey,
+          environment: apiKey.startsWith('lip_sk_live_') ? 'production' : 'sandbox',
         });
       }
       return this.lipana;
@@ -101,18 +107,6 @@ export class PaymentsService {
       if (!dto.rideId && !dto.parcelId) {
         throw new BadRequestException('Provide either rideId or parcelId');
       }
-
-      // Idempotency check: prevent duplicate requests within window
-      const idempotencyKey = `${userId}:${dto.rideId || dto.parcelId}`;
-      if (this.isDuplicateRequest(idempotencyKey)) {
-        this.logger.warn(
-          `Duplicate payment request detected: ${idempotencyKey}`,
-        );
-        throw new BadRequestException(
-          'A payment request is already being processed. Please wait.',
-        );
-      }
-      this.recordRequest(idempotencyKey);
 
       // Resolve the amount from the ride or parcel
       let amount: number;
@@ -155,6 +149,9 @@ export class PaymentsService {
         entityId = parcel.id;
       }
 
+      // Idempotency check: prevent duplicate in-flight requests within window
+      const idempotencyKey = `${userId}:${dto.rideId || dto.parcelId}`;
+
       // Check for existing pending payment for this entity
       const existingPayment = await this.prisma.payment.findFirst({
         where: {
@@ -176,6 +173,17 @@ export class PaymentsService {
           message: 'Payment already in progress',
         };
       }
+
+      // No in-flight payment — apply idempotency only to prevent simultaneous new requests
+      if (this.isDuplicateRequest(idempotencyKey)) {
+        this.logger.warn(
+          `Duplicate payment request detected: ${idempotencyKey}`,
+        );
+        throw new BadRequestException(
+          'A payment request is already being processed. Please wait.',
+        );
+      }
+      this.recordRequest(idempotencyKey);
 
       // Create a PROCESSING payment record
       const payment = await this.prisma.payment.create({

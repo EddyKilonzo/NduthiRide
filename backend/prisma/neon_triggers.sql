@@ -352,7 +352,7 @@ RETURNS TABLE (
     AND r.current_lat  IS NOT NULL
     AND r.current_lng  IS NOT NULL
     AND haversine_km(user_lat, user_lng, r.current_lat, r.current_lng) <= radius_km
-  ORDER BY distance_km ASC;
+  ORDER BY haversine_km(user_lat, user_lng, r.current_lat, r.current_lng) ASC;
 $$;
 
 -- 7c. Rider earnings summary for a date range.

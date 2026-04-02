@@ -64,6 +64,9 @@ import { MediaModule } from './media/media.module';
     // Admin dashboard
     AdminModule,
 
+    // Support tickets
+    SupportModule,
+
     // Media uploads (Cloudinary)
     MediaModule,
   ],

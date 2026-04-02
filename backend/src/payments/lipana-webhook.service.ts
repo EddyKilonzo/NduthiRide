@@ -21,9 +21,7 @@ export class LipanaWebhookService {
   private readonly REPLAY_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 
   constructor(private readonly config: ConfigService) {
-    this.webhookSecret = this.config.getOrThrow<string>(
-      'LIPANA_WEBHOOK_SECRET',
-    );
+    this.webhookSecret = this.config.getOrThrow<string>('lipana.webhookSecret');
   }
 
   /**

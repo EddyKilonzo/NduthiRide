@@ -82,7 +82,7 @@ export class ChatService {
    */
   async getConversationByRideOrParcel(rideId?: string, parcelId?: string) {
     try {
-      return this.prisma.conversation.findFirst({
+      const conversation = await this.prisma.conversation.findFirst({
         where: {
           ...(rideId ? { rideId } : {}),
           ...(parcelId ? { parcelId } : {}),
@@ -100,6 +100,25 @@ export class ChatService {
           },
         },
       });
+
+      if (!conversation) return null;
+
+      return {
+        ...conversation,
+        messages: conversation.messages.map((msg: any) => ({
+          id: msg.id,
+          conversationId: msg.conversationId,
+          senderAccountId: msg.senderAccountId,
+          content: msg.isDeleted ? 'This message was deleted' : msg.content,
+          type: msg.type,
+          locationPin: msg.locationPin,
+          senderRole: msg.senderRole,
+          senderName: msg.senderAccount?.fullName ?? 'Unknown',
+          senderAvatar: msg.senderAccount?.avatarUrl ?? null,
+          isRead: msg.isRead,
+          createdAt: msg.createdAt,
+        })),
+      };
     } catch (error) {
       this.logger.error('getConversationByRideOrParcel failed', error);
       throw error;
