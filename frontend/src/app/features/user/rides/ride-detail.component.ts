@@ -137,9 +137,13 @@ const ACTIVE_STATUSES: Ride['status'][] = [
                     }
                   </div>
                 </div>
-                @if (p.status === 'FAILED') {
-                  <p class="payment-hint" style="margin-top:10px">The M-Pesa prompt was not completed. You can resend it below.</p>
-                  <button class="btn btn--primary btn--full" style="margin-top:8px" (click)="resendPayment()" [disabled]="payingNow()">
+                @if (p.status === 'FAILED' || p.status === 'PROCESSING') {
+                  <p class="payment-hint" style="margin-top:10px">
+                    @if (p.status === 'FAILED') { The prompt was not completed. }
+                    @else { Didn't get the prompt or it expired? }
+                    You can resend below.
+                  </p>
+                  <button class="btn btn--secondary btn--full" style="margin-top:8px" (click)="resendPayment()" [disabled]="payingNow()">
                     @if (payingNow()) { <app-spinner [size]="16" /> Sending... }
                     @else { <lucide-icon name="refresh-cw" [size]="16"></lucide-icon> Resend M-Pesa Prompt }
                   </button>
