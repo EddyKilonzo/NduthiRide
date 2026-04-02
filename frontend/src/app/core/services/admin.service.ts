@@ -50,6 +50,14 @@ export class AdminService {
     }
   }
 
+  async getRide(id: string): Promise<Ride> {
+    return this.api.getRide(id);
+  }
+
+  async updateRide(id: string, dto: { estimatedFare?: number; finalFare?: number; status?: string }): Promise<Ride> {
+    return this.api.updateRide(id, dto);
+  }
+
   async listParcels(page = 1, limit = 20, status?: string): Promise<PaginatedResult<Parcel>> {
     try {
       return await this.api.listParcels(page, limit, status);

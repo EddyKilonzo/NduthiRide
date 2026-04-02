@@ -37,6 +37,14 @@ export class AdminApi extends BaseApiService {
     return this.get<PaginatedResult<Ride>>(`${this.path}/rides`, params);
   }
 
+  async getRide(id: string): Promise<Ride> {
+    return this.get<Ride>(`${this.path}/rides/${id}`);
+  }
+
+  async updateRide(id: string, dto: { estimatedFare?: number; finalFare?: number; status?: string }): Promise<Ride> {
+    return this.patch<Ride>(`${this.path}/rides/${id}`, dto);
+  }
+
   async listParcels(page = 1, limit = 20, status?: string): Promise<PaginatedResult<Parcel>> {
     let params = new HttpParams().set('page', page).set('limit', limit);
     if (status) params = params.set('status', status);

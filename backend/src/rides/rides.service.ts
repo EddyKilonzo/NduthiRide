@@ -394,41 +394,49 @@ export class RidesService {
 
       this.logger.log(`Rider ${rider.id} accepted ride ${rideId}`);
 
-      // Create a chat conversation for the ride
-      await this.chatService.createConversation(rideId);
+      // Fire-and-forget: side effects must not delay the HTTP response
+      // (sequential DB round-trips to Neon can cause 504s on Render)
+      void (async () => {
+        try {
+          await this.chatService.createConversation(rideId);
 
-      // Notify the user that a rider is on the way
-      const userAccount = await this.prisma.account.findUnique({
-        where: { id: updated.userId },
-        select: { email: true, fullName: true },
-      });
-      const riderAccount = await this.prisma.account.findUnique({
-        where: { id: accountId },
-        select: { fullName: true, phone: true },
-      });
-      if (userAccount?.email && riderAccount) {
-        void this.mailService.sendRiderAccepted({
-          to: userAccount.email,
-          userName: userAccount.fullName,
-          rideId,
-          pickupAddress: updated.pickupAddress,
-          dropoffAddress: updated.dropoffAddress,
-          estimatedFare: updated.estimatedFare,
-          riderName: riderAccount.fullName,
-          riderPhone: riderAccount.phone,
-          bikeModel: rider.bikeModel ?? 'Motorcycle',
-          bikeRegistration: rider.bikeRegistration ?? 'Not provided',
-          ratingAverage: rider.ratingAverage,
-        });
-      }
+          const [userAccount, riderAccount] = await Promise.all([
+            this.prisma.account.findUnique({
+              where: { id: updated.userId },
+              select: { email: true, fullName: true },
+            }),
+            this.prisma.account.findUnique({
+              where: { id: accountId },
+              select: { fullName: true, phone: true },
+            }),
+          ]);
 
-      // Add in-app notification
-      await this.sendRideNotification(
-        updated.userId,
-        'Rider Assigned',
-        `${riderAccount?.fullName ?? 'Your rider'} has accepted your ride request and is on the way!`,
-        rideId,
-      );
+          if (userAccount?.email && riderAccount) {
+            void this.mailService.sendRiderAccepted({
+              to: userAccount.email,
+              userName: userAccount.fullName,
+              rideId,
+              pickupAddress: updated.pickupAddress,
+              dropoffAddress: updated.dropoffAddress,
+              estimatedFare: updated.estimatedFare,
+              riderName: riderAccount.fullName,
+              riderPhone: riderAccount.phone,
+              bikeModel: rider.bikeModel ?? 'Motorcycle',
+              bikeRegistration: rider.bikeRegistration ?? 'Not provided',
+              ratingAverage: rider.ratingAverage,
+            });
+          }
+
+          await this.sendRideNotification(
+            updated.userId,
+            'Rider Assigned',
+            `${riderAccount?.fullName ?? 'Your rider'} has accepted your ride request and is on the way!`,
+            rideId,
+          );
+        } catch (err) {
+          this.logger.error(`Post-accept side effects failed for ride ${rideId}`, err);
+        }
+      })();
 
       return updated;
     } catch (error) {

@@ -343,6 +343,67 @@ export class AdminService {
     }
   }
 
+  /**
+   * Returns full details for a single ride.
+   */
+  async getRideById(rideId: string): Promise<unknown> {
+    try {
+      const ride = await this.prisma.ride.findUnique({
+        where: { id: rideId },
+        include: {
+          user: { select: { fullName: true, phone: true, email: true } },
+          rider: {
+            include: { account: { select: { fullName: true, phone: true } } },
+          },
+          payment: true,
+          rating: true,
+        },
+      });
+      if (!ride) throw new NotFoundException('Ride not found');
+      return ride;
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      this.logger.error(`getRideById failed: ${rideId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Admin-level ride update — allows editing fare and forcing a status change.
+   */
+  async updateRide(
+    rideId: string,
+    dto: { estimatedFare?: number; finalFare?: number; status?: string },
+  ): Promise<unknown> {
+    try {
+      const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+      if (!ride) throw new NotFoundException('Ride not found');
+
+      const updated = await this.prisma.ride.update({
+        where: { id: rideId },
+        data: {
+          ...(dto.estimatedFare !== undefined && { estimatedFare: dto.estimatedFare }),
+          ...(dto.finalFare !== undefined && { finalFare: dto.finalFare }),
+          ...(dto.status !== undefined && { status: dto.status as any }),
+        },
+        include: {
+          user: { select: { fullName: true, phone: true, email: true } },
+          rider: {
+            include: { account: { select: { fullName: true, phone: true } } },
+          },
+          payment: true,
+        },
+      });
+
+      this.logger.log(`Admin updated ride ${rideId}: ${JSON.stringify(dto)}`);
+      return updated;
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      this.logger.error(`updateRide failed: ${rideId}`, error);
+      throw error;
+    }
+  }
+
   // ─── Parcels ──────────────────────────────────────────────
 
   /**

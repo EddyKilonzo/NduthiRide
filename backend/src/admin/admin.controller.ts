@@ -104,6 +104,25 @@ export class AdminController {
     return this.adminService.listRides(query);
   }
 
+  @Get('rides/:id')
+  @ApiOperation({ summary: 'Get full details of a single ride' })
+  @ApiResponse({ status: 200, description: 'Ride details' })
+  @ApiResponse({ status: 404, description: 'Ride not found' })
+  getRide(@Param('id') id: string) {
+    return this.adminService.getRideById(id);
+  }
+
+  @Patch('rides/:id')
+  @ApiOperation({ summary: 'Edit ride fare or force a status change' })
+  @ApiResponse({ status: 200, description: 'Updated ride' })
+  @ApiResponse({ status: 404, description: 'Ride not found' })
+  updateRide(
+    @Param('id') id: string,
+    @Body() dto: { estimatedFare?: number; finalFare?: number; status?: string },
+  ) {
+    return this.adminService.updateRide(id, dto);
+  }
+
   // ─── Parcels ────────────────────────────────────────────
 
   @Get('parcels')

@@ -6,6 +6,7 @@ export interface RidePayment {
   id: string;
   status: PaymentStatus;
   amount: number;
+  method: string;
   mpesaReceiptNumber: string | null;
   completedAt: string | null;
   checkoutRequestId: string | null;
