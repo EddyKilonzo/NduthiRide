@@ -66,7 +66,7 @@ type ImageField = 'licenseImageUrl' | 'idFrontImageUrl' | 'idBackImageUrl' | 'lo
                           <lucide-icon name="eye" [size]="12"></lucide-icon>View
                         </button>
                         <button type="button" class="btn-retake" (click)="licenseInput.click(); $event.stopPropagation()">
-                          <lucide-icon name="refresh-cw" [size]="12"></lucide-icon>Retake
+                          <lucide-icon name="rotate-cw" [size]="12"></lucide-icon>Retake
                         </button>
                       </div>
                     </div>
@@ -102,7 +102,7 @@ type ImageField = 'licenseImageUrl' | 'idFrontImageUrl' | 'idBackImageUrl' | 'lo
                           <lucide-icon name="eye" [size]="11"></lucide-icon>View
                         </button>
                         <button type="button" class="btn-retake btn-retake--sm" (click)="idFrontInput.click(); $event.stopPropagation()">
-                          <lucide-icon name="refresh-cw" [size]="11"></lucide-icon>Retake
+                          <lucide-icon name="rotate-cw" [size]="11"></lucide-icon>Retake
                         </button>
                       </div>
                     } @else {
@@ -127,7 +127,7 @@ type ImageField = 'licenseImageUrl' | 'idFrontImageUrl' | 'idBackImageUrl' | 'lo
                           <lucide-icon name="eye" [size]="11"></lucide-icon>View
                         </button>
                         <button type="button" class="btn-retake btn-retake--sm" (click)="idBackInput.click(); $event.stopPropagation()">
-                          <lucide-icon name="refresh-cw" [size]="11"></lucide-icon>Retake
+                          <lucide-icon name="rotate-cw" [size]="11"></lucide-icon>Retake
                         </button>
                       </div>
                     } @else {
@@ -189,7 +189,7 @@ type ImageField = 'licenseImageUrl' | 'idFrontImageUrl' | 'idBackImageUrl' | 'lo
                           <lucide-icon name="eye" [size]="12"></lucide-icon>View
                         </button>
                         <button type="button" class="btn-retake" (click)="logbookInput.click(); $event.stopPropagation()">
-                          <lucide-icon name="refresh-cw" [size]="12"></lucide-icon>Retake
+                          <lucide-icon name="rotate-cw" [size]="12"></lucide-icon>Retake
                         </button>
                       </div>
                     </div>

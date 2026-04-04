@@ -8,7 +8,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PaymentStatus } from '@prisma/client';
+import { PaymentMethod, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { Lipana } from '@lipana/sdk';
@@ -80,6 +80,59 @@ export class PaymentsService implements OnModuleInit {
         'Payment service initialization failed',
       );
     }
+  }
+
+  /**
+   * Calls Lipana STK and stores checkout / transaction ids on the payment row.
+   */
+  private async performStkPushAndPersistIds(
+    paymentId: string,
+    amount: number,
+    entityType: 'ride' | 'parcel',
+    entityId: string,
+    mpesaPhoneRaw: string,
+    userId: string,
+  ): Promise<{ transactionId: string; checkoutRequestId: string }> {
+    const phone = this.normalizePhone(mpesaPhoneRaw);
+    if (!this.isValidKenyanPhone(phone)) {
+      throw new BadRequestException(
+        'Invalid phone number. Use format: 07XX, +2547XX, or 2547XX',
+      );
+    }
+
+    const stkResponse = await this.getLipana().transactions.initiateStkPush({
+      phone,
+      amount: Math.ceil(amount),
+      accountReference: `NduthiRide-${entityType}-${entityId.slice(0, 8)}`,
+      transactionDesc: `${entityType === 'ride' ? 'Ride' : 'Parcel'} payment`,
+    });
+
+    if (!stkResponse.transactionId || !stkResponse.checkoutRequestID) {
+      this.recordCircuitFailure();
+      throw new InternalServerErrorException(
+        'Invalid response from payment provider',
+      );
+    }
+
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        checkoutRequestId: stkResponse.checkoutRequestID,
+        mpesaReceiptNumber: stkResponse.transactionId,
+      },
+    });
+
+    this.recordCircuitSuccess();
+    this.clearFailedAttempts(userId);
+
+    this.logger.log(
+      `STK push initiated: ${stkResponse.transactionId} for payment ${paymentId}`,
+    );
+
+    return {
+      transactionId: stkResponse.transactionId,
+      checkoutRequestId: stkResponse.checkoutRequestID,
+    };
   }
 
   // ─── Initiate payment ─────────────────────────────────────
@@ -223,51 +276,19 @@ export class PaymentsService implements OnModuleInit {
         );
       }
 
-      // Normalize and validate phone number
-      const phone = this.normalizePhone(dto.mpesaPhone);
-      if (!this.isValidKenyanPhone(phone)) {
-        throw new BadRequestException(
-          'Invalid phone number. Use format: 07XX, +2547XX, or 2547XX',
-        );
-      }
-
-      // Initiate STK push via Lipana
-      const stkResponse = await this.getLipana().transactions.initiateStkPush({
-        phone,
-        amount: Math.ceil(amount), // Lipana requires whole KES
-        accountReference: `NduthiRide-${entityType}-${entityId.slice(0, 8)}`,
-        transactionDesc: `${entityType === 'ride' ? 'Ride' : 'Parcel'} payment`,
-      });
-
-      // Validate Lipana response
-      if (!stkResponse.transactionId || !stkResponse.checkoutRequestID) {
-        this.recordCircuitFailure();
-        throw new InternalServerErrorException(
-          'Invalid response from payment provider',
-        );
-      }
-
-      // Store the transaction ID and checkout request ID from Lipana
-      await this.prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          checkoutRequestId: stkResponse.checkoutRequestID,
-          mpesaReceiptNumber: stkResponse.transactionId,
-        },
-      });
-
-      // SECURITY: Record success for circuit breaker and fraud detection
-      this.recordCircuitSuccess();
-      this.clearFailedAttempts(userId);
-
-      this.logger.log(
-        `STK push initiated: ${stkResponse.transactionId} for payment ${payment.id}`,
+      const stk = await this.performStkPushAndPersistIds(
+        payment.id,
+        amount,
+        entityType,
+        entityId,
+        dto.mpesaPhone,
+        userId,
       );
 
       return {
         paymentId: payment.id,
-        transactionId: stkResponse.transactionId,
-        checkoutRequestId: stkResponse.checkoutRequestID,
+        transactionId: stk.transactionId,
+        checkoutRequestId: stk.checkoutRequestId,
         message: 'Check your phone for the M-Pesa prompt',
       };
     } catch (error) {
@@ -420,9 +441,8 @@ export class PaymentsService implements OnModuleInit {
   // ─── Resend STK push ──────────────────────────────────────
 
   /**
-   * Marks an existing PROCESSING/FAILED payment as FAILED and fires a new STK push.
-   * This is the correct resend path — initiatePayment alone cannot resend because it
-   * returns the still-PROCESSING record instead of creating a new one.
+   * Re-fires STK on the **same** Payment row. Required because `rideId` / `parcelId`
+   * are @unique — a second `payment.create` would violate the constraint (500).
    */
   async resendPayment(
     userId: string,
@@ -434,7 +454,7 @@ export class PaymentsService implements OnModuleInit {
       const payment = await this.prisma.payment.findUnique({
         where: { id: paymentId },
         include: {
-          ride:   { select: { userId: true } },
+          ride: { select: { userId: true } },
           parcel: { select: { userId: true } },
         },
       });
@@ -448,49 +468,80 @@ export class PaymentsService implements OnModuleInit {
         payment.status !== PaymentStatus.PROCESSING &&
         payment.status !== PaymentStatus.FAILED
       ) {
-        throw new BadRequestException('Only PROCESSING or FAILED payments can be resent');
+        throw new BadRequestException(
+          'Only PROCESSING or FAILED payments can be resent',
+        );
+      }
+
+      if (payment.method !== PaymentMethod.MPESA) {
+        throw new BadRequestException('Only M-Pesa payments can be resent');
       }
 
       if (!payment.mpesaPhone) {
         throw new BadRequestException('No M-Pesa phone recorded on this payment');
       }
 
-      // Mark old payment as FAILED so the idempotency check below won't see it
-      await this.prisma.payment.update({
-        where: { id: paymentId },
-        data: { status: PaymentStatus.FAILED },
-      });
+      this.checkCircuitBreaker();
+      this.checkFraudDetection(userId);
 
-      // Notify any open socket listeners that the old payment is now FAILED
-      this.trackingGateway.emitPaymentUpdate(paymentId, { status: 'FAILED' });
-
-      // Clear in-memory idempotency so the new request goes through within the 60-s window
-      const entityId = payment.rideId ?? payment.parcelId ?? '';
-      const idempotencyKey = `${userId}:${entityId}`;
+      const entityKey = payment.rideId ?? payment.parcelId ?? '';
+      const idempotencyKey = `${userId}:${entityKey}`;
       this.recentRequests.delete(idempotencyKey);
+      if (this.isDuplicateRequest(idempotencyKey)) {
+        throw new BadRequestException(
+          'A payment request is already being processed. Please wait.',
+        );
+      }
+      this.recordRequest(idempotencyKey);
 
-      await this.createAuditLog(userId, 'PAYMENT_RESEND_REQUESTED', paymentId, {
-        oldPaymentId: paymentId,
-        entityId,
-      }, ipAddress, userAgent);
-
-      // Delegate to the normal initiate flow (no existing PROCESSING record now)
-      return this.initiatePayment(
+      await this.createAuditLog(
         userId,
-        {
-          rideId:    payment.rideId   ?? undefined,
-          parcelId:  payment.parcelId ?? undefined,
-          method:    payment.method,
-          mpesaPhone: payment.mpesaPhone,
-        },
+        'PAYMENT_RESEND_REQUESTED',
+        paymentId,
+        { paymentId, entityKey },
         ipAddress,
         userAgent,
       );
+
+      const entityType: 'ride' | 'parcel' = payment.rideId ? 'ride' : 'parcel';
+      const entityId = payment.rideId ?? payment.parcelId!;
+      this.validatePaymentAmount(payment.amount);
+
+      await this.prisma.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: PaymentStatus.PROCESSING,
+          checkoutRequestId: null,
+          mpesaReceiptNumber: null,
+        },
+      });
+
+      this.trackingGateway.emitPaymentUpdate(paymentId, { status: 'PROCESSING' });
+
+      const stk = await this.performStkPushAndPersistIds(
+        paymentId,
+        payment.amount,
+        entityType,
+        entityId,
+        payment.mpesaPhone,
+        userId,
+      );
+
+      return {
+        paymentId,
+        transactionId: stk.transactionId,
+        checkoutRequestId: stk.checkoutRequestId,
+        message: 'Check your phone for the M-Pesa prompt',
+      };
     } catch (error) {
       if (
         error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) throw error;
+        error instanceof NotFoundException ||
+        error instanceof InternalServerErrorException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
       this.logger.error('resendPayment failed', error);
       throw new InternalServerErrorException('Could not resend payment');
     }

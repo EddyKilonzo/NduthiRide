@@ -127,7 +127,7 @@ import type { RidePayment } from '../../../core/models/ride.models';
                   </p>
                   <button class="btn btn--secondary btn--full" style="margin-top:8px" (click)="resendPayment()" [disabled]="payingNow()">
                     @if (payingNow()) { <app-spinner [size]="16" /> Sending... }
-                    @else { <lucide-icon name="refresh-cw" [size]="16"></lucide-icon> Resend M-Pesa Prompt }
+                    @else { <lucide-icon name="rotate-cw" [size]="16"></lucide-icon> Resend M-Pesa Prompt }
                   </button>
                 }
               } @else if (canPay()) {
