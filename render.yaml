@@ -2,9 +2,10 @@ services:
   - type: web
     name: nduthiride-backend
     runtime: node
+    rootDir: backend
     # NODE_ENV=production omits devDependencies by default; Nest/Prisma/TS need them to build.
-    buildCommand: cd backend && npm ci --include=dev && npm run build
-    startCommand: node backend/dist/main.js
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/main.js
     envVars:
       - key: NODE_ENV
         value: production
@@ -18,16 +19,26 @@ services:
       # ── App URLs ──────────────────────────────────────────
       - key: FRONTEND_URL
         sync: false
-      - key: BACKEND_URL
-        sync: false
       - key: CORS_ORIGINS
         sync: false
 
       # ── JWT ───────────────────────────────────────────────
-      - key: JWT_SECRET
+      - key: JWT_ACCESS_SECRET
         sync: false
-      - key: JWT_EXPIRES_IN
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: JWT_REFRESH_EXPIRES_IN
         value: 7d
+
+      # ── Lipana (M-Pesa STK Push) ──────────────────────────
+      - key: LIPANA_SECRET_KEY
+        sync: false
+      - key: LIPANA_PUBLISHABLE_KEY
+        sync: false
+      - key: LIPANA_WEBHOOK_SECRET
+        sync: false
 
       # ── Cloudinary ────────────────────────────────────────
       - key: CLOUDINARY_CLOUD_NAME
@@ -37,37 +48,21 @@ services:
       - key: CLOUDINARY_API_SECRET
         sync: false
 
-      # ── SMTP (Brevo) ──────────────────────────────────────
-      - key: SMTP_HOST
+      # ── SMTP ──────────────────────────────────────────────
+      - key: MAIL_HOST
         sync: false
-      - key: SMTP_PORT
+      - key: MAIL_PORT
+        value: 587
+      - key: MAIL_USER
         sync: false
-      - key: SMTP_USER
+      - key: MAIL_PASS
         sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: SMTP_FROM
-        sync: false
-      - key: SENDER_EMAIL
+      - key: MAIL_FROM_NAME
+        value: NduthiRide
+      - key: MAIL_FROM_ADDRESS
         sync: false
       - key: OTP_EXPIRES_MINS
         value: 10
-
-      # ── M-Pesa ────────────────────────────────────────────
-      - key: MPESA_CONSUMER_KEY
-        sync: false
-      - key: MPESA_CONSUMER_SECRET
-        sync: false
-      - key: MPESA_SHORTCODE
-        sync: false
-      - key: MPESA_PASSKEY
-        sync: false
-      - key: MPESA_CALLBACK_URL
-        sync: false
-      - key: MPESA_API_URL
-        sync: false
-      - key: LIPANA_WEBHOOK_SECRET
-        sync: false
 
       # ── Firebase (push notifications) ─────────────────────
       - key: FIREBASE_SERVICE_ACCOUNT
