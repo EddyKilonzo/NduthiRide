@@ -311,4 +311,25 @@ export class TrackingGateway
     this.server.to(`payment:${paymentId}`).emit('payment:updated', data);
     this.logger.log(`Emitted payment update for ${paymentId}: ${data.status}`);
   }
+
+  /**
+   * Notifies passenger and rider (by account id) that a trip payment reached a terminal state.
+   * Clients join `account:${accountId}` on connect — no extra subscribe step.
+   */
+  emitTripPaymentUpdate(
+    accountId: string,
+    data: {
+      kind: 'ride' | 'parcel';
+      entityId: string;
+      paymentId: string;
+      status: 'COMPLETED' | 'FAILED';
+      mpesaReceiptNumber?: string | null;
+      completedAt?: string | null;
+    },
+  ): void {
+    this.server.to(`account:${accountId}`).emit('trip:payment', data);
+    this.logger.log(
+      `Emitted trip:payment (${data.status}) for ${data.kind} ${data.entityId} → account ${accountId}`,
+    );
+  }
 }

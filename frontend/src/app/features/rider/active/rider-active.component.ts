@@ -6,7 +6,7 @@ import { RideService }     from '../../../core/services/ride.service';
 import { ParcelService }   from '../../../core/services/parcel.service';
 import { MediaService }    from '../../../core/services/media.service';
 import { ToastService }    from '../../../core/services/toast.service';
-import { TrackingService } from '../../../core/services/tracking.service';
+import { TrackingService, type TripPaymentPayload } from '../../../core/services/tracking.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import type { Ride, RideStatus } from '../../../core/models/ride.models';
 import type { Parcel, ParcelStatus } from '../../../core/models/parcel.models';
@@ -219,7 +219,7 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
                     <button
                       class="btn btn--primary btn--full btn--lg btn--pill action-btn"
                       (click)="advanceParcel(parcel.id, next.status, parcel.status)"
-                      [disabled]="updating() || (next.status === 'DELIVERED' && !proofUploaded())">
+                      [disabled]="updating() || (next.status === 'DELIVERED' && (!proofUploaded() || parcelPaymentPending(parcel)))">
                       <lucide-icon [name]="next.icon" [size]="20" *ngIf="!updating()"></lucide-icon>
                       <app-spinner *ngIf="updating()"></app-spinner>
                       <span>{{ updating() ? 'Processing...' : next.label }}</span>
@@ -227,6 +227,12 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
                     <p class="error-hint" *ngIf="next.status === 'DELIVERED' && !proofUploaded()">
                       * Please upload proof of delivery to complete
                     </p>
+                    @if (next.status === 'DELIVERED' && parcelPaymentPending(parcel)) {
+                      <p class="error-hint">
+                        <lucide-icon name="alert-circle" [size]="14"></lucide-icon>
+                        Waiting for M-Pesa payment confirmation before marking delivered.
+                      </p>
+                    }
                   }
                 </div>
               </div>
@@ -481,15 +487,39 @@ export class RiderActiveComponent implements OnInit, OnDestroy {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private geoWatchId: number | null = null;
   private initialLoaded = false;
+  private readonly tripPaymentCb = (d: TripPaymentPayload) => {
+    const ride = this.activeRide();
+    const parcel = this.activeParcel();
+    const hit =
+      (d.kind === 'ride' && ride?.id === d.entityId) ||
+      (d.kind === 'parcel' && parcel?.id === d.entityId);
+    if (!hit) return;
+    void this.silentRefresh();
+    if (d.status === 'COMPLETED') {
+      this.toast.success(
+        d.kind === 'ride'
+          ? 'Passenger paid via M-Pesa. You can complete the ride after drop-off.'
+          : 'Sender paid via M-Pesa. You can mark delivered after proof upload.',
+      );
+    } else if (d.status === 'FAILED') {
+      this.toast.error(
+        d.kind === 'ride'
+          ? 'Passenger M-Pesa payment failed — they can resend the prompt.'
+          : 'Sender M-Pesa payment failed — they can resend the prompt.',
+      );
+    }
+  };
 
   async ngOnInit(): Promise<void> {
     this.trackingService.connect();
+    this.trackingService.onTripPayment(this.tripPaymentCb);
     await this.refresh();
     this.pollTimer = setInterval(() => void this.silentRefresh(), 30_000);
     this.startLocationBroadcast();
   }
 
   ngOnDestroy(): void {
+    this.trackingService.offTripPayment(this.tripPaymentCb);
     if (this.pollTimer) clearInterval(this.pollTimer);
     if (this.geoWatchId !== null) navigator.geolocation?.clearWatch(this.geoWatchId);
     this.trackingService.disconnect();
@@ -610,5 +640,11 @@ export class RiderActiveComponent implements OnInit, OnDestroy {
   protected ridePaymentPending(ride: Ride): boolean {
     if (ride.paymentMethod !== 'MPESA') return false;
     return ride.payment?.status !== 'COMPLETED';
+  }
+
+  /** True when the parcel is MPESA and payment hasn't been confirmed yet. */
+  protected parcelPaymentPending(parcel: Parcel): boolean {
+    if (parcel.paymentMethod !== 'MPESA') return false;
+    return parcel.payment?.status !== 'COMPLETED';
   }
 }

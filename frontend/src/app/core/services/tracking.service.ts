@@ -11,6 +11,16 @@ export interface RiderLocation {
   timestamp: string;
 }
 
+/** Server → client: M-Pesa payment reached a terminal state for a ride or parcel */
+export interface TripPaymentPayload {
+  kind: 'ride' | 'parcel';
+  entityId: string;
+  paymentId: string;
+  status: 'COMPLETED' | 'FAILED';
+  mpesaReceiptNumber?: string | null;
+  completedAt?: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TrackingService implements OnDestroy {
   private readonly auth = inject(AuthService);
@@ -117,6 +127,14 @@ export class TrackingService implements OnDestroy {
 
   offPaymentUpdate(cb: (data: unknown) => void): void {
     this.socket?.off('payment:updated', cb);
+  }
+
+  onTripPayment(cb: (data: TripPaymentPayload) => void): void {
+    this.socket?.on('trip:payment', cb);
+  }
+
+  offTripPayment(cb: (data: TripPaymentPayload) => void): void {
+    this.socket?.off('trip:payment', cb);
   }
 
   ngOnDestroy(): void {

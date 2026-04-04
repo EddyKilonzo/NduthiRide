@@ -382,6 +382,22 @@ export class PaymentsService implements OnModuleInit {
             status: PaymentStatus.COMPLETED,
             completedAt: new Date(),
           },
+          include: {
+            ride: {
+              select: {
+                id: true,
+                userId: true,
+                rider: { select: { accountId: true } },
+              },
+            },
+            parcel: {
+              select: {
+                id: true,
+                userId: true,
+                rider: { select: { accountId: true } },
+              },
+            },
+          },
         });
 
         this.logger.log(
@@ -395,6 +411,8 @@ export class PaymentsService implements OnModuleInit {
           mpesaReceiptNumber: updatedPayment.mpesaReceiptNumber,
           completedAt: updatedPayment.completedAt?.toISOString(),
         });
+
+        this.emitTripPaymentAccountNotifications(updatedPayment, 'COMPLETED');
         
         // SECURITY: Audit log for completed payment
         await this.createAuditLog(
@@ -409,6 +427,22 @@ export class PaymentsService implements OnModuleInit {
           data: {
             status: PaymentStatus.FAILED,
           },
+          include: {
+            ride: {
+              select: {
+                id: true,
+                userId: true,
+                rider: { select: { accountId: true } },
+              },
+            },
+            parcel: {
+              select: {
+                id: true,
+                userId: true,
+                rider: { select: { accountId: true } },
+              },
+            },
+          },
         });
 
         this.logger.warn(
@@ -419,6 +453,8 @@ export class PaymentsService implements OnModuleInit {
         this.trackingGateway.emitPaymentUpdate(payment.id, {
           status: 'FAILED',
         });
+
+        this.emitTripPaymentAccountNotifications(updatedPayment, 'FAILED');
       } else if (event === 'payment.pending' || status === 'pending') {
         // Already in PROCESSING state, no update needed
         this.logger.debug(
@@ -576,6 +612,63 @@ export class PaymentsService implements OnModuleInit {
   }
 
   // ─── Helpers ──────────────────────────────────────────────
+
+  /** Push payment outcome to passenger + rider account rooms (real-time status / feedback). */
+  private emitTripPaymentAccountNotifications(
+    payment: {
+      id: string;
+      mpesaReceiptNumber: string | null;
+      completedAt: Date | null;
+      ride: {
+        id: string;
+        userId: string;
+        rider: { accountId: string } | null;
+      } | null;
+      parcel: {
+        id: string;
+        userId: string;
+        rider: { accountId: string } | null;
+      } | null;
+    },
+    status: 'COMPLETED' | 'FAILED',
+  ): void {
+    const base = {
+      paymentId: payment.id,
+      status,
+      mpesaReceiptNumber: payment.mpesaReceiptNumber,
+      completedAt: payment.completedAt?.toISOString() ?? null,
+    };
+    if (payment.ride) {
+      this.trackingGateway.emitTripPaymentUpdate(payment.ride.userId, {
+        kind: 'ride',
+        entityId: payment.ride.id,
+        ...base,
+      });
+      const riderAccountId = payment.ride.rider?.accountId;
+      if (riderAccountId) {
+        this.trackingGateway.emitTripPaymentUpdate(riderAccountId, {
+          kind: 'ride',
+          entityId: payment.ride.id,
+          ...base,
+        });
+      }
+    }
+    if (payment.parcel) {
+      this.trackingGateway.emitTripPaymentUpdate(payment.parcel.userId, {
+        kind: 'parcel',
+        entityId: payment.parcel.id,
+        ...base,
+      });
+      const riderAccountId = payment.parcel.rider?.accountId;
+      if (riderAccountId) {
+        this.trackingGateway.emitTripPaymentUpdate(riderAccountId, {
+          kind: 'parcel',
+          entityId: payment.parcel.id,
+          ...base,
+        });
+      }
+    }
+  }
 
   /**
    * Normalizes a Kenyan phone number to the +254XXXXXXXXX format.

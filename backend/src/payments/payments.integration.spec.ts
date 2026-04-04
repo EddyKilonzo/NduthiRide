@@ -50,6 +50,7 @@ const mockAuditService = {
 
 const mockTrackingGateway = {
   emitPaymentUpdate: jest.fn(),
+  emitTripPaymentUpdate: jest.fn(),
 };
 
 describe('PaymentsService - Integration & Security Tests', () => {

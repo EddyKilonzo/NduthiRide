@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { RideService }     from '../../../core/services/ride.service';
 import { PaymentService }  from '../../../core/services/payment.service';
-import { TrackingService } from '../../../core/services/tracking.service';
+import { TrackingService, type TripPaymentPayload } from '../../../core/services/tracking.service';
 import { ToastService }    from '../../../core/services/toast.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { RoutePickerMapComponent, RouteMapPoint } from '../../../shared/components/route-picker-map/route-picker-map.component';
@@ -34,6 +34,34 @@ const ACTIVE_STATUSES: Ride['status'][] = [
         </div>
 
         <div class="detail-grid">
+          @if (showRatedThanks()) {
+            <div class="card card--rated-banner grid-full">
+              <div class="rated-banner-inner">
+                <lucide-icon name="star" [size]="22" class="rated-banner-icon"></lucide-icon>
+                <div>
+                  <p class="rated-banner-title">Thanks for rating</p>
+                  <p class="rated-banner-sub">You gave this ride <strong>{{ ride()!.rating!.score }} / 5</strong> stars.</p>
+                </div>
+              </div>
+            </div>
+          }
+          @if (showRatingPrompt()) {
+            <div class="card card--rating-prompt grid-full">
+              <h3 class="rating-prompt-title">How was your ride?</h3>
+              <p class="rating-prompt-sub">Trip complete — rate your rider. It helps everyone on NduthiRide.</p>
+              <div class="stars" role="group" aria-label="Rating">
+                @for (star of [1,2,3,4,5]; track star) {
+                  <button type="button" class="star-btn" [class.star-btn--active]="selectedRating() >= star"
+                    (click)="selectedRating.set(star)" [attr.aria-pressed]="selectedRating() >= star">
+                    <lucide-icon name="star" [size]="28"></lucide-icon>
+                  </button>
+                }
+              </div>
+              <button class="btn btn--primary btn--full" [disabled]="selectedRating() === 0"
+                (click)="submitRating()">Submit rating</button>
+            </div>
+          }
+
           <!-- Map card (Full width) — shows live rider dot when active -->
           <div class="card map-card grid-full">
             <div class="card-header-with-action">
@@ -91,9 +119,20 @@ const ACTIVE_STATUSES: Ride['status'][] = [
               </div>
             }
             <div class="info-row">
-              <span>Payment</span>
-              <strong>{{ ride()!.paymentMethod }}</strong>
+              <span>Payment method</span>
+              <strong>{{ ride()!.paymentMethod === 'MPESA' ? 'M-Pesa' : 'Cash' }}</strong>
             </div>
+            @if (ride()!.paymentMethod === 'MPESA') {
+              <div class="info-row">
+                <span>M-Pesa status</span>
+                <strong class="fare-pay-line fare-pay-line--{{ farePaymentSummary().variant }}">{{ farePaymentSummary().text }}</strong>
+              </div>
+            } @else {
+              <div class="info-row">
+                <span>Settlement</span>
+                <strong class="fare-pay-line fare-pay-line--muted">Cash — pay your driver directly</strong>
+              </div>
+            }
           </div>
 
           <!-- Rider card -->
@@ -165,23 +204,6 @@ const ACTIVE_STATUSES: Ride['status'][] = [
               <button class="btn btn--danger btn--full" (click)="cancel()" [disabled]="cancelling()">
                 @if (cancelling()) { Cancelling... } @else { Cancel Ride }
               </button>
-            </div>
-          }
-
-          <!-- Rate (completed, not yet rated) -->
-          @if (ride()!.status === 'COMPLETED' && !rated()) {
-            <div class="card">
-              <h3 class="card-title">Rate Your Ride</h3>
-              <div class="stars" role="group" aria-label="Rating">
-                @for (star of [1,2,3,4,5]; track star) {
-                  <button type="button" class="star-btn" [class.star-btn--active]="selectedRating() >= star"
-                    (click)="selectedRating.set(star)" [attr.aria-pressed]="selectedRating() >= star">
-                    <lucide-icon name="star" [size]="28"></lucide-icon>
-                  </button>
-                }
-              </div>
-              <button class="btn btn--primary btn--full" [disabled]="selectedRating() === 0"
-                (click)="submitRating()">Submit Rating</button>
             </div>
           }
 
@@ -263,6 +285,28 @@ const ACTIVE_STATUSES: Ride['status'][] = [
     .payment-status-label { font-weight: 700; font-size: 14px; }
     .payment-receipt { font-size: 12px; margin-top: 4px; opacity: 0.85; }
 
+    .fare-pay-line--success { color: var(--clr-success); }
+    .fare-pay-line--warning { color: var(--clr-warning); }
+    .fare-pay-line--error   { color: var(--clr-error); }
+    .fare-pay-line--neutral,
+    .fare-pay-line--muted   { color: var(--clr-text-muted); }
+
+    .card--rating-prompt {
+      border: 2px solid rgba(var(--clr-primary-rgb), 0.35);
+      background: linear-gradient(135deg, rgba(var(--clr-primary-rgb), 0.06) 0%, transparent 55%);
+    }
+    .rating-prompt-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 8px; color: var(--clr-text); }
+    .rating-prompt-sub { font-size: 14px; color: var(--clr-text-muted); margin: 0 0 18px; line-height: 1.45; }
+
+    .card--rated-banner {
+      background: rgba(34, 197, 94, 0.08);
+      border-color: rgba(34, 197, 94, 0.28);
+    }
+    .rated-banner-inner { display: flex; align-items: flex-start; gap: 14px; }
+    .rated-banner-icon { color: var(--clr-warning); flex-shrink: 0; margin-top: 2px; }
+    .rated-banner-title { font-weight: 700; margin: 0 0 4px; font-size: 15px; }
+    .rated-banner-sub { margin: 0; font-size: 14px; color: var(--clr-text-muted); }
+
     @media (max-width: 640px) {
       .detail-grid { grid-template-columns: 1fr; }
       .map-card { height: 240px; }
@@ -293,6 +337,19 @@ export class RideDetailComponent implements OnInit, OnDestroy {
   private subscribedPaymentId: string | null = null;
   private paymentUpdateCb: ((d: unknown) => void) | null = null;
   private locationCb: (() => void) | null = null;
+  private tripPaymentListening = false;
+  private paymentPollGeneration = 0;
+
+  private readonly tripPaymentHandler = (d: TripPaymentPayload) => {
+    const r = this.ride();
+    if (!r || d.kind !== 'ride' || d.entityId !== r.id) return;
+    if (d.status !== 'COMPLETED' && d.status !== 'FAILED') return;
+    this.applyPaymentTerminal(
+      d.status,
+      d.mpesaReceiptNumber,
+      d.completedAt ?? null,
+    );
+  };
 
   protected readonly pickupPoint = computed<RouteMapPoint | null>(() => {
     const r = this.ride();
@@ -312,6 +369,45 @@ export class RideDetailComponent implements OnInit, OnDestroy {
     const r = this.ride();
     return r?.paymentMethod === 'MPESA' && !this.payment()
       && ACTIVE_STATUSES.includes(r.status as Ride['status']);
+  });
+
+  protected readonly showRatingPrompt = computed(
+    () => this.ride()?.status === 'COMPLETED' && !this.rated(),
+  );
+
+  protected readonly showRatedThanks = computed(() => {
+    const r = this.ride();
+    return r?.status === 'COMPLETED' && this.rated() && !!r.rating;
+  });
+
+  protected readonly farePaymentSummary = computed((): {
+    text: string;
+    variant: 'success' | 'warning' | 'error' | 'neutral' | 'muted';
+  } => {
+    const r = this.ride();
+    const p = this.payment();
+    if (!r || r.paymentMethod !== 'MPESA') {
+      return { text: '', variant: 'neutral' };
+    }
+    if (!p) {
+      if (ACTIVE_STATUSES.includes(r.status as Ride['status'])) {
+        return { text: 'Pay below before the ride ends', variant: 'warning' };
+      }
+      if (r.status === 'COMPLETED') {
+        return { text: 'No M-Pesa record on file', variant: 'neutral' };
+      }
+      return { text: 'Not started', variant: 'neutral' };
+    }
+    switch (p.status) {
+      case 'COMPLETED':
+        return { text: 'Paid ✓', variant: 'success' };
+      case 'FAILED':
+        return { text: 'Failed — resend below', variant: 'error' };
+      case 'PROCESSING':
+        return { text: 'Awaiting M-Pesa…', variant: 'warning' };
+      default:
+        return { text: 'Pending', variant: 'warning' };
+    }
   });
 
   constructor() {
@@ -342,6 +438,16 @@ export class RideDetailComponent implements OnInit, OnDestroy {
       // Subscribe to existing payment WebSocket room
       if (r.payment?.checkoutRequestId && r.payment.status === 'PROCESSING') {
         this.subscribePaymentSocket(r.payment.id);
+        void this.startPaymentPollFallback(r.payment.checkoutRequestId);
+      }
+
+      if (
+        ACTIVE_STATUSES.includes(r.status as Ride['status']) &&
+        r.paymentMethod === 'MPESA'
+      ) {
+        this.trackingService.connect();
+        this.trackingService.onTripPayment(this.tripPaymentHandler);
+        this.tripPaymentListening = true;
       }
     }).catch(() => this.loading.set(false));
   }
@@ -352,6 +458,9 @@ export class RideDetailComponent implements OnInit, OnDestroy {
     }
     if (this.paymentUpdateCb) {
       this.trackingService.offPaymentUpdate(this.paymentUpdateCb as (d: unknown) => void);
+    }
+    if (this.tripPaymentListening) {
+      this.trackingService.offTripPayment(this.tripPaymentHandler);
     }
     // Disconnect tracking if we connected it
     if (this.isActive()) {
@@ -377,6 +486,9 @@ export class RideDetailComponent implements OnInit, OnDestroy {
       this.toast.info('Check your phone for the M-Pesa prompt.');
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
+      if (result.checkoutRequestId) {
+        void this.startPaymentPollFallback(result.checkoutRequestId);
+      }
     } catch {
       this.toast.error('Could not initiate payment. Try again.');
     } finally {
@@ -413,10 +525,58 @@ export class RideDetailComponent implements OnInit, OnDestroy {
       this.toast.info('Check your phone for the M-Pesa prompt.');
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
+      if (result.checkoutRequestId) {
+        void this.startPaymentPollFallback(result.checkoutRequestId);
+      }
     } catch {
       this.toast.error('Could not resend payment prompt. Try again.');
     } finally {
       this.payingNow.set(false);
+    }
+  }
+
+  /** When webhook/socket is slow, polling still updates payment + refreshes ride. */
+  private async startPaymentPollFallback(checkoutRequestId: string): Promise<void> {
+    const gen = ++this.paymentPollGeneration;
+    try {
+      const res = await this.paymentService.pollStatus(checkoutRequestId);
+      if (gen !== this.paymentPollGeneration) return;
+      if (res.status === 'COMPLETED' || res.status === 'FAILED') {
+        this.applyPaymentTerminal(res.status, res.mpesaReceiptNumber, null);
+      }
+    } catch {
+      /* timeout or network — user can refresh */
+    }
+  }
+
+  private applyPaymentTerminal(
+    status: string,
+    mpesaReceiptNumber: string | null | undefined,
+    completedAt: string | null | undefined,
+  ): void {
+    const prev = this.payment()?.status;
+    this.payment.update((p) =>
+      p
+        ? {
+            ...p,
+            status: status as RidePayment['status'],
+            mpesaReceiptNumber: mpesaReceiptNumber ?? p.mpesaReceiptNumber,
+            completedAt: completedAt ?? p.completedAt,
+          }
+        : p,
+    );
+    if (status === 'COMPLETED' && prev !== 'COMPLETED') {
+      this.toast.success('M-Pesa payment received. Your fare is paid.');
+      const rid = this.ride()?.id;
+      if (rid) {
+        void this.rideService.getById(rid).then((fresh) => {
+          this.ride.set(fresh);
+          if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
+        });
+      }
+    }
+    if (status === 'FAILED' && prev !== 'FAILED') {
+      this.toast.error('Payment was not completed. You can resend the M-Pesa prompt.');
     }
   }
 
@@ -426,12 +586,20 @@ export class RideDetailComponent implements OnInit, OnDestroy {
 
     this.paymentUpdateCb = (data: unknown) => {
       const d = data as { status: string; mpesaReceiptNumber?: string | null; completedAt?: string };
-      this.payment.update((p) => p
-        ? { ...p, status: d.status as RidePayment['status'], mpesaReceiptNumber: d.mpesaReceiptNumber ?? p.mpesaReceiptNumber, completedAt: d.completedAt ?? p.completedAt }
-        : p,
-      );
-      if (d.status === 'COMPLETED') this.toast.success('Payment confirmed!');
-      if (d.status === 'FAILED') this.toast.error('Payment failed. Please try again.');
+      if (d.status === 'COMPLETED' || d.status === 'FAILED') {
+        this.applyPaymentTerminal(d.status, d.mpesaReceiptNumber, d.completedAt ?? null);
+      } else {
+        this.payment.update((p) =>
+          p
+            ? {
+                ...p,
+                status: d.status as RidePayment['status'],
+                mpesaReceiptNumber: d.mpesaReceiptNumber ?? p.mpesaReceiptNumber,
+                completedAt: d.completedAt ?? p.completedAt,
+              }
+            : p,
+        );
+      }
     };
     this.trackingService.onPaymentUpdate(this.paymentUpdateCb as (d: { status: string; amount?: number; mpesaReceiptNumber?: string | null; completedAt?: string }) => void);
   }
@@ -453,9 +621,18 @@ export class RideDetailComponent implements OnInit, OnDestroy {
   protected submitRating(): void {
     const id = this.ride()?.id;
     if (!id || this.selectedRating() === 0) return;
-    void this.rideService.rate(id, this.selectedRating()).then(
-      () => { this.rated.set(true); this.toast.success('Thank you for your feedback!'); },
-    ).catch(() => this.toast.error('Rating failed'));
+    const score = this.selectedRating();
+    void this.rideService
+      .rate(id, score)
+      .then(async () => {
+        this.rated.set(true);
+        this.selectedRating.set(0);
+        const fresh = await this.rideService.getById(id);
+        this.ride.set(fresh);
+        if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
+        this.toast.success('Thank you for your feedback!');
+      })
+      .catch(() => this.toast.error('Rating failed'));
   }
 
   protected badge(status: string): string {

@@ -7,7 +7,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { ParcelStatus } from '@prisma/client';
+import { ParcelStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -415,6 +415,17 @@ export class ParcelsService {
         );
       }
 
+      if (newStatus === ParcelStatus.DELIVERED && parcel.paymentMethod === PaymentMethod.MPESA) {
+        const paid = await this.prisma.payment.findFirst({
+          where: { parcelId, status: PaymentStatus.COMPLETED },
+        });
+        if (!paid) {
+          throw new BadRequestException(
+            'Payment has not been confirmed yet. Ask the sender to complete M-Pesa payment before marking delivered.',
+          );
+        }
+      }
+
       const data: Record<string, unknown> = { status: newStatus };
       if (newStatus === ParcelStatus.DELIVERED) {
         data.deliveredAt = new Date();
@@ -615,7 +626,10 @@ export class ParcelsService {
             ],
           },
         },
-        include: { user: { select: { fullName: true, phone: true } } },
+        include: {
+          user: { select: { fullName: true, phone: true } },
+          payment: { select: { status: true } },
+        },
       });
     } catch (error) {
       if (error instanceof NotFoundException) throw error;

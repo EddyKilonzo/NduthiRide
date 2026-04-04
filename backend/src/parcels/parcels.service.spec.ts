@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { ParcelStatus } from '@prisma/client';
+import { ParcelStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 
 import { ParcelsService } from './parcels.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,6 +13,11 @@ import { TrackingGateway } from '../tracking/tracking.gateway';
 import { ChatService } from '../chat/chat.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MapService } from '../map/map.service';
+
+const mockMapService = {
+  getDirections: jest.fn(),
+};
 
 const mockPrisma = {
   parcel: {
@@ -36,6 +41,9 @@ const mockPrisma = {
   },
   setting: {
     findMany: jest.fn().mockResolvedValue([]),
+  },
+  payment: {
+    findFirst: jest.fn(),
   },
 };
 
@@ -76,6 +84,7 @@ describe('ParcelsService', () => {
         { provide: TrackingGateway, useValue: mockTrackingGateway },
         { provide: ChatService, useValue: mockChatService },
         { provide: ChatGateway, useValue: mockChatGateway },
+        { provide: MapService, useValue: mockMapService },
       ],
     }).compile();
 
@@ -289,9 +298,36 @@ describe('ParcelsService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('throws when marking MPESA parcel delivered before payment completes', async () => {
+      const mockRider = { id: riderId };
+      const mockParcel = {
+        id: parcelId,
+        riderId,
+        status: ParcelStatus.IN_TRANSIT,
+        paymentMethod: PaymentMethod.MPESA,
+      };
+
+      mockPrisma.rider.findUnique.mockResolvedValue(mockRider);
+      mockPrisma.parcel.findUnique.mockResolvedValue(mockParcel);
+      mockPrisma.payment.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateParcelStatus(
+          parcelId,
+          riderAccountId,
+          ParcelStatus.DELIVERED,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('closes conversation and emits event when delivered', async () => {
       const mockRider = { id: riderId };
-      const mockParcel = { id: parcelId, riderId, status: ParcelStatus.IN_TRANSIT };
+      const mockParcel = {
+        id: parcelId,
+        riderId,
+        status: ParcelStatus.IN_TRANSIT,
+        paymentMethod: PaymentMethod.CASH,
+      };
       const mockConversation = { id: 'conv-1' };
 
       mockPrisma.rider.findUnique.mockResolvedValue(mockRider);
@@ -317,6 +353,44 @@ describe('ParcelsService', () => {
 
       expect(mockChatService.closeConversation).toHaveBeenCalledWith('conv-1');
       expect(mockChatGateway.emitChatClosed).toHaveBeenCalled();
+    });
+
+    it('allows MPESA parcel delivered when payment is completed', async () => {
+      const mockRider = { id: riderId };
+      const mockParcel = {
+        id: parcelId,
+        riderId,
+        status: ParcelStatus.IN_TRANSIT,
+        paymentMethod: PaymentMethod.MPESA,
+      };
+      const mockConversation = { id: 'conv-1' };
+
+      mockPrisma.rider.findUnique.mockResolvedValue(mockRider);
+      mockPrisma.parcel.findUnique.mockResolvedValue(mockParcel);
+      mockPrisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-1',
+        status: PaymentStatus.COMPLETED,
+      });
+      mockPrisma.parcel.update.mockResolvedValue({
+        ...mockParcel,
+        status: ParcelStatus.DELIVERED,
+      });
+      mockChatService.getConversationByRideOrParcel.mockResolvedValue(
+        mockConversation,
+      );
+      mockChatService.closeConversation.mockResolvedValue({
+        id: 'conv-1',
+        closedAt: new Date(),
+      });
+
+      await service.updateParcelStatus(
+        parcelId,
+        riderAccountId,
+        ParcelStatus.DELIVERED,
+      );
+
+      expect(mockPrisma.payment.findFirst).toHaveBeenCalled();
+      expect(mockChatService.closeConversation).toHaveBeenCalled();
     });
   });
 

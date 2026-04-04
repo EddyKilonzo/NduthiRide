@@ -1,14 +1,21 @@
-import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { ParcelService } from '../../../core/services/parcel.service';
 import { PaymentService } from '../../../core/services/payment.service';
-import { TrackingService } from '../../../core/services/tracking.service';
+import { TrackingService, type TripPaymentPayload } from '../../../core/services/tracking.service';
 import { ToastService }  from '../../../core/services/toast.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
-import type { Parcel } from '../../../core/models/parcel.models';
+import type { Parcel, ParcelStatus } from '../../../core/models/parcel.models';
 import type { RidePayment } from '../../../core/models/ride.models';
+
+const ACTIVE_PARCEL_PAYMENT_STATUSES: ParcelStatus[] = [
+  'PENDING',
+  'ACCEPTED',
+  'PICKED_UP',
+  'IN_TRANSIT',
+];
 
 @Component({
   selector: 'app-parcel-detail',
@@ -30,6 +37,34 @@ import type { RidePayment } from '../../../core/models/ride.models';
         </div>
 
         <div class="detail-grid">
+          @if (showRatedThanks()) {
+            <div class="card card--rated-banner grid-full">
+              <div class="rated-banner-inner">
+                <lucide-icon name="star" [size]="22" class="rated-banner-icon"></lucide-icon>
+                <div>
+                  <p class="rated-banner-title">Thanks for rating</p>
+                  <p class="rated-banner-sub">You gave this delivery <strong>{{ parcel()!.rating!.score }} / 5</strong> stars.</p>
+                </div>
+              </div>
+            </div>
+          }
+          @if (showRatingPrompt()) {
+            <div class="card card--rating-prompt grid-full">
+              <h3 class="rating-prompt-title">How was your delivery?</h3>
+              <p class="rating-prompt-sub">Your parcel was delivered — rate your rider. It helps everyone on NduthiRide.</p>
+              <div class="stars" role="group" aria-label="Rating">
+                @for (star of [1,2,3,4,5]; track star) {
+                  <button type="button" class="star-btn" [class.star-btn--active]="selectedRating() >= star"
+                    (click)="selectedRating.set(star)" [attr.aria-pressed]="selectedRating() >= star">
+                    <lucide-icon name="star" [size]="28"></lucide-icon>
+                  </button>
+                }
+              </div>
+              <button class="btn btn--primary btn--full" [disabled]="selectedRating() === 0"
+                (click)="submitRating()">Submit rating</button>
+            </div>
+          }
+
           <!-- Route card -->
           <div class="card">
             <h3 class="card-title">Route</h3>
@@ -57,7 +92,18 @@ import type { RidePayment } from '../../../core/models/ride.models';
             <div class="info-row"><span>Weight</span><strong>{{ parcel()!.weightKg }} kg</strong></div>
             <div class="info-row"><span>Distance</span><strong>{{ parcel()!.distanceKm | number:'1.1-1' }} km</strong></div>
             <div class="info-row"><span>Delivery Fee</span><strong class="text-primary">KES {{ parcel()!.deliveryFee | number:'1.0-0' }}</strong></div>
-            <div class="info-row"><span>Payment</span><strong>{{ parcel()!.paymentMethod }}</strong></div>
+            <div class="info-row"><span>Payment method</span><strong>{{ parcel()!.paymentMethod === 'MPESA' ? 'M-Pesa' : 'Cash' }}</strong></div>
+            @if (parcel()!.paymentMethod === 'MPESA') {
+              <div class="info-row">
+                <span>M-Pesa status</span>
+                <strong class="fare-pay-line fare-pay-line--{{ parcelPaymentSummary().variant }}">{{ parcelPaymentSummary().text }}</strong>
+              </div>
+            } @else {
+              <div class="info-row">
+                <span>Settlement</span>
+                <strong class="fare-pay-line fare-pay-line--muted">Cash — pay your driver directly</strong>
+              </div>
+            }
           </div>
 
           <!-- Recipient card -->
@@ -150,23 +196,6 @@ import type { RidePayment } from '../../../core/models/ride.models';
             </div>
           }
 
-          <!-- Rate (delivered, not yet rated) -->
-          @if (parcel()!.status === 'DELIVERED' && !rated()) {
-            <div class="card">
-              <h3 class="card-title">Rate Your Delivery</h3>
-              <div class="stars" role="group" aria-label="Rating">
-                @for (star of [1,2,3,4,5]; track star) {
-                  <button type="button" class="star-btn" [class.star-btn--active]="selectedRating() >= star"
-                    (click)="selectedRating.set(star)" [attr.aria-pressed]="selectedRating() >= star">
-                    <lucide-icon name="star" [size]="28"></lucide-icon>
-                  </button>
-                }
-              </div>
-              <button class="btn btn--primary btn--full" [disabled]="selectedRating() === 0"
-                (click)="submitRating()">Submit Rating</button>
-            </div>
-          }
-
           <!-- Support action -->
           <div class="card support-box">
             <h3 class="card-title">Need Help?</h3>
@@ -181,6 +210,7 @@ import type { RidePayment } from '../../../core/models/ride.models';
   `,
   styles: [`
     .detail-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; }
+    .grid-full { grid-column: 1 / -1; }
     .card-title { font-size: 13px; font-weight: 600; color: var(--clr-text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 16px; }
     .card-header-with-action { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
     .card-header-with-action .card-title { margin-bottom: 0; }
@@ -222,6 +252,29 @@ import type { RidePayment } from '../../../core/models/ride.models';
     }
     .payment-status-label { font-weight: 700; font-size: 14px; }
     .payment-receipt { font-size: 12px; margin-top: 4px; opacity: 0.85; }
+
+    .fare-pay-line--success { color: var(--clr-success); }
+    .fare-pay-line--warning { color: var(--clr-warning); }
+    .fare-pay-line--error   { color: var(--clr-error); }
+    .fare-pay-line--neutral,
+    .fare-pay-line--muted   { color: var(--clr-text-muted); }
+
+    .card--rating-prompt {
+      border: 2px solid rgba(var(--clr-primary-rgb), 0.35);
+      background: linear-gradient(135deg, rgba(var(--clr-primary-rgb), 0.06) 0%, transparent 55%);
+    }
+    .rating-prompt-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 8px; color: var(--clr-text); }
+    .rating-prompt-sub { font-size: 14px; color: var(--clr-text-muted); margin: 0 0 18px; line-height: 1.45; }
+
+    .card--rated-banner {
+      background: rgba(34, 197, 94, 0.08);
+      border-color: rgba(34, 197, 94, 0.28);
+    }
+    .rated-banner-inner { display: flex; align-items: flex-start; gap: 14px; }
+    .rated-banner-icon { color: var(--clr-warning); flex-shrink: 0; margin-top: 2px; }
+    .rated-banner-title { font-weight: 700; margin: 0 0 4px; font-size: 15px; }
+    .rated-banner-sub { margin: 0; font-size: 14px; color: var(--clr-text-muted); }
+
     @media (max-width: 640px) {
       .detail-grid { grid-template-columns: 1fr; }
     }
@@ -245,11 +298,63 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
 
   private subscribedPaymentId: string | null = null;
   private paymentUpdateCb: ((d: unknown) => void) | null = null;
+  private tripPaymentListening = false;
+  private paymentPollGeneration = 0;
+
+  protected readonly showRatingPrompt = computed(
+    () => this.parcel()?.status === 'DELIVERED' && !this.rated(),
+  );
+
+  protected readonly showRatedThanks = computed(() => {
+    const p = this.parcel();
+    return p?.status === 'DELIVERED' && this.rated() && !!p.rating;
+  });
+
+  protected readonly parcelPaymentSummary = computed((): {
+    text: string;
+    variant: 'success' | 'warning' | 'error' | 'neutral' | 'muted';
+  } => {
+    const parcel = this.parcel();
+    const pay = this.payment();
+    if (!parcel || parcel.paymentMethod !== 'MPESA') {
+      return { text: '', variant: 'neutral' };
+    }
+    if (!pay) {
+      if (ACTIVE_PARCEL_PAYMENT_STATUSES.includes(parcel.status)) {
+        return { text: 'Pay below before delivery is completed', variant: 'warning' };
+      }
+      if (parcel.status === 'DELIVERED') {
+        return { text: 'No M-Pesa record on file', variant: 'neutral' };
+      }
+      return { text: 'Not started', variant: 'neutral' };
+    }
+    switch (pay.status) {
+      case 'COMPLETED':
+        return { text: 'Paid ✓', variant: 'success' };
+      case 'FAILED':
+        return { text: 'Failed — resend below', variant: 'error' };
+      case 'PROCESSING':
+        return { text: 'Awaiting M-Pesa…', variant: 'warning' };
+      default:
+        return { text: 'Pending', variant: 'warning' };
+    }
+  });
+
+  private readonly tripPaymentHandler = (d: TripPaymentPayload) => {
+    const parcel = this.parcel();
+    if (!parcel || d.kind !== 'parcel' || d.entityId !== parcel.id) return;
+    if (d.status !== 'COMPLETED' && d.status !== 'FAILED') return;
+    this.applyPaymentTerminal(
+      d.status,
+      d.mpesaReceiptNumber,
+      d.completedAt ?? null,
+    );
+  };
 
   protected canPay(): boolean {
     const p = this.parcel();
     return !!p && p.paymentMethod === 'MPESA' && !this.payment()
-      && ['PENDING', 'ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'].includes(p.status);
+      && ACTIVE_PARCEL_PAYMENT_STATUSES.includes(p.status);
   }
 
   async ngOnInit(): Promise<void> {
@@ -260,7 +365,18 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       if (p.payment) this.payment.set(p.payment as RidePayment);
       if (p.rating) this.rated.set(true);
       if (p.payment?.checkoutRequestId && p.payment.status === 'PROCESSING') {
+        this.trackingService.connect();
         this.subscribePaymentSocket(p.payment.id);
+        void this.startPaymentPollFallback(p.payment.checkoutRequestId);
+      }
+
+      if (
+        ACTIVE_PARCEL_PAYMENT_STATUSES.includes(p.status) &&
+        p.paymentMethod === 'MPESA'
+      ) {
+        this.trackingService.connect();
+        this.trackingService.onTripPayment(this.tripPaymentHandler);
+        this.tripPaymentListening = true;
       }
     } catch {
       this.toast.error('Could not load parcel');
@@ -275,6 +391,9 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
     }
     if (this.paymentUpdateCb) {
       this.trackingService.offPaymentUpdate(this.paymentUpdateCb as (d: unknown) => void);
+    }
+    if (this.tripPaymentListening) {
+      this.trackingService.offTripPayment(this.tripPaymentHandler);
     }
   }
 
@@ -296,6 +415,9 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       this.toast.info('Check your phone for the M-Pesa prompt.');
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
+      if (result.checkoutRequestId) {
+        void this.startPaymentPollFallback(result.checkoutRequestId);
+      }
     } catch {
       this.toast.error('Could not initiate payment. Try again.');
     } finally {
@@ -332,10 +454,57 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       this.toast.info('Check your phone for the M-Pesa prompt.');
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
+      if (result.checkoutRequestId) {
+        void this.startPaymentPollFallback(result.checkoutRequestId);
+      }
     } catch {
       this.toast.error('Could not resend payment prompt. Try again.');
     } finally {
       this.payingNow.set(false);
+    }
+  }
+
+  private async startPaymentPollFallback(checkoutRequestId: string): Promise<void> {
+    const gen = ++this.paymentPollGeneration;
+    try {
+      const res = await this.paymentService.pollStatus(checkoutRequestId);
+      if (gen !== this.paymentPollGeneration) return;
+      if (res.status === 'COMPLETED' || res.status === 'FAILED') {
+        this.applyPaymentTerminal(res.status, res.mpesaReceiptNumber, null);
+      }
+    } catch {
+      /* timeout or network */
+    }
+  }
+
+  private applyPaymentTerminal(
+    status: string,
+    mpesaReceiptNumber: string | null | undefined,
+    completedAt: string | null | undefined,
+  ): void {
+    const prev = this.payment()?.status;
+    this.payment.update((p) =>
+      p
+        ? {
+            ...p,
+            status: status as RidePayment['status'],
+            mpesaReceiptNumber: mpesaReceiptNumber ?? p.mpesaReceiptNumber,
+            completedAt: completedAt ?? p.completedAt,
+          }
+        : p,
+    );
+    if (status === 'COMPLETED' && prev !== 'COMPLETED') {
+      this.toast.success('M-Pesa payment received. Your delivery fee is paid.');
+      const pid = this.parcel()?.id;
+      if (pid) {
+        void this.parcelService.getById(pid).then((fresh) => {
+          this.parcel.set(fresh);
+          if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
+        });
+      }
+    }
+    if (status === 'FAILED' && prev !== 'FAILED') {
+      this.toast.error('Payment was not completed. You can resend the M-Pesa prompt.');
     }
   }
 
@@ -344,12 +513,20 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
     this.trackingService.subscribeToPayment(paymentId);
     this.paymentUpdateCb = (data: unknown) => {
       const d = data as { status: string; mpesaReceiptNumber?: string | null; completedAt?: string };
-      this.payment.update((p) => p
-        ? { ...p, status: d.status as RidePayment['status'], mpesaReceiptNumber: d.mpesaReceiptNumber ?? p.mpesaReceiptNumber, completedAt: d.completedAt ?? p.completedAt }
-        : p,
-      );
-      if (d.status === 'COMPLETED') this.toast.success('Payment confirmed!');
-      if (d.status === 'FAILED') this.toast.error('Payment failed. Please try again.');
+      if (d.status === 'COMPLETED' || d.status === 'FAILED') {
+        this.applyPaymentTerminal(d.status, d.mpesaReceiptNumber, d.completedAt ?? null);
+      } else {
+        this.payment.update((p) =>
+          p
+            ? {
+                ...p,
+                status: d.status as RidePayment['status'],
+                mpesaReceiptNumber: d.mpesaReceiptNumber ?? p.mpesaReceiptNumber,
+                completedAt: d.completedAt ?? p.completedAt,
+              }
+            : p,
+        );
+      }
     };
     this.trackingService.onPaymentUpdate(this.paymentUpdateCb as (d: { status: string; amount?: number; mpesaReceiptNumber?: string | null; completedAt?: string }) => void);
   }
@@ -372,9 +549,14 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
   protected async submitRating(): Promise<void> {
     const id = this.parcel()?.id;
     if (!id || this.selectedRating() === 0) return;
+    const score = this.selectedRating();
     try {
-      await this.parcelService.rate(id, this.selectedRating());
+      await this.parcelService.rate(id, score);
       this.rated.set(true);
+      this.selectedRating.set(0);
+      const fresh = await this.parcelService.getById(id);
+      this.parcel.set(fresh);
+      if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
       this.toast.success('Thank you for your feedback!');
     } catch {
       this.toast.error('Rating failed');
