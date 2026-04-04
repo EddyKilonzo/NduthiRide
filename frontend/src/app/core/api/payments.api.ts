@@ -64,6 +64,19 @@ export class PaymentsApi extends BaseApiService {
   }
 
   /**
+   * Resend STK push for an existing PROCESSING or FAILED payment.
+   * Marks the old payment FAILED and initiates a fresh STK push.
+   */
+  async resend(paymentId: string): Promise<{
+    paymentId: string;
+    transactionId?: string;
+    checkoutRequestId?: string;
+    message: string;
+  }> {
+    return this.post(`${this.path}/${paymentId}/resend`, {});
+  }
+
+  /**
    * Get payment status by checkoutRequestId
    */
   async getStatus(checkoutRequestId: string): Promise<{

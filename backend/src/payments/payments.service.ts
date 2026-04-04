@@ -301,9 +301,15 @@ export class PaymentsService implements OnModuleInit {
   ): Promise<void> {
     try {
       // 1. Verify webhook signature (SECURITY CRITICAL)
-      if (!this.webhookService.verifySignature(rawBody, signature)) {
-        this.logger.warn('Webhook signature verification failed');
-        // Return 200 anyway to prevent Lipana from retrying
+      let signatureValid: boolean;
+      try {
+        signatureValid = this.webhookService.verifySignature(rawBody, signature);
+      } catch {
+        signatureValid = false;
+      }
+      if (!signatureValid) {
+        this.logger.warn('Webhook signature verification failed — request ignored');
+        // Return 200 to prevent Lipana from retrying with the same bad request
         return;
       }
 
@@ -408,6 +414,85 @@ export class PaymentsService implements OnModuleInit {
     } catch (error) {
       // Log but don't throw - webhook should always return 200
       this.logger.error('handleLipanaWebhook failed', error);
+    }
+  }
+
+  // ─── Resend STK push ──────────────────────────────────────
+
+  /**
+   * Marks an existing PROCESSING/FAILED payment as FAILED and fires a new STK push.
+   * This is the correct resend path — initiatePayment alone cannot resend because it
+   * returns the still-PROCESSING record instead of creating a new one.
+   */
+  async resendPayment(
+    userId: string,
+    paymentId: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    try {
+      const payment = await this.prisma.payment.findUnique({
+        where: { id: paymentId },
+        include: {
+          ride:   { select: { userId: true } },
+          parcel: { select: { userId: true } },
+        },
+      });
+
+      if (!payment) throw new NotFoundException('Payment not found');
+
+      const ownerId = payment.ride?.userId ?? payment.parcel?.userId;
+      if (ownerId !== userId) throw new BadRequestException('Not your payment');
+
+      if (
+        payment.status !== PaymentStatus.PROCESSING &&
+        payment.status !== PaymentStatus.FAILED
+      ) {
+        throw new BadRequestException('Only PROCESSING or FAILED payments can be resent');
+      }
+
+      if (!payment.mpesaPhone) {
+        throw new BadRequestException('No M-Pesa phone recorded on this payment');
+      }
+
+      // Mark old payment as FAILED so the idempotency check below won't see it
+      await this.prisma.payment.update({
+        where: { id: paymentId },
+        data: { status: PaymentStatus.FAILED },
+      });
+
+      // Notify any open socket listeners that the old payment is now FAILED
+      this.trackingGateway.emitPaymentUpdate(paymentId, { status: 'FAILED' });
+
+      // Clear in-memory idempotency so the new request goes through within the 30-s window
+      const entityId = payment.rideId ?? payment.parcelId ?? '';
+      const idempotencyKey = `${userId}:${entityId}`;
+      this.recentRequests.delete(idempotencyKey);
+
+      await this.createAuditLog(userId, 'PAYMENT_RESEND_REQUESTED', paymentId, {
+        oldPaymentId: paymentId,
+        entityId,
+      }, ipAddress, userAgent);
+
+      // Delegate to the normal initiate flow (no existing PROCESSING record now)
+      return this.initiatePayment(
+        userId,
+        {
+          rideId:    payment.rideId   ?? undefined,
+          parcelId:  payment.parcelId ?? undefined,
+          method:    payment.method,
+          mpesaPhone: payment.mpesaPhone,
+        },
+        ipAddress,
+        userAgent,
+      );
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) throw error;
+      this.logger.error('resendPayment failed', error);
+      throw new InternalServerErrorException('Could not resend payment');
     }
   }
 

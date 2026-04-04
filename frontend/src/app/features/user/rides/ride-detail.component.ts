@@ -384,11 +384,38 @@ export class RideDetailComponent implements OnInit, OnDestroy {
   }
 
   protected async resendPayment(): Promise<void> {
+    const p = this.payment();
     const r = this.ride();
-    if (!r || !r.mpesaPhone) return;
-    // Clear the failed payment so the pay button logic re-runs via initiatePayment
-    this.payment.set(null);
-    await this.initiatePayment();
+    if (!p || !r) return;
+    this.payingNow.set(true);
+    try {
+      // Clean up the old socket room before subscribing to the new payment
+      if (this.subscribedPaymentId) {
+        this.trackingService.unsubscribeFromPayment(this.subscribedPaymentId);
+        this.subscribedPaymentId = null;
+      }
+      if (this.paymentUpdateCb) {
+        this.trackingService.offPaymentUpdate(this.paymentUpdateCb as (d: unknown) => void);
+        this.paymentUpdateCb = null;
+      }
+
+      const result = await this.paymentService.resend(p.id);
+      this.payment.set({
+        id: result.paymentId,
+        status: 'PROCESSING',
+        amount: r.estimatedFare,
+        mpesaReceiptNumber: null,
+        completedAt: null,
+        checkoutRequestId: result.checkoutRequestId ?? null,
+      });
+      this.toast.info('Check your phone for the M-Pesa prompt.');
+      this.trackingService.connect();
+      this.subscribePaymentSocket(result.paymentId);
+    } catch {
+      this.toast.error('Could not resend payment prompt. Try again.');
+    } finally {
+      this.payingNow.set(false);
+    }
   }
 
   private subscribePaymentSocket(paymentId: string): void {

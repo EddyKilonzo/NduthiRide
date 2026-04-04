@@ -146,6 +146,26 @@ export class PaymentService {
   }
 
   /**
+   * Resends the STK push for a PROCESSING or FAILED payment.
+   * The backend marks the old payment FAILED, then creates a new one —
+   * so this works even when the old payment is still PROCESSING.
+   *
+   * @param paymentId - The existing payment ID to resend
+   * @returns New payment details for UI + socket subscription
+   */
+  async resend(paymentId: string): Promise<{
+    paymentId: string;
+    transactionId?: string;
+    checkoutRequestId?: string;
+    message: string;
+  }> {
+    if (!paymentId) throw new Error('paymentId is required');
+    const result = await this.api.resend(paymentId);
+    if (!result.paymentId) throw new Error('Resend failed — no paymentId returned');
+    return result;
+  }
+
+  /**
    * Gets the current payment status by checkoutRequestId.
    * 
    * @param checkoutRequestId - The checkout request ID from payment initiation

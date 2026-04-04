@@ -100,6 +100,34 @@ export class PaymentsController {
   }
 
   /**
+   * Resend STK push for an existing PROCESSING or FAILED payment.
+   * Marks the old payment FAILED and creates a fresh one so the user
+   * gets a new M-Pesa prompt — even if the old payment is still PROCESSING.
+   */
+  @Post(':paymentId/resend')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Resend STK push for a PROCESSING or FAILED payment',
+    description: 'Marks the existing payment as FAILED and initiates a new STK push.',
+  })
+  @ApiResponse({ status: 201, description: 'New STK push sent' })
+  @ApiResponse({ status: 400, description: 'Payment not resendable (e.g., already COMPLETED)' })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  resendPayment(
+    @CurrentUser() user: Account,
+    @Param('paymentId') paymentId: string,
+    @Req() req: Request,
+  ) {
+    return this.paymentsService.resendPayment(
+      user.id,
+      paymentId,
+      req.ip,
+      req.headers['user-agent'] as string,
+    );
+  }
+
+  /**
    * Public endpoint — called by Lipana's servers, not the frontend.
    * Receives webhook notifications for payment status changes.
    *
