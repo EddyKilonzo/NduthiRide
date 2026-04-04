@@ -79,6 +79,11 @@ export class AdminApi extends BaseApiService {
     return this.patch<any>(`${this.path}/payouts/${id}`, { status, reference });
   }
 
+  /** Sends KES to rider M-Pesa via Lipana; marks payout COMPLETED with Lipana payout id. */
+  async sendPayoutViaLipana(id: string): Promise<any> {
+    return this.post<any>(`${this.path}/payouts/${id}/send-lipana`, {});
+  }
+
   // ─── Support ────────────────────────────────────────────
 
   async listSupportTickets(page = 1, limit = 20): Promise<PaginatedResult<any>> {

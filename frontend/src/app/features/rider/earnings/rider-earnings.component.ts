@@ -1,8 +1,11 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 import { RideService }   from '../../../core/services/ride.service';
 import { ParcelService } from '../../../core/services/parcel.service';
+import { RidersApi } from '../../../core/api/riders.api';
+import { ToastService } from '../../../core/services/toast.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import type { Ride }   from '../../../core/models/ride.models';
 import type { Parcel } from '../../../core/models/parcel.models';
@@ -10,7 +13,7 @@ import type { Parcel } from '../../../core/models/parcel.models';
 @Component({
   selector: 'app-rider-earnings',
   standalone: true,
-  imports: [CommonModule, SpinnerComponent, LucideAngularModule],
+  imports: [CommonModule, FormsModule, SpinnerComponent, LucideAngularModule],
   template: `
     <div class="earnings-page app-page">
       <div class="page-header">
@@ -54,16 +57,47 @@ import type { Parcel } from '../../../core/models/parcel.models';
           <div class="stat-card success">
             <div class="stat-icon payout"><lucide-icon name="wallet" [size]="20"></lucide-icon></div>
             <div class="stat-info">
-              <span class="label">Est. Payout (85%)</span>
-              <h3 class="value">KES {{ estimatedPayout() | number:'1.0-0' }}</h3>
+              <span class="label">Available balance</span>
+              <h3 class="value">KES {{ availableBalance() | number:'1.0-0' }}</h3>
             </div>
+          </div>
+        </div>
+
+        <!-- Self-service M-Pesa withdrawal -->
+        <div class="withdraw-card card modern-shadow">
+          <div class="withdraw-header">
+            <lucide-icon name="smartphone" [size]="22"></lucide-icon>
+            <div>
+              <h3>Withdraw to M-Pesa</h3>
+              <p class="withdraw-sub">We pay you from our business M-Pesa (Lipana). Riders don’t sign up for Lipana — only a valid M-Pesa number. Minimum KES&nbsp;10.</p>
+            </div>
+          </div>
+          <p class="available-line">
+            Available balance: <strong>KES {{ availableBalance() | number:'1.0-0' }}</strong>
+          </p>
+          <div class="withdraw-form">
+            <div class="field">
+              <label for="wd-amount">Amount (KES)</label>
+              <input id="wd-amount" type="number" [(ngModel)]="withdrawAmount" min="10"
+                [attr.max]="availableBalance()" step="1" placeholder="e.g. 500" />
+            </div>
+            <div class="field">
+              <label for="wd-phone">M-Pesa phone</label>
+              <input id="wd-phone" type="text" [(ngModel)]="withdrawPhone"
+                placeholder="07XX XXX XXX or +254…" autocomplete="tel" />
+            </div>
+            <button type="button" class="btn btn--primary btn--full withdraw-btn"
+              (click)="withdrawToMpesa()" [disabled]="withdrawing() || availableBalance() < 10">
+              @if (withdrawing()) { <app-spinner [size]="18" /> Sending… }
+              @else { <lucide-icon name="banknote" [size]="16"></lucide-icon> Withdraw }
+            </button>
           </div>
         </div>
 
         <!-- Commission Info -->
         <div class="info-banner modern-shadow">
           <lucide-icon name="info" [size]="18"></lucide-icon>
-          <p>Platform commission is 15%. Payouts are automatically processed to your registered M-Pesa account after each trip completion.</p>
+          <p>Platform commission is 15%. Your share is added to <strong>Available balance</strong> when rides and deliveries complete. Use the form above to cash out to M-Pesa anytime.</p>
         </div>
 
         <!-- Transactions Table -->
@@ -163,6 +197,31 @@ import type { Parcel } from '../../../core/models/parcel.models';
     .info-banner p { font-size: 13px; color: var(--clr-text-muted); line-height: 1.5; }
     .info-banner lucide-icon { color: var(--clr-primary); flex-shrink: 0; }
 
+    .withdraw-card {
+      padding: 22px 24px; margin-bottom: 24px; border: 1px solid var(--clr-border);
+      border-radius: var(--radius-lg); background: var(--clr-bg-card);
+    }
+    .withdraw-header {
+      display: flex; align-items: flex-start; gap: 14px; margin-bottom: 14px;
+      h3 { font-size: 17px; font-weight: 700; margin: 0; }
+      lucide-icon { color: var(--clr-primary); flex-shrink: 0; margin-top: 2px; }
+    }
+    .withdraw-sub { font-size: 12px; color: var(--clr-text-muted); margin: 4px 0 0; }
+    .available-line { font-size: 14px; color: var(--clr-text-muted); margin-bottom: 16px; }
+    .available-line strong { color: var(--clr-text); }
+    .withdraw-form { display: grid; gap: 14px; max-width: 360px; }
+    .withdraw-form .field label {
+      display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .04em; color: var(--clr-text-muted); margin-bottom: 6px;
+    }
+    .withdraw-form .field input {
+      width: 100%; padding: 12px 14px; border-radius: var(--radius-md);
+      border: 1px solid var(--clr-border); background: var(--clr-bg-elevated);
+      color: var(--clr-text); font-size: 15px;
+      &:focus { outline: none; border-color: var(--clr-primary); }
+    }
+    .withdraw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
+
     .table-card { padding: 0; overflow: hidden; box-shadow: var(--shadow-card); }
     .table-header {
       padding: 24px; border-bottom: 1px solid var(--clr-border);
@@ -220,12 +279,23 @@ import type { Parcel } from '../../../core/models/parcel.models';
 export class RiderEarningsComponent implements OnInit {
   private readonly rideService   = inject(RideService);
   private readonly parcelService = inject(ParcelService);
+  private readonly ridersApi     = inject(RidersApi);
+  private readonly toast         = inject(ToastService);
 
   protected readonly loading  = signal(true);
   protected readonly rides    = signal<Ride[]>([]);
   protected readonly parcels  = signal<Parcel[]>([]);
   protected readonly rideTotalCount = signal(0);
   protected readonly parcelTotalCount = signal(0);
+  protected readonly profileTotalEarnings = signal(0);
+  protected readonly withdrawing = signal(false);
+
+  withdrawAmount: number | null = null;
+  withdrawPhone = '';
+
+  protected readonly availableBalance = computed(() =>
+    Math.floor(this.profileTotalEarnings()),
+  );
 
   protected readonly combinedTransactions = computed(() => {
     const rideTx = this.rides().map(r => ({
@@ -255,20 +325,60 @@ export class RiderEarningsComponent implements OnInit {
     this.rides().reduce((s, r) => s + (r.finalFare ?? r.estimatedFare), 0) +
     this.parcels().reduce((s, p) => s + p.deliveryFee, 0),
   );
-  protected readonly estimatedPayout = computed(() => this.grossEarnings() * 0.85);
 
   async ngOnInit(): Promise<void> {
     try {
-      const [rides, parcels] = await Promise.all([
+      const [rides, parcels, profile] = await Promise.all([
         this.loadAllCompletedRides(),
         this.loadAllDeliveredParcels(),
+        this.ridersApi.getMyProfile().catch(() => null),
       ]);
       this.rides.set(rides.items);
       this.parcels.set(parcels.items);
       this.rideTotalCount.set(rides.total);
       this.parcelTotalCount.set(parcels.total);
+      if (profile) {
+        this.profileTotalEarnings.set(profile.totalEarnings ?? 0);
+        this.withdrawPhone = profile.account?.phone?.trim() ?? '';
+      }
     } catch { /* silent */ } finally {
       this.loading.set(false);
+    }
+  }
+
+  private async refreshBalance(): Promise<void> {
+    try {
+      const profile = await this.ridersApi.getMyProfile();
+      this.profileTotalEarnings.set(profile.totalEarnings ?? 0);
+    } catch { /* ignore */ }
+  }
+
+  async withdrawToMpesa(): Promise<void> {
+    const bal = this.availableBalance();
+    const amt = Math.ceil(Number(this.withdrawAmount));
+    if (!Number.isFinite(amt) || amt < 10) {
+      this.toast.error('Enter an amount of at least KES 10');
+      return;
+    }
+    if (amt > bal) {
+      this.toast.error('Amount exceeds your available balance');
+      return;
+    }
+    const phone = (this.withdrawPhone || '').trim();
+    if (!phone) {
+      this.toast.error('Enter the M-Pesa number that should receive the money');
+      return;
+    }
+    this.withdrawing.set(true);
+    try {
+      await this.ridersApi.requestPayout(amt, 'MPESA', phone);
+      this.toast.success('Withdrawal sent. Check your M-Pesa shortly.');
+      this.withdrawAmount = null;
+      await this.refreshBalance();
+    } catch {
+      /* error toast from interceptor */
+    } finally {
+      this.withdrawing.set(false);
     }
   }
 

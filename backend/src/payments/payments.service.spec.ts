@@ -228,7 +228,7 @@ describe('PaymentsService', () => {
 
       await service.initiatePayment(userId, rideDto);
 
-      // Second request within 30s should fail
+      // Second request within 60s should fail
       await expect(service.initiatePayment(userId, rideDto)).rejects.toThrow(
         BadRequestException,
       );

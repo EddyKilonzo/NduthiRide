@@ -316,7 +316,7 @@ describe('PaymentsService - Integration & Security Tests', () => {
     const userId = 'user-idempotency';
     const rideId = 'ride-123';
 
-    it('should reject duplicate payment request within 30 seconds', async () => {
+    it('should reject duplicate payment request within 60 seconds', async () => {
       mockPrisma.ride.findUnique.mockResolvedValue({
         id: rideId,
         userId,
@@ -337,7 +337,7 @@ describe('PaymentsService - Integration & Security Tests', () => {
         mpesaPhone: '0712345678',
       });
 
-      // Second request within 30s should fail
+      // Second request within 60s should fail
       await expect(service.initiatePayment(userId, {
         rideId,
         method: PaymentMethod.MPESA,

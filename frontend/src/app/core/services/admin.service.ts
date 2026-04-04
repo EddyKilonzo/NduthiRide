@@ -90,6 +90,10 @@ export class AdminService {
     return this.api.updatePayoutStatus(id, status, reference);
   }
 
+  async sendPayoutViaLipana(id: string): Promise<any> {
+    return this.api.sendPayoutViaLipana(id);
+  }
+
   async listSupportTickets(page = 1, limit = 20): Promise<PaginatedResult<any>> {
     return this.api.listSupportTickets(page, limit);
   }

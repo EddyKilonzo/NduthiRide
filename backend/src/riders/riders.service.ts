@@ -1,5 +1,12 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { LipanaPayoutService } from '../payments/lipana-payout.service';
 import {
   UpdateRiderAvailabilityDto,
   UpdateRiderLocationDto,
@@ -12,7 +19,10 @@ import { haversineKm } from '../common/utils/geo';
 export class RidersService {
   private readonly logger = new Logger(RidersService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly lipanaPayout: LipanaPayoutService,
+  ) {}
 
   /**
    * Returns the full Rider profile for the given account.
@@ -218,35 +228,152 @@ export class RidersService {
 
   /**
    * Requests a payout from earnings.
+   * MPESA: sends immediately via Lipana (POST /payouts/phone); no admin step.
+   * Other methods (e.g. BANK): creates PENDING and reserves balance for admin processing.
    */
-  async requestPayout(accountId: string, amount: number, method: string, details: string): Promise<any> {
-    const rider = await this.prisma.rider.findUnique({ where: { accountId } });
+  async requestPayout(
+    accountId: string,
+    amount: number,
+    method: string,
+    details: string,
+  ): Promise<any> {
+    const rider = await this.prisma.rider.findUnique({
+      where: { accountId },
+      include: { account: { select: { phone: true } } },
+    });
     if (!rider) throw new NotFoundException('Rider not found');
 
-    if (rider.totalEarnings < amount) {
-      throw new Error('Insufficient earnings for payout');
+    const amt = Math.ceil(Number(amount));
+    if (!Number.isFinite(amt) || amt < 1) {
+      throw new BadRequestException('Invalid payout amount');
+    }
+    if (rider.totalEarnings < amt) {
+      throw new BadRequestException('Insufficient earnings for payout');
+    }
+
+    const m = (method || 'MPESA').toUpperCase();
+    if (m === 'MPESA') {
+      return this.requestMpesaPayoutSelfService(rider, amt, details);
+    }
+
+    if (amt < 10) {
+      throw new BadRequestException('Minimum payout is KES 10');
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // Create payout record
-      const payout = await tx.payout.create({
+      const updated = await tx.rider.updateMany({
+        where: { id: rider.id, totalEarnings: { gte: amt } },
+        data: { totalEarnings: { decrement: amt } },
+      });
+      if (updated.count !== 1) {
+        throw new BadRequestException('Insufficient earnings for payout');
+      }
+      return tx.payout.create({
         data: {
           riderId: rider.id,
-          amount,
+          amount: amt,
           status: 'PENDING',
-          method,
+          method: m,
           accountDetails: details,
         },
       });
-
-      // Deduct from rider's earnings (In production, you'd likely keep a separate balance field)
-      await tx.rider.update({
-        where: { id: rider.id },
-        data: { totalEarnings: { decrement: amount } },
-      });
-
-      return payout;
     });
+  }
+
+  /**
+   * Reserves balance, sends M-Pesa via Lipana, marks COMPLETED or refunds on failure.
+   */
+  private async requestMpesaPayoutSelfService(
+    rider: {
+      id: string;
+      totalEarnings: number;
+      account: { phone: string | null };
+    },
+    amt: number,
+    details: string,
+  ) {
+    if (amt < 10) {
+      throw new BadRequestException('Minimum M-Pesa withdrawal is KES 10');
+    }
+
+    const raw = (details?.trim() || rider.account.phone || '').trim();
+    if (!raw) {
+      throw new BadRequestException(
+        'Enter the M-Pesa number to receive funds, or add a phone number to your profile.',
+      );
+    }
+    const e164 = this.lipanaPayout.normalizeToE164(raw);
+    if (!this.lipanaPayout.isValidKenyanE164(e164)) {
+      throw new BadRequestException('Invalid M-Pesa phone number');
+    }
+    const phone254 = e164.replace(/^\+/, '');
+
+    const payout = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.rider.updateMany({
+        where: { id: rider.id, totalEarnings: { gte: amt } },
+        data: { totalEarnings: { decrement: amt } },
+      });
+      if (updated.count !== 1) {
+        throw new BadRequestException('Insufficient earnings for payout');
+      }
+      return tx.payout.create({
+        data: {
+          riderId: rider.id,
+          amount: amt,
+          status: 'PROCESSING',
+          method: 'MPESA',
+          accountDetails: raw,
+        },
+      });
+    });
+
+    try {
+      const { id: lipanaId } = await this.lipanaPayout.sendToPhone(
+        phone254,
+        amt,
+      );
+      try {
+        return await this.prisma.payout.update({
+          where: { id: payout.id },
+          data: {
+            status: 'COMPLETED',
+            reference: lipanaId,
+            processedAt: new Date(),
+          },
+        });
+      } catch (dbErr) {
+        this.logger.error(
+          `Lipana payout ${lipanaId} succeeded for rider ${rider.id} but DB update failed`,
+          dbErr,
+        );
+        throw new InternalServerErrorException(
+          'M-Pesa transfer may have been sent but we could not finalize your record. Contact support with your rider ID.',
+        );
+      }
+    } catch (err) {
+      if (err instanceof InternalServerErrorException) throw err;
+
+      const msg =
+        err instanceof Error ? err.message : 'M-Pesa payout failed';
+      this.logger.warn(
+        `Rider self-service payout failed payoutId=${payout.id}: ${msg}`,
+      );
+
+      await this.prisma.$transaction([
+        this.prisma.payout.update({
+          where: { id: payout.id },
+          data: { status: 'FAILED' },
+        }),
+        this.prisma.rider.update({
+          where: { id: rider.id },
+          data: { totalEarnings: { increment: amt } },
+        }),
+      ]);
+
+      throw new BadRequestException(
+        `${msg} Your balance has been restored. You can try again in a moment.`,
+      );
+    }
   }
 
   /**

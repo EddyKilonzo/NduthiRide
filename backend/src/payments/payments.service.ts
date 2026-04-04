@@ -24,7 +24,7 @@ export class PaymentsService implements OnModuleInit {
 
   // Idempotency cache: Map<userId:entityId, timestamp>
   private readonly recentRequests = new Map<string, number>();
-  private readonly IDEMPOTENCY_WINDOW_MS = 30_000; // 30 seconds
+  private readonly IDEMPOTENCY_WINDOW_MS = 60_000; // 60 seconds
 
   // Fraud detection: Track failed attempts per user
   private readonly failedAttempts = new Map<
@@ -89,7 +89,7 @@ export class PaymentsService implements OnModuleInit {
    * Creates a Payment record in PROCESSING state and returns the transaction details
    * which the frontend should poll to check for completion.
    *
-   * Implements idempotency to prevent duplicate STK pushes within a 30-second window.
+   * Implements idempotency to prevent duplicate STK pushes within a 60-second window.
    */
   async initiatePayment(
     userId: string,
@@ -464,7 +464,7 @@ export class PaymentsService implements OnModuleInit {
       // Notify any open socket listeners that the old payment is now FAILED
       this.trackingGateway.emitPaymentUpdate(paymentId, { status: 'FAILED' });
 
-      // Clear in-memory idempotency so the new request goes through within the 30-s window
+      // Clear in-memory idempotency so the new request goes through within the 60-s window
       const entityId = payment.rideId ?? payment.parcelId ?? '';
       const idempotencyKey = `${userId}:${entityId}`;
       this.recentRequests.delete(idempotencyKey);

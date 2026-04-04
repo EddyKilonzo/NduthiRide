@@ -1,5 +1,11 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { LipanaPayoutService } from '../payments/lipana-payout.service';
 import {
   ListAccountsDto,
   ListRidesDto,
@@ -28,6 +34,7 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly supportService: SupportService,
+    private readonly lipanaPayout: LipanaPayoutService,
   ) {}
 
   // ─── Dashboard ────────────────────────────────────────────
@@ -546,13 +553,106 @@ export class AdminService {
     return this.paginate(payouts, total, page, limit);
   }
 
-  async updatePayoutStatus(id: string, dto: { status: string; reference?: string }): Promise<unknown> {
+  async updatePayoutStatus(
+    id: string,
+    dto: { status: string; reference?: string },
+  ): Promise<unknown> {
+    const payout = await this.prisma.payout.findUnique({ where: { id } });
+    if (!payout) throw new NotFoundException('Payout not found');
+    if (payout.status !== 'PENDING') {
+      throw new BadRequestException('Only pending payouts can be updated');
+    }
+
+    if (dto.status === 'REJECTED') {
+      return this.prisma.$transaction(async (tx) => {
+        const updated = await tx.payout.update({
+          where: { id },
+          data: {
+            status: 'REJECTED',
+            processedAt: new Date(),
+            reference: dto.reference ?? null,
+          },
+        });
+        await tx.rider.update({
+          where: { id: payout.riderId },
+          data: { totalEarnings: { increment: payout.amount } },
+        });
+        return updated;
+      });
+    }
+
+    if (dto.status === 'COMPLETED') {
+      return this.prisma.payout.update({
+        where: { id },
+        data: {
+          status: 'COMPLETED',
+          reference: dto.reference,
+          processedAt: new Date(),
+        },
+      });
+    }
+
+    throw new BadRequestException('Invalid payout status');
+  }
+
+  /**
+   * Sends payout to rider M-Pesa via Lipana (B2C-style). Marks payout COMPLETED on success.
+   */
+  async sendPayoutViaLipana(id: string): Promise<unknown> {
+    const payout = await this.prisma.payout.findUnique({
+      where: { id },
+      include: {
+        rider: { include: { account: { select: { phone: true } } } },
+      },
+    });
+    if (!payout) throw new NotFoundException('Payout not found');
+    if (payout.status !== 'PENDING') {
+      throw new BadRequestException('Only pending payouts can be sent');
+    }
+    if (payout.method.toUpperCase() !== 'MPESA') {
+      throw new BadRequestException(
+        'Automated Lipana send is only for MPESA payouts; use manual complete for bank.',
+      );
+    }
+
+    const raw = (
+      payout.accountDetails?.trim() ||
+      payout.rider.account.phone ||
+      ''
+    ).trim();
+    const e164 = this.lipanaPayout.normalizeToE164(raw);
+    if (!this.lipanaPayout.isValidKenyanE164(e164)) {
+      throw new BadRequestException(
+        'Invalid M-Pesa phone. Rider must use a valid 07… / +254… number on the payout request.',
+      );
+    }
+    const phone254 = e164.replace(/^\+/, '');
+    const amount = Math.ceil(payout.amount);
+    if (amount < 10) {
+      throw new BadRequestException('Lipana requires a minimum payout of KES 10');
+    }
+
+    let lipanaId: string;
+    try {
+      const res = await this.lipanaPayout.sendToPhone(phone254, amount);
+      lipanaId = res.id;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Lipana payout failed';
+      this.logger.warn(`Lipana rider payout failed payoutId=${id}: ${msg}`);
+      throw new BadRequestException(
+        `${msg} Payout left as PENDING — fix the issue or reject to refund the rider balance.`,
+      );
+    }
+
     return this.prisma.payout.update({
       where: { id },
       data: {
-        status: dto.status,
-        reference: dto.reference,
-        processedAt: dto.status === 'COMPLETED' ? new Date() : undefined,
+        status: 'COMPLETED',
+        reference: lipanaId,
+        processedAt: new Date(),
+      },
+      include: {
+        rider: { include: { account: { select: { fullName: true, phone: true } } } },
       },
     });
   }

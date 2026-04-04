@@ -19,7 +19,7 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
           </div>
           <div>
             <h1>Payout Requests</h1>
-            <p>Manage and process rider withdrawal requests</p>
+            <p>Riders withdraw M-Pesa themselves from Earnings. Use this list for bank payouts, failures, or support.</p>
           </div>
         </div>
         <div class="header-actions">
@@ -37,7 +37,7 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
             <lucide-icon name="banknote" [size]="48"></lucide-icon>
           </div>
           <h3>No payout requests</h3>
-          <p>When riders request to withdraw their earnings, they will appear here.</p>
+          <p>Non–M-Pesa requests and edge cases appear here. M-Pesa withdrawals are usually instant from the rider app.</p>
         </div>
       } @else {
         <div class="card table-wrapper">
@@ -76,10 +76,16 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
                   <td>
                     <div class="action-btns">
                       @if (p.status === 'PENDING') {
-                        <button class="btn btn--icon btn--success-ghost" title="Approve & Complete" (click)="processPayout(p, 'COMPLETED')">
+                        @if (p.method === 'MPESA') {
+                          <button class="btn btn--icon btn--primary-ghost" title="Send KES via Lipana M-Pesa" (click)="sendViaLipana(p)" [disabled]="sendingId() === p.id">
+                            @if (sendingId() === p.id) { <app-spinner [size]="16" /> }
+                            @else { <lucide-icon name="smartphone" [size]="18"></lucide-icon> }
+                          </button>
+                        }
+                        <button class="btn btn--icon btn--success-ghost" title="Mark complete (manual reference)" (click)="processPayout(p, 'COMPLETED')">
                           <lucide-icon name="check-circle" [size]="18"></lucide-icon>
                         </button>
-                        <button class="btn btn--icon btn--danger-ghost" title="Reject" (click)="processPayout(p, 'REJECTED')">
+                        <button class="btn btn--icon btn--danger-ghost" title="Reject — refunds rider balance" (click)="processPayout(p, 'REJECTED')">
                           <lucide-icon name="x-circle" [size]="18"></lucide-icon>
                         </button>
                       } @else {
@@ -132,6 +138,7 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
       &:hover { background: var(--clr-bg-elevated); color: var(--clr-text); }
     }
     .btn--success-ghost:hover { color: var(--clr-success) !important; background: rgba(34,197,94,.1) !important; }
+    .btn--primary-ghost:hover { color: var(--clr-primary) !important; background: rgba(64,138,113,.12) !important; }
     .btn--danger-ghost:hover { color: var(--clr-error) !important; background: rgba(239,68,68,.1) !important; }
     .text-right { text-align: right; }
     .mono-xs { font-family: var(--font-mono, monospace); font-size: 11px; }
@@ -156,6 +163,7 @@ export class AdminPayoutsComponent implements OnInit {
   protected readonly loading = signal(true);
   protected readonly page = signal(1);
   protected readonly totalPages = signal(1);
+  protected readonly sendingId = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
     await this.load();
@@ -171,6 +179,20 @@ export class AdminPayoutsComponent implements OnInit {
       this.toast.error('Failed to load payouts');
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  async sendViaLipana(payout: any): Promise<void> {
+    if (!confirm(`Send KES ${Math.ceil(payout.amount)} to this rider via Lipana M-Pesa?`)) return;
+    this.sendingId.set(payout.id);
+    try {
+      await this.adminService.sendPayoutViaLipana(payout.id);
+      this.toast.success('Payout sent via Lipana');
+      await this.load();
+    } catch {
+      /* error toast from interceptor */
+    } finally {
+      this.sendingId.set(null);
     }
   }
 

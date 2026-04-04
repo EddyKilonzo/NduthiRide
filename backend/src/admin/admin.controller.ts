@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Param,
   Body,
@@ -176,6 +177,17 @@ export class AdminController {
     @Body() dto: { status: string; reference?: string },
   ) {
     return this.adminService.updatePayoutStatus(id, dto);
+  }
+
+  @Post('payouts/:id/send-lipana')
+  @ApiOperation({
+    summary: 'Send M-Pesa payout via Lipana',
+    description:
+      'Calls Lipana POST /payouts/phone for MPESA pending payouts, then marks COMPLETED with Lipana payout id as reference.',
+  })
+  @ApiResponse({ status: 200, description: 'Payout sent and completed' })
+  sendPayoutViaLipana(@Param('id') id: string) {
+    return this.adminService.sendPayoutViaLipana(id);
   }
 
   // ─── Support ───────────────────────────────────────────

@@ -17,6 +17,10 @@ export interface RiderProfile {
   ratingAverage: number;
   totalRides: number;
   totalEarnings: number;
+  account?: {
+    phone: string | null;
+    fullName?: string;
+  };
 }
 
 export interface UpdateRiderProfileDto {

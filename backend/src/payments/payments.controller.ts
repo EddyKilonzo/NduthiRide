@@ -41,7 +41,7 @@ export class PaymentsController {
   @ApiOperation({
     summary: 'Initiate M-Pesa STK push for a ride or parcel via Lipana',
     description:
-      'Initiates an STK push payment. Implements idempotency - duplicate requests within 30s are rejected.',
+      'Initiates an STK push payment. Implements idempotency - duplicate requests within 60s are rejected.',
   })
   @ApiResponse({
     status: 201,

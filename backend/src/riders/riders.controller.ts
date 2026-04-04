@@ -91,8 +91,15 @@ export class RidersController {
   }
 
   @Patch('me/payouts')
-  @ApiOperation({ summary: 'Request a payout' })
-  @ApiResponse({ status: 200, description: 'Payout request created' })
+  @ApiOperation({
+    summary: 'Withdraw earnings',
+    description:
+      'MPESA: sends to the given phone (or profile phone) immediately via Lipana. BANK/other: creates a pending request for admin.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Payout completed (MPESA) or queued (other methods)',
+  })
   requestPayout(
     @CurrentUser() user: Account,
     @Body() dto: { amount: number; method: string; details: string },
