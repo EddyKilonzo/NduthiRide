@@ -337,8 +337,22 @@ const ACTIVE_STATUSES: Ride['status'][] = [
       100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); transform: scale(1); }
     }
     .payment-status--failed    { background: rgba(239,68,68,0.08);  border-color: rgba(239,68,68,0.25);  color: var(--clr-error); }
-    .payment-status--processing,.payment-status--pending {
+    .payment-status--processing, .payment-status--pending {
       background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.25); color: var(--clr-warning);
+      animation: processing-glow 2s ease-in-out infinite;
+    }
+    @keyframes processing-glow {
+      0%, 100% { border-color: rgba(245, 158, 11, 0.25); box-shadow: none; }
+      50%       { border-color: rgba(245, 158, 11, 0.55); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.08); }
+    }
+    .payment-status--processing lucide-icon:first-child,
+    .payment-status--pending    lucide-icon:first-child {
+      animation: spin-icon 1.2s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin-icon {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
     }
     .payment-status-label { font-weight: 700; font-size: 14px; }
     .payment-receipt { font-size: 12px; margin-top: 4px; opacity: 0.85; }
@@ -397,11 +411,20 @@ export class RideDetailComponent implements OnInit, OnDestroy {
   protected readonly selectedRating = signal(0);
 
   // Payment
-  protected readonly payment        = signal<RidePayment | null>(null);
-  protected readonly payingNow      = signal(false);
+  protected readonly payment          = signal<RidePayment | null>(null);
+  protected readonly payingNow        = signal(false);
   /** Becomes true after the 30-second grace window while STK push is in-flight. */
   protected readonly showResendOption = signal(false);
   private resendGraceTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Timestamp (ms) when the payment last entered PROCESSING state. */
+  private processingStartTime: number | null = null;
+  /** Timer that defers a FAILED transition to avoid instant error flicker. */
+  private failedDelayTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Ride-status polling after payment is confirmed
+  private rideStatusPollTimer: ReturnType<typeof setTimeout> | null = null;
+  private rideStatusPollCount = 0;
+  private static readonly MAX_RIDE_STATUS_POLLS = 72; // 6 min @ 5 s intervals
 
   // Live tracking
   protected readonly riderPosition = signal<RouteMapPoint | null>(null);
@@ -531,9 +554,15 @@ export class RideDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Start 30-second grace period before revealing the Resend button. */
+  /**
+   * Call whenever a fresh STK push is sent.
+   * Stamps the start time (used to guard against instant FAILED flicker) and
+   * starts the 30-second grace window before the Resend button is revealed.
+   */
   private startResendGrace(): void {
     this.clearResendGrace();
+    this.clearFailedDelay();
+    this.processingStartTime = Date.now();
     this.showResendOption.set(false);
     this.resendGraceTimer = setTimeout(() => this.showResendOption.set(true), 30_000);
   }
@@ -545,15 +574,71 @@ export class RideDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  private clearFailedDelay(): void {
+    if (this.failedDelayTimer !== null) {
+      clearTimeout(this.failedDelayTimer);
+      this.failedDelayTimer = null;
+    }
+  }
+
+  /**
+   * After M-Pesa payment is confirmed while the ride is still active, poll the
+   * ride status every 5 seconds so the UI automatically transitions to COMPLETED
+   * (showing the rating prompt) as soon as the rider marks the trip done —
+   * without requiring the user to manually refresh.
+   */
+  private startRideStatusPoll(): void {
+    this.clearRideStatusPoll();
+    this.rideStatusPollCount = 0;
+    this.rideStatusPollTimer = setTimeout(() => void this.pollRideStatus(), 5_000);
+  }
+
+  private clearRideStatusPoll(): void {
+    if (this.rideStatusPollTimer !== null) {
+      clearTimeout(this.rideStatusPollTimer);
+      this.rideStatusPollTimer = null;
+    }
+  }
+
+  private async pollRideStatus(): Promise<void> {
+    this.rideStatusPollTimer = null;
+    const r = this.ride();
+    if (!r || !ACTIVE_STATUSES.includes(r.status as Ride['status'])) return;
+    if (this.rideStatusPollCount >= RideDetailComponent.MAX_RIDE_STATUS_POLLS) return;
+
+    this.rideStatusPollCount++;
+    try {
+      const fresh = await this.rideService.getById(r.id);
+      this.ride.set(fresh);
+      if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
+
+      if (ACTIVE_STATUSES.includes(fresh.status as Ride['status'])) {
+        // Still active — schedule next poll.
+        this.rideStatusPollTimer = setTimeout(() => void this.pollRideStatus(), 5_000);
+      }
+      // If COMPLETED or CANCELLED, the computed signals update automatically and
+      // the rating prompt / payment-success-done banner appear without any extra work.
+    } catch {
+      // Network hiccup — retry.
+      this.rideStatusPollTimer = setTimeout(() => void this.pollRideStatus(), 5_000);
+    }
+  }
+
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id')!;
     void this.rideService.getById(id).then((r) => {
       this.ride.set(r);
       if (r.payment) {
         this.payment.set(r.payment as RidePayment);
-        // Payment was already in PROCESSING when we arrived — show resend immediately.
-        if ((r.payment as RidePayment).status === 'PROCESSING') {
+        const pStatus = (r.payment as RidePayment).status;
+        if (pStatus === 'PROCESSING') {
+          // Arrived on a page that already had an in-flight payment.
+          this.processingStartTime = Date.now() - RideDetailComponent.MIN_PROCESSING_MS;
           this.showResendOption.set(true);
+        }
+        // Payment already confirmed but rider hasn't completed the trip yet — poll.
+        if (pStatus === 'COMPLETED' && ACTIVE_STATUSES.includes(r.status as Ride['status'])) {
+          this.startRideStatusPoll();
         }
       }
       this.loading.set(false);
@@ -582,6 +667,8 @@ export class RideDetailComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.clearResendGrace();
+    this.clearFailedDelay();
+    this.clearRideStatusPoll();
     if (this.subscribedPaymentId) {
       this.trackingService.unsubscribeFromPayment(this.subscribedPaymentId);
     }
@@ -680,12 +767,43 @@ export class RideDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Minimum time (ms) the PROCESSING state is shown before a FAILED event can
+   * flip the UI to the error state. Prevents instant red flicker when the Lipana
+   * sandbox (or a slow network) delivers a failure webhook before the user has
+   * had any chance to see the M-Pesa prompt on their phone.
+   */
+  private static readonly MIN_PROCESSING_MS = 8_000;
+
   private applyPaymentTerminal(
     status: string,
     mpesaReceiptNumber: string | null | undefined,
     completedAt: string | null | undefined,
   ): void {
     const prev = this.payment()?.status;
+    if (prev === status) return;
+
+    // If FAILED arrives within the minimum PROCESSING window, defer it so the
+    // user isn't hit with an error before the STK prompt has had time to arrive.
+    if (status === 'FAILED' && prev === 'PROCESSING' && this.processingStartTime !== null) {
+      const elapsed = Date.now() - this.processingStartTime;
+      const remaining = RideDetailComponent.MIN_PROCESSING_MS - elapsed;
+      if (remaining > 0) {
+        this.clearFailedDelay();
+        this.failedDelayTimer = setTimeout(
+          () => {
+            this.failedDelayTimer = null;
+            // Only apply FAILED if the payment hasn't succeeded in the meantime.
+            if (this.payment()?.status !== 'COMPLETED') {
+              this.applyPaymentTerminal(status, mpesaReceiptNumber, completedAt);
+            }
+          },
+          remaining,
+        );
+        return;
+      }
+    }
+
     this.payment.update((p) =>
       p
         ? {
@@ -696,8 +814,10 @@ export class RideDetailComponent implements OnInit, OnDestroy {
           }
         : p,
     );
+
     if (status === 'COMPLETED' && prev !== 'COMPLETED') {
       this.clearResendGrace();
+      this.clearFailedDelay();
       this.showResendOption.set(false);
       this.toast.success('Payment successful — your fare is paid.');
       const rid = this.ride()?.id;
@@ -705,6 +825,11 @@ export class RideDetailComponent implements OnInit, OnDestroy {
         void this.rideService.getById(rid).then((fresh) => {
           this.ride.set(fresh);
           if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
+          // If the ride is still active (rider hasn't marked it done yet), poll
+          // every 5 s so the UI auto-transitions once the rider completes the trip.
+          if (ACTIVE_STATUSES.includes(fresh.status as Ride['status'])) {
+            this.startRideStatusPoll();
+          }
         });
       }
     }

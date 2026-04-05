@@ -294,8 +294,22 @@ const ACTIVE_PARCEL_PAYMENT_STATUSES: ParcelStatus[] = [
       100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); transform: scale(1); }
     }
     .payment-status--failed    { background: rgba(239,68,68,0.08);  border-color: rgba(239,68,68,0.25);  color: var(--clr-error); }
-    .payment-status--processing,.payment-status--pending {
+    .payment-status--processing, .payment-status--pending {
       background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.25); color: var(--clr-warning);
+      animation: processing-glow 2s ease-in-out infinite;
+    }
+    @keyframes processing-glow {
+      0%, 100% { border-color: rgba(245, 158, 11, 0.25); box-shadow: none; }
+      50%       { border-color: rgba(245, 158, 11, 0.55); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.08); }
+    }
+    .payment-status--processing lucide-icon:first-child,
+    .payment-status--pending    lucide-icon:first-child {
+      animation: spin-icon 1.2s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin-icon {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
     }
     .payment-status-label { font-weight: 700; font-size: 14px; }
     .payment-receipt { font-size: 12px; margin-top: 4px; opacity: 0.85; }
@@ -354,6 +368,15 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
   /** Becomes true after the 30-second grace window while STK push is in-flight. */
   protected readonly showResendOption = signal(false);
   private resendGraceTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Timestamp (ms) when the payment last entered PROCESSING state. */
+  private processingStartTime: number | null = null;
+  /** Timer that defers a FAILED transition to avoid instant error flicker. */
+  private failedDelayTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Parcel-status polling after payment is confirmed
+  private parcelStatusPollTimer: ReturnType<typeof setTimeout> | null = null;
+  private parcelStatusPollCount = 0;
+  private static readonly MAX_PARCEL_STATUS_POLLS = 72; // 6 min @ 5 s intervals
 
   private subscribedPaymentId: string | null = null;
   private paymentUpdateCb: ((d: unknown) => void) | null = null;
@@ -438,9 +461,15 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       && ACTIVE_PARCEL_PAYMENT_STATUSES.includes(p.status);
   }
 
-  /** Start 30-second grace period before revealing the Resend button. */
+  /**
+   * Call whenever a fresh STK push is sent.
+   * Stamps the start time (used to guard against instant FAILED flicker) and
+   * starts the 30-second grace window before the Resend button is revealed.
+   */
   private startResendGrace(): void {
     this.clearResendGrace();
+    this.clearFailedDelay();
+    this.processingStartTime = Date.now();
     this.showResendOption.set(false);
     this.resendGraceTimer = setTimeout(() => this.showResendOption.set(true), 30_000);
   }
@@ -452,6 +481,51 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  private clearFailedDelay(): void {
+    if (this.failedDelayTimer !== null) {
+      clearTimeout(this.failedDelayTimer);
+      this.failedDelayTimer = null;
+    }
+  }
+
+  /**
+   * After M-Pesa payment is confirmed while the parcel is still in transit,
+   * poll the parcel status every 5 seconds so the UI automatically transitions
+   * to DELIVERED (showing the rating prompt) once the rider marks it delivered.
+   */
+  private startParcelStatusPoll(): void {
+    this.clearParcelStatusPoll();
+    this.parcelStatusPollCount = 0;
+    this.parcelStatusPollTimer = setTimeout(() => void this.pollParcelStatus(), 5_000);
+  }
+
+  private clearParcelStatusPoll(): void {
+    if (this.parcelStatusPollTimer !== null) {
+      clearTimeout(this.parcelStatusPollTimer);
+      this.parcelStatusPollTimer = null;
+    }
+  }
+
+  private async pollParcelStatus(): Promise<void> {
+    this.parcelStatusPollTimer = null;
+    const p = this.parcel();
+    if (!p || !ACTIVE_PARCEL_PAYMENT_STATUSES.includes(p.status)) return;
+    if (this.parcelStatusPollCount >= ParcelDetailComponent.MAX_PARCEL_STATUS_POLLS) return;
+
+    this.parcelStatusPollCount++;
+    try {
+      const fresh = await this.parcelService.getById(p.id);
+      this.parcel.set(fresh);
+      if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
+
+      if (ACTIVE_PARCEL_PAYMENT_STATUSES.includes(fresh.status)) {
+        this.parcelStatusPollTimer = setTimeout(() => void this.pollParcelStatus(), 5_000);
+      }
+    } catch {
+      this.parcelStatusPollTimer = setTimeout(() => void this.pollParcelStatus(), 5_000);
+    }
+  }
+
   async ngOnInit(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('id')!;
     try {
@@ -459,9 +533,14 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       this.parcel.set(p);
       if (p.payment) {
         this.payment.set(p.payment as RidePayment);
-        // Payment was already in PROCESSING when we arrived — show resend immediately.
-        if ((p.payment as RidePayment).status === 'PROCESSING') {
+        const pStatus = (p.payment as RidePayment).status;
+        if (pStatus === 'PROCESSING') {
+          this.processingStartTime = Date.now() - ParcelDetailComponent.MIN_PROCESSING_MS;
           this.showResendOption.set(true);
+        }
+        // Payment already confirmed but parcel not yet delivered — poll.
+        if (pStatus === 'COMPLETED' && ACTIVE_PARCEL_PAYMENT_STATUSES.includes(p.status)) {
+          this.startParcelStatusPoll();
         }
       }
       if (p.rating) this.rated.set(true);
@@ -488,6 +567,8 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.clearResendGrace();
+    this.clearFailedDelay();
+    this.clearParcelStatusPoll();
     if (this.subscribedPaymentId) {
       this.trackingService.unsubscribeFromPayment(this.subscribedPaymentId);
     }
@@ -581,12 +662,34 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  private static readonly MIN_PROCESSING_MS = 8_000;
+
   private applyPaymentTerminal(
     status: string,
     mpesaReceiptNumber: string | null | undefined,
     completedAt: string | null | undefined,
   ): void {
     const prev = this.payment()?.status;
+    if (prev === status) return;
+
+    if (status === 'FAILED' && prev === 'PROCESSING' && this.processingStartTime !== null) {
+      const elapsed = Date.now() - this.processingStartTime;
+      const remaining = ParcelDetailComponent.MIN_PROCESSING_MS - elapsed;
+      if (remaining > 0) {
+        this.clearFailedDelay();
+        this.failedDelayTimer = setTimeout(
+          () => {
+            this.failedDelayTimer = null;
+            if (this.payment()?.status !== 'COMPLETED') {
+              this.applyPaymentTerminal(status, mpesaReceiptNumber, completedAt);
+            }
+          },
+          remaining,
+        );
+        return;
+      }
+    }
+
     this.payment.update((p) =>
       p
         ? {
@@ -597,8 +700,10 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
           }
         : p,
     );
+
     if (status === 'COMPLETED' && prev !== 'COMPLETED') {
       this.clearResendGrace();
+      this.clearFailedDelay();
       this.showResendOption.set(false);
       this.toast.success('M-Pesa payment received. Your delivery fee is paid.');
       const pid = this.parcel()?.id;
@@ -606,6 +711,11 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
         void this.parcelService.getById(pid).then((fresh) => {
           this.parcel.set(fresh);
           if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
+          // If the parcel hasn't been delivered yet, poll so the UI auto-transitions
+          // to DELIVERED and shows the rating prompt when the rider marks it done.
+          if (ACTIVE_PARCEL_PAYMENT_STATUSES.includes(fresh.status)) {
+            this.startParcelStatusPoll();
+          }
         });
       }
     }
