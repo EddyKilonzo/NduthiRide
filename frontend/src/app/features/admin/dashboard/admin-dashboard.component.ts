@@ -18,6 +18,7 @@ const ADMIN_CHART_COPY = {
   avgLabel: 'Avg. per trip',
   rideShareLabel: 'Ride vs Parcel',
   dailyAmountTitle: 'Daily revenue',
+  dailyAmountHint: 'From completed M-Pesa payments where applicable; otherwise booked fare on completion.',
 } as const;
 
 @Component({

@@ -27,6 +27,13 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
       let errorMessage = 'An unexpected error occurred';
 
       if (error instanceof HttpErrorResponse) {
+        // Payment status polling is a silent background operation — transient errors
+        // are handled by the poll loop itself, so we must not show a toast here.
+        const isPaymentStatusPoll = req.url.includes('/payments/status/');
+        if (isPaymentStatusPoll) {
+          return throwError(() => error);
+        }
+
         if (error.status === 504) {
           errorMessage = 'Server is unavailable. Please try again in a moment.';
         } else if (error.error && typeof error.error.message === 'string') {

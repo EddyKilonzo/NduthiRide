@@ -77,6 +77,9 @@ model Account {
   // Email verification — true once the user confirms their OTP
   isEmailVerified Boolean @default(false) @map("is_email_verified")
 
+  // Average of scores from riders who rated this passenger (rides only)
+  passengerRatingAverage Float @default(0) @map("passenger_rating_average")
+
   // Push notifications
   fcmToken        String? @map("fcm_token")
 
@@ -87,7 +90,8 @@ model Account {
   rider               Rider?
   rides               Ride[]              @relation("UserRides")
   parcels             Parcel[]            @relation("UserParcels")
-  ratings             Rating[]            @relation("UserRatings")
+  ratings                  Rating[]            @relation("UserRatings")
+  passengerRatingsReceived PassengerRating[] @relation("PassengerRatingsReceived")
   messages            Message[]
   verificationTokens  VerificationToken[]
   notifications       Notification[]
@@ -151,7 +155,8 @@ model Rider {
   ridesAsRider    Ride[]            @relation("RiderRides")
   parcelsAsRider  Parcel[]          @relation("RiderParcels")
   locationHistory LocationHistory[]
-  ratingsReceived Rating[]          @relation("RiderRatings")
+  ratingsReceived       Rating[]            @relation("RiderRatings")
+  passengerRatingsGiven PassengerRating[]   @relation("PassengerRatingsGiven")
   payouts         Payout[]
 
   @@map("riders")
@@ -196,8 +201,9 @@ model Ride {
   completedAt DateTime? @map("completed_at")
 
   // Relations
-  payment      Payment?
-  rating       Rating?
+  payment          Payment?
+  rating           Rating?
+  passengerRating  PassengerRating?
   conversation Conversation?
 
   @@map("rides")
@@ -305,6 +311,27 @@ model Rating {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("ratings")
+}
+
+// Rider's rating of the passenger after a completed ride (separate from Rating = user → rider)
+model PassengerRating {
+  id String @id @default(cuid())
+
+  rideId String @unique @map("ride_id")
+  ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  riderId String @map("rider_id")
+  rider   Rider  @relation("PassengerRatingsGiven", fields: [riderId], references: [id])
+
+  passengerAccountId String  @map("passenger_account_id")
+  passenger          Account @relation("PassengerRatingsReceived", fields: [passengerAccountId], references: [id])
+
+  score   Int
+  comment String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("passenger_ratings")
 }
 
 // ─── Chat models ─────────────────────────────────────────────

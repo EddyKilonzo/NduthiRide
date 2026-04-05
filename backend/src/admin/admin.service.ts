@@ -337,7 +337,14 @@ export class AdminService {
             rider: {
               include: { account: { select: { fullName: true, phone: true } } },
             },
-            payment: { select: { status: true, amount: true, method: true } },
+            payment: {
+              select: {
+                status: true,
+                amount: true,
+                method: true,
+                completedAt: true,
+              },
+            },
           },
         }),
         this.prisma.ride.count({ where }),
@@ -457,7 +464,14 @@ export class AdminService {
             rider: {
               include: { account: { select: { fullName: true, phone: true } } },
             },
-            payment: { select: { status: true, amount: true, method: true } },
+            payment: {
+              select: {
+                status: true,
+                amount: true,
+                method: true,
+                completedAt: true,
+              },
+            },
           },
         }),
         this.prisma.parcel.count({ where }),

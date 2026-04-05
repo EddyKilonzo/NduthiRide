@@ -173,7 +173,9 @@ export class ParcelsService {
                 },
               },
             },
-            payment: { select: { status: true, amount: true } },
+            payment: {
+              select: { status: true, amount: true, completedAt: true },
+            },
             rating: { select: { score: true } },
           },
         }),
@@ -212,7 +214,9 @@ export class ParcelsService {
           orderBy: { createdAt: 'desc' },
           include: {
             user: { select: { fullName: true, avatarUrl: true, phone: true } },
-            payment: { select: { status: true, amount: true } },
+            payment: {
+              select: { status: true, amount: true, completedAt: true },
+            },
             rating: { select: { score: true } },
           },
         }),
@@ -426,6 +430,50 @@ export class ParcelsService {
         }
       }
 
+      let cashPaymentSettled: {
+        id: string;
+        amount: number;
+        completedAt: Date;
+      } | null = null;
+
+      if (newStatus === ParcelStatus.DELIVERED && parcel.paymentMethod === PaymentMethod.CASH) {
+        const existing = await this.prisma.payment.findFirst({
+          where: { parcelId },
+        });
+        if (existing) {
+          if (existing.status !== PaymentStatus.COMPLETED) {
+            const p = await this.prisma.payment.update({
+              where: { id: existing.id },
+              data: {
+                status: PaymentStatus.COMPLETED,
+                completedAt: new Date(),
+                method: PaymentMethod.CASH,
+              },
+            });
+            cashPaymentSettled = {
+              id: p.id,
+              amount: p.amount,
+              completedAt: p.completedAt!,
+            };
+          }
+        } else {
+          const p = await this.prisma.payment.create({
+            data: {
+              parcelId,
+              amount: parcel.deliveryFee,
+              status: PaymentStatus.COMPLETED,
+              method: PaymentMethod.CASH,
+              completedAt: new Date(),
+            },
+          });
+          cashPaymentSettled = {
+            id: p.id,
+            amount: p.amount,
+            completedAt: p.completedAt!,
+          };
+        }
+      }
+
       const data: Record<string, unknown> = { status: newStatus };
       if (newStatus === ParcelStatus.DELIVERED) {
         data.deliveredAt = new Date();
@@ -445,6 +493,30 @@ export class ParcelsService {
         where: { id: parcelId },
         data,
       });
+
+      if (cashPaymentSettled) {
+        this.trackingGateway.emitPaymentUpdate(cashPaymentSettled.id, {
+          status: 'COMPLETED',
+          amount: cashPaymentSettled.amount,
+          completedAt: cashPaymentSettled.completedAt.toISOString(),
+        });
+        this.trackingGateway.emitTripPaymentUpdate(parcel.userId, {
+          kind: 'parcel',
+          entityId: parcelId,
+          paymentId: cashPaymentSettled.id,
+          status: 'COMPLETED',
+          mpesaReceiptNumber: null,
+          completedAt: cashPaymentSettled.completedAt.toISOString(),
+        });
+        this.trackingGateway.emitTripPaymentUpdate(accountId, {
+          kind: 'parcel',
+          entityId: parcelId,
+          paymentId: cashPaymentSettled.id,
+          status: 'COMPLETED',
+          mpesaReceiptNumber: null,
+          completedAt: cashPaymentSettled.completedAt.toISOString(),
+        });
+      }
 
       // Update rider's total earnings on delivery
       if (newStatus === ParcelStatus.DELIVERED) {

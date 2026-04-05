@@ -10,6 +10,8 @@ export interface ActivityChartsCopy {
   avgLabel: string;
   rideShareLabel: string;
   dailyAmountTitle: string;
+  /** Shown under the daily amount chart title (e.g. M-Pesa vs fare). */
+  dailyAmountHint?: string;
 }
 
 interface BarSpec {
@@ -83,7 +85,12 @@ interface BarSpec {
 
         <div class="card chart-card modern-shadow">
           <div class="chart-card__head">
-            <h3>{{ copy().dailyAmountTitle }}</h3>
+            <div>
+              <h3>{{ copy().dailyAmountTitle }}</h3>
+              @if (copy().dailyAmountHint) {
+                <p class="chart-hint">{{ copy().dailyAmountHint }}</p>
+              }
+            </div>
             <span class="chart-sub">KES</span>
           </div>
           <div class="chart-svg-wrap chart-svg-wrap--line">
@@ -233,6 +240,10 @@ interface BarSpec {
       color: var(--clr-text);
     }
     .chart-sub { font-size: 11px; font-weight: 600; color: var(--clr-text-muted); }
+    .chart-hint {
+      font-size: 11px; font-weight: 500; color: var(--clr-text-dim); margin: 4px 0 0;
+      line-height: 1.35; max-width: 42ch;
+    }
     .chart-svg-wrap {
       width: 100%;
       min-height: 160px;

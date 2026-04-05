@@ -37,6 +37,41 @@ const ACTIVE_PARCEL_PAYMENT_STATUSES: ParcelStatus[] = [
         </div>
 
         <div class="detail-grid">
+          @switch (paymentSuccessKind()) {
+            @case ('mpesa-mid') {
+              <div class="card card--payment-success-banner grid-full" role="status" aria-live="polite">
+                <div class="payment-success-inner">
+                  <lucide-icon name="check-circle" [size]="28" class="payment-success-icon"></lucide-icon>
+                  <div>
+                    <p class="payment-success-title">Payment successful</p>
+                    <p class="payment-success-sub">M-Pesa payment received. Your delivery fee is paid. The rider will mark the parcel delivered once it arrives — then you can rate the experience.</p>
+                  </div>
+                </div>
+              </div>
+            }
+            @case ('mpesa-done') {
+              <div class="card card--payment-success-banner grid-full" role="status" aria-live="polite">
+                <div class="payment-success-inner">
+                  <lucide-icon name="party-popper" [size]="28" class="payment-success-icon"></lucide-icon>
+                  <div>
+                    <p class="payment-success-title">Payment successful</p>
+                    <p class="payment-success-sub">Your M-Pesa payment is confirmed for this delivery. Thank you for using NduthiRide.</p>
+                  </div>
+                </div>
+              </div>
+            }
+            @case ('cash-done') {
+              <div class="card card--payment-success-banner grid-full" role="status" aria-live="polite">
+                <div class="payment-success-inner">
+                  <lucide-icon name="check-circle" [size]="28" class="payment-success-icon"></lucide-icon>
+                  <div>
+                    <p class="payment-success-title">Delivery &amp; payment recorded</p>
+                    <p class="payment-success-sub">Your rider confirmed cash collection. This delivery is closed — you can rate your experience below.</p>
+                  </div>
+                </div>
+              </div>
+            }
+          }
           @if (showRatedThanks()) {
             <div class="card card--rated-banner grid-full">
               <div class="rated-banner-inner">
@@ -101,7 +136,11 @@ const ACTIVE_PARCEL_PAYMENT_STATUSES: ParcelStatus[] = [
             } @else {
               <div class="info-row">
                 <span>Settlement</span>
-                <strong class="fare-pay-line fare-pay-line--muted">Cash — pay your driver directly</strong>
+                @if (parcel()!.status === 'DELIVERED' && parcel()!.payment?.status === 'COMPLETED') {
+                  <strong class="fare-pay-line fare-pay-line--success">Cash recorded ✓</strong>
+                } @else {
+                  <strong class="fare-pay-line fare-pay-line--muted">Cash — pay your driver directly</strong>
+                }
               </div>
             }
           </div>
@@ -153,7 +192,7 @@ const ACTIVE_PARCEL_PAYMENT_STATUSES: ParcelStatus[] = [
             <div class="card payment-card">
               <h3 class="card-title">Payment</h3>
               @if (payment(); as p) {
-                <div class="payment-status payment-status--{{ p.status.toLowerCase() }}">
+                <div class="payment-status payment-status--{{ p.status.toLowerCase() }}" [class.payment-status--success-pulse]="p.status === 'COMPLETED'">
                   <lucide-icon [name]="paymentIcon(p.status)" [size]="20"></lucide-icon>
                   <div>
                     <p class="payment-status-label">{{ paymentLabel(p.status) }}</p>
@@ -161,11 +200,11 @@ const ACTIVE_PARCEL_PAYMENT_STATUSES: ParcelStatus[] = [
                       <p class="payment-receipt">Receipt: {{ p.mpesaReceiptNumber }}</p>
                     }
                     @if (p.status === 'PROCESSING') {
-                      <p class="payment-hint">Check your phone for the M-Pesa prompt.</p>
+                      <p class="payment-hint">Check your phone for the M-Pesa prompt. It may take up to 30 seconds to arrive.</p>
                     }
                   </div>
                 </div>
-                @if (p.status === 'FAILED' || p.status === 'PROCESSING') {
+                @if (p.status === 'FAILED' || (p.status === 'PROCESSING' && showResendOption())) {
                   <p class="payment-hint" style="margin-top:10px">
                     @if (p.status === 'FAILED') { The prompt was not completed. }
                     @else { Didn't get the prompt or it expired? }
@@ -246,6 +285,14 @@ const ACTIVE_PARCEL_PAYMENT_STATUSES: ParcelStatus[] = [
       border: 1px solid var(--clr-border);
     }
     .payment-status--completed { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25); color: var(--clr-success); }
+    .payment-status--success-pulse {
+      animation: payment-success-pulse 0.9s ease-out 1;
+    }
+    @keyframes payment-success-pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45); transform: scale(1); }
+      55%  { box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); transform: scale(1.01); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); transform: scale(1); }
+    }
     .payment-status--failed    { background: rgba(239,68,68,0.08);  border-color: rgba(239,68,68,0.25);  color: var(--clr-error); }
     .payment-status--processing,.payment-status--pending {
       background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.25); color: var(--clr-warning);
@@ -265,6 +312,15 @@ const ACTIVE_PARCEL_PAYMENT_STATUSES: ParcelStatus[] = [
     }
     .rating-prompt-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 8px; color: var(--clr-text); }
     .rating-prompt-sub { font-size: 14px; color: var(--clr-text-muted); margin: 0 0 18px; line-height: 1.45; }
+
+    .card--payment-success-banner {
+      background: rgba(34, 197, 94, 0.1);
+      border: 2px solid rgba(34, 197, 94, 0.35);
+    }
+    .payment-success-inner { display: flex; align-items: flex-start; gap: 14px; }
+    .payment-success-icon { color: var(--clr-success); flex-shrink: 0; margin-top: 2px; }
+    .payment-success-title { font-weight: 800; margin: 0 0 6px; font-size: 16px; color: var(--clr-text); }
+    .payment-success-sub { margin: 0; font-size: 14px; color: var(--clr-text-muted); line-height: 1.45; }
 
     .card--rated-banner {
       background: rgba(34, 197, 94, 0.08);
@@ -293,13 +349,38 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
   protected readonly rated          = signal(false);
   protected readonly selectedRating = signal(0);
 
-  protected readonly payment   = signal<RidePayment | null>(null);
-  protected readonly payingNow = signal(false);
+  protected readonly payment          = signal<RidePayment | null>(null);
+  protected readonly payingNow        = signal(false);
+  /** Becomes true after the 30-second grace window while STK push is in-flight. */
+  protected readonly showResendOption = signal(false);
+  private resendGraceTimer: ReturnType<typeof setTimeout> | null = null;
 
   private subscribedPaymentId: string | null = null;
   private paymentUpdateCb: ((d: unknown) => void) | null = null;
   private tripPaymentListening = false;
   private paymentPollGeneration = 0;
+
+  protected readonly paymentSuccessKind = computed(():
+    | 'mpesa-mid'
+    | 'mpesa-done'
+    | 'cash-done'
+    | null => {
+    const parcel = this.parcel();
+    if (!parcel) return null;
+    const p = this.payment();
+    if (parcel.paymentMethod === 'MPESA' && p?.status === 'COMPLETED') {
+      if (ACTIVE_PARCEL_PAYMENT_STATUSES.includes(parcel.status)) return 'mpesa-mid';
+      if (parcel.status === 'DELIVERED') return 'mpesa-done';
+    }
+    if (
+      parcel.paymentMethod === 'CASH' &&
+      parcel.status === 'DELIVERED' &&
+      parcel.payment?.status === 'COMPLETED'
+    ) {
+      return 'cash-done';
+    }
+    return null;
+  });
 
   protected readonly showRatingPrompt = computed(
     () => this.parcel()?.status === 'DELIVERED' && !this.rated(),
@@ -357,12 +438,32 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       && ACTIVE_PARCEL_PAYMENT_STATUSES.includes(p.status);
   }
 
+  /** Start 30-second grace period before revealing the Resend button. */
+  private startResendGrace(): void {
+    this.clearResendGrace();
+    this.showResendOption.set(false);
+    this.resendGraceTimer = setTimeout(() => this.showResendOption.set(true), 30_000);
+  }
+
+  private clearResendGrace(): void {
+    if (this.resendGraceTimer !== null) {
+      clearTimeout(this.resendGraceTimer);
+      this.resendGraceTimer = null;
+    }
+  }
+
   async ngOnInit(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('id')!;
     try {
       const p = await this.parcelService.getById(id);
       this.parcel.set(p);
-      if (p.payment) this.payment.set(p.payment as RidePayment);
+      if (p.payment) {
+        this.payment.set(p.payment as RidePayment);
+        // Payment was already in PROCESSING when we arrived — show resend immediately.
+        if ((p.payment as RidePayment).status === 'PROCESSING') {
+          this.showResendOption.set(true);
+        }
+      }
       if (p.rating) this.rated.set(true);
       if (p.payment?.checkoutRequestId && p.payment.status === 'PROCESSING') {
         this.trackingService.connect();
@@ -386,6 +487,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.clearResendGrace();
     if (this.subscribedPaymentId) {
       this.trackingService.unsubscribeFromPayment(this.subscribedPaymentId);
     }
@@ -413,6 +515,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
         checkoutRequestId: result.checkoutRequestId ?? null,
       });
       this.toast.info('Check your phone for the M-Pesa prompt.');
+      this.startResendGrace();
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
       if (result.checkoutRequestId) {
@@ -452,6 +555,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
         checkoutRequestId: result.checkoutRequestId ?? null,
       });
       this.toast.info('Check your phone for the M-Pesa prompt.');
+      this.startResendGrace();
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
       if (result.checkoutRequestId) {
@@ -494,6 +598,8 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
         : p,
     );
     if (status === 'COMPLETED' && prev !== 'COMPLETED') {
+      this.clearResendGrace();
+      this.showResendOption.set(false);
       this.toast.success('M-Pesa payment received. Your delivery fee is paid.');
       const pid = this.parcel()?.id;
       if (pid) {
@@ -504,6 +610,8 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       }
     }
     if (status === 'FAILED' && prev !== 'FAILED') {
+      this.clearResendGrace();
+      this.showResendOption.set(true);
       this.toast.error('Payment was not completed. You can resend the M-Pesa prompt.');
     }
   }

@@ -75,6 +75,12 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
                   <div class="fare-section">
                     <span class="label">Estimated Fare</span>
                     <h2 class="fare-value">KES {{ ride.estimatedFare | number:'1.0-0' }}</h2>
+                    @if (ride.paymentMethod === 'MPESA' && ride.payment?.status === 'COMPLETED') {
+                      <div class="mpesa-paid-strip" role="status">
+                        <lucide-icon name="check-circle" [size]="18"></lucide-icon>
+                        <span>Passenger paid via M-Pesa — you can complete the ride after drop-off.</span>
+                      </div>
+                    }
                   </div>
 
                   <div class="route-display">
@@ -388,6 +394,12 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
     .fare-section { margin-bottom: 32px; }
     .fare-section .label { font-size: 13px; color: var(--clr-text-muted); font-weight: 600; }
     .fare-section .fare-value { font-size: 32px; font-weight: 800; color: var(--clr-primary); font-family: var(--font-display); margin-top: 4px; }
+    .mpesa-paid-strip {
+      display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; padding: 12px 14px;
+      border-radius: var(--radius-md); font-size: 13px; font-weight: 600; line-height: 1.4;
+      background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.28); color: var(--clr-success);
+    }
+    .mpesa-paid-strip lucide-icon { flex-shrink: 0; margin-top: 1px; }
 
     .route-display {
       background: var(--clr-bg-elevated); border-radius: var(--radius-lg); padding: 20px;

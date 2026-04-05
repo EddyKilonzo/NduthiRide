@@ -20,7 +20,18 @@
       "Bash(/dev/null taskkill:*)",
       "Bash(find C:UsersAdminDocumentsProjectsNduthRidefrontendsrcappfeaturesauth -name *.ts -o -name *.html)",
       "Bash(find C:/Users/Admin/Documents/Projects/NduthRide/backend/src -name configuration* -o -name config*)",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_xSH3KlFrmf5i@ep-muddy-cell-ampl44gk.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require&connect_timeout=30\" npx prisma migrate deploy)",
+      "Bash(Test-NetConnection -ComputerName ep-muddy-cell-ampl44gk.c-5.us-east-1.aws.neon.tech -Port 5432)",
+      "Bash(powershell -Command \"Test-NetConnection -ComputerName ''ep-muddy-cell-ampl44gk.c-5.us-east-1.aws.neon.tech'' -Port 5432\")",
+      "Bash(powershell -Command \"Test-NetConnection -ComputerName 'ep-muddy-cell-ampl44gk.c-5.us-east-1.aws.neon.tech' -Port 5432 -InformationLevel Quiet\" 2>&1)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git rm:*)",
+      "Bash(git ls-files:*)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|html|css\\)$\")",
+      "Bash(grep -l \"payment\\\\|mpesa\\\\|stk\\\\|resend\" \"C:\\\\Users\\\\Admin\\\\Documents\\\\Projects\\\\NduthRide/frontend/src/app/features/user/rides\"/*.ts)"
     ]
   }
 }

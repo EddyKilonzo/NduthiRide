@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { LucideAngularModule } from 'lucide-angular';
 import { RideService }   from '../../../core/services/ride.service';
 import { ParcelService } from '../../../core/services/parcel.service';
+import { ToastService }  from '../../../core/services/toast.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import type { Ride }   from '../../../core/models/ride.models';
 import type { Parcel } from '../../../core/models/parcel.models';
@@ -70,6 +71,32 @@ type TabType = 'rides' | 'parcels';
                     <span class="value">KES {{ r.estimatedFare | number:'1.0-0' }}</span>
                   </div>
                 </div>
+
+                @if (!r.passengerRating) {
+                  <div class="rate-passenger-section">
+                    <p class="rate-passenger-title">Rate {{ r.user.fullName.split(' ')[0] }}</p>
+                    <p class="rate-passenger-hint">Private feedback — helps build trust on the platform.</p>
+                    <div class="star-row" role="group" aria-label="Passenger rating">
+                      @for (star of [1,2,3,4,5]; track star) {
+                        <button type="button" class="star-btn" [class.star-btn--active]="passengerStarFor(r.id) >= star"
+                          (click)="pickPassengerStar(r.id, star)" [attr.aria-pressed]="passengerStarFor(r.id) >= star">
+                          <lucide-icon name="star" [size]="24"></lucide-icon>
+                        </button>
+                      }
+                    </div>
+                    <button type="button" class="btn btn--primary btn--sm btn--full btn--pill"
+                      [disabled]="passengerStarFor(r.id) === 0 || passengerSubmittingFor(r.id)"
+                      (click)="submitPassengerRating(r.id)">
+                      @if (passengerSubmittingFor(r.id)) { Submitting... }
+                      @else { Submit rating }
+                    </button>
+                  </div>
+                } @else {
+                  <div class="passenger-rated-note">
+                    <lucide-icon name="star" [size]="16" class="star-gold"></lucide-icon>
+                    <span>You rated this passenger <strong>{{ r.passengerRating.score }} / 5</strong></span>
+                  </div>
+                }
               </div>
             }
           </div>
@@ -283,6 +310,24 @@ type TabType = 'rides' | 'parcels';
     .text-primary { color: var(--clr-primary); }
     .text-dim { color: var(--clr-text-dim); }
 
+    .rate-passenger-section {
+      margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--clr-border);
+    }
+    .rate-passenger-title { font-weight: 700; font-size: 14px; margin: 0 0 4px; color: var(--clr-text); }
+    .rate-passenger-hint { font-size: 12px; color: var(--clr-text-muted); margin: 0 0 12px; line-height: 1.4; }
+    .star-row { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+    .star-btn {
+      padding: 4px; border: none; background: none; cursor: pointer; color: var(--clr-text-dim);
+      border-radius: 8px; transition: color 0.15s, transform 0.15s;
+    }
+    .star-btn:hover { color: var(--clr-warning); transform: scale(1.06); }
+    .star-btn--active { color: var(--clr-warning); }
+    .passenger-rated-note {
+      margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--clr-border-subtle);
+      display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--clr-text-muted);
+    }
+    .star-gold { color: var(--clr-warning); flex-shrink: 0; }
+
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
     @media (max-width: 640px) {
@@ -293,6 +338,7 @@ type TabType = 'rides' | 'parcels';
 export class RiderHistoryComponent implements OnInit {
   private readonly rideService   = inject(RideService);
   private readonly parcelService = inject(ParcelService);
+  private readonly toast         = inject(ToastService);
 
   protected readonly tab   = signal<TabType>('rides');
   protected readonly loading = signal(true);
@@ -300,6 +346,9 @@ export class RiderHistoryComponent implements OnInit {
   protected readonly rides          = signal<Ride[]>([]);
   protected readonly ridePage       = signal(1);
   protected readonly rideTotalPages = signal(1);
+
+  private readonly passengerStars      = signal<Record<string, number>>({});
+  private readonly passengerSubmitting = signal<Record<string, boolean>>({});
 
   protected readonly parcels          = signal<Parcel[]>([]);
   protected readonly parcelPage       = signal(1);
@@ -332,4 +381,36 @@ export class RiderHistoryComponent implements OnInit {
   protected nextRidePage(): void { this.ridePage.update((p) => p + 1); void this.loadRides(); }
   protected prevParcelPage(): void { this.parcelPage.update((p) => p - 1); void this.loadParcels(); }
   protected nextParcelPage(): void { this.parcelPage.update((p) => p + 1); void this.loadParcels(); }
+
+  protected passengerStarFor(rideId: string): number {
+    return this.passengerStars()[rideId] ?? 0;
+  }
+
+  protected passengerSubmittingFor(rideId: string): boolean {
+    return this.passengerSubmitting()[rideId] ?? false;
+  }
+
+  protected pickPassengerStar(rideId: string, star: number): void {
+    this.passengerStars.update((m) => ({ ...m, [rideId]: star }));
+  }
+
+  protected async submitPassengerRating(rideId: string): Promise<void> {
+    const score = this.passengerStars()[rideId];
+    if (!score) {
+      this.toast.error('Choose a star rating first');
+      return;
+    }
+    this.passengerSubmitting.update((m) => ({ ...m, [rideId]: true }));
+    try {
+      await this.rideService.ratePassenger(rideId, score);
+      this.toast.success('Thanks — rating saved');
+      const res = await this.rideService.getRiderHistory(this.ridePage(), 15, 'COMPLETED');
+      this.rides.set(res.data);
+      this.rideTotalPages.set(res.totalPages);
+    } catch {
+      this.toast.error('Could not save rating');
+    } finally {
+      this.passengerSubmitting.update((m) => ({ ...m, [rideId]: false }));
+    }
+  }
 }

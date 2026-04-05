@@ -8,15 +8,29 @@ import { ParcelService } from '../../../core/services/parcel.service';
 import { TrackingService } from '../../../core/services/tracking.service';
 import { RidersApi, type RiderProfile } from '../../../core/api/riders.api';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
-import { DashboardActivityChartsComponent } from '../../../shared/components/dashboard-activity-charts/dashboard-activity-charts.component';
+import {
+  DashboardActivityChartsComponent,
+  type ActivityChartsCopy,
+} from '../../../shared/components/dashboard-activity-charts/dashboard-activity-charts.component';
 import { ToastService } from '../../../core/services/toast.service';
 import {
+  activityPointFromParcel,
+  activityPointFromRide,
   buildWeeklyChartBuckets,
   dateKeyFromDate,
   localDayKey,
   ridesAndParcelsToActivityPoints,
   type DayBucket,
 } from '../../../shared/utils/activity-buckets.util';
+
+const RIDER_CHART_COPY: ActivityChartsCopy = {
+  amount7d: '7-day earnings',
+  jobsLabel: 'Jobs completed',
+  avgLabel: 'Avg. per job',
+  rideShareLabel: 'Ride share',
+  dailyAmountTitle: 'Daily earnings',
+  dailyAmountHint: 'M-Pesa jobs use settled payment amounts and dates; cash uses trip completion.',
+};
 
 @Component({
   selector: 'app-rider-dashboard',
@@ -223,6 +237,7 @@ import {
           [chartSeries]="chartSeries()"
           [chartsLoading]="chartsLoading()"
           gradientId="riderEarnArea"
+          [copy]="riderChartCopy"
         />
       </div>
     </div>
@@ -375,6 +390,8 @@ export class RiderDashboardComponent implements OnInit, OnDestroy {
   protected readonly chartsLoading = signal(true);
   private loadStatsAttempt = 0;
 
+  protected readonly riderChartCopy = RIDER_CHART_COPY;
+
   protected readonly earningsInsight = computed(() => {
     const cur = this.chartSeries().reduce((sum, d) => sum + d.amount, 0);
     const prev = this.prevWeekEarnings();
@@ -517,10 +534,15 @@ export class RiderDashboardComponent implements OnInit, OnDestroy {
       this.completedCount.set(rideRes.total + parcelRes.total);
 
       const todayKey = dateKeyFromDate(new Date());
-      const todayRides = rideRes.data.filter((r) => localDayKey(r.completedAt ?? r.createdAt) === todayKey);
-      const todayParcels = parcelRes.data.filter((p) => localDayKey(p.deliveredAt ?? p.createdAt) === todayKey);
       const earnings =
-        todayRides.reduce((s, r) => s + r.estimatedFare, 0) + todayParcels.reduce((s, p) => s + p.deliveryFee, 0);
+        rideRes.data.reduce((s, r) => {
+          const pt = activityPointFromRide(r);
+          return localDayKey(pt.dateIso) === todayKey ? s + pt.amount : s;
+        }, 0) +
+        parcelRes.data.reduce((s, p) => {
+          const pt = activityPointFromParcel(p);
+          return localDayKey(pt.dateIso) === todayKey ? s + pt.amount : s;
+        }, 0);
       this.todayEarnings.set(earnings);
 
       const points = ridesAndParcelsToActivityPoints(rideRes.data, parcelRes.data);

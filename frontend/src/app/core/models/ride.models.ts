@@ -57,6 +57,8 @@ export interface Ride {
   completedAt: string | null;
   payment?: RidePayment | null;
   rating?: { score: number } | null;
+  /** Score the assigned rider gave you on this trip (if any). */
+  passengerRating?: { score: number; comment?: string | null } | null;
 }
 
 export interface CreateRideDto {

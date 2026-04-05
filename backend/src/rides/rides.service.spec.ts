@@ -37,6 +37,10 @@ const mockPrisma = {
     create: jest.fn(),
     findMany: jest.fn(),
   },
+  passengerRating: {
+    create: jest.fn(),
+    findMany: jest.fn(),
+  },
 };
 
 const mockMail = {

@@ -146,6 +146,19 @@ export class RidesController {
     return this.ridesService.updateRideStatus(id, user.id, status);
   }
 
+  @Post(':id/rate-passenger')
+  @UseGuards(RolesGuard)
+  @Roles(Role.RIDER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Rate the passenger after a completed ride (rider only)' })
+  ratePassenger(
+    @Param('id') id: string,
+    @CurrentUser() user: Account,
+    @Body() dto: RateRideDto,
+  ) {
+    return this.ridesService.ratePassenger(id, user.id, dto);
+  }
+
   // ─── Shared ─────────────────────────────────────────────
 
   @Get(':id')

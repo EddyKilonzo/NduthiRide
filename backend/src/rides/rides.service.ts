@@ -7,7 +7,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { RideStatus } from '@prisma/client';
+import { PaymentMethod, PaymentStatus, RideStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -199,8 +199,11 @@ export class RidesService {
                 },
               },
             },
-            payment: { select: { status: true, amount: true } },
+            payment: {
+              select: { status: true, amount: true, completedAt: true },
+            },
             rating: { select: { score: true } },
+            passengerRating: { select: { score: true, comment: true } },
           },
         }),
         this.prisma.ride.count({ where }),
@@ -240,8 +243,11 @@ export class RidesService {
           orderBy: { createdAt: 'desc' },
           include: {
             user: { select: { fullName: true, avatarUrl: true, phone: true } },
-            payment: { select: { status: true, amount: true } },
+            payment: {
+              select: { status: true, amount: true, completedAt: true },
+            },
             rating: { select: { score: true } },
+            passengerRating: { select: { score: true, comment: true } },
           },
         }),
         this.prisma.ride.count({ where }),
@@ -333,6 +339,7 @@ export class RidesService {
           },
           payment: true,
           rating: true,
+          passengerRating: { select: { score: true, comment: true } },
         },
       });
 
@@ -490,6 +497,52 @@ export class RidesService {
         }
       }
 
+      /** Set when rider completes a cash trip — payment row + realtime clients */
+      let cashPaymentSettled: {
+        id: string;
+        amount: number;
+        completedAt: Date;
+      } | null = null;
+
+      // Cash: rider completing the ride confirms cash was collected — settle payment record
+      if (newStatus === RideStatus.COMPLETED && ride.paymentMethod === 'CASH') {
+        const existing = await this.prisma.payment.findFirst({
+          where: { rideId },
+        });
+        if (existing) {
+          if (existing.status !== PaymentStatus.COMPLETED) {
+            const p = await this.prisma.payment.update({
+              where: { id: existing.id },
+              data: {
+                status: PaymentStatus.COMPLETED,
+                completedAt: new Date(),
+                method: PaymentMethod.CASH,
+              },
+            });
+            cashPaymentSettled = {
+              id: p.id,
+              amount: p.amount,
+              completedAt: p.completedAt!,
+            };
+          }
+        } else {
+          const p = await this.prisma.payment.create({
+            data: {
+              rideId,
+              amount: ride.estimatedFare,
+              status: PaymentStatus.COMPLETED,
+              method: PaymentMethod.CASH,
+              completedAt: new Date(),
+            },
+          });
+          cashPaymentSettled = {
+            id: p.id,
+            amount: p.amount,
+            completedAt: p.completedAt!,
+          };
+        }
+      }
+
       const data: Record<string, unknown> = { status: newStatus };
       if (newStatus === RideStatus.COMPLETED) {
         data.completedAt = new Date();
@@ -510,6 +563,30 @@ export class RidesService {
         where: { id: rideId },
         data,
       });
+
+      if (cashPaymentSettled) {
+        this.trackingGateway.emitPaymentUpdate(cashPaymentSettled.id, {
+          status: 'COMPLETED',
+          amount: cashPaymentSettled.amount,
+          completedAt: cashPaymentSettled.completedAt.toISOString(),
+        });
+        this.trackingGateway.emitTripPaymentUpdate(ride.userId, {
+          kind: 'ride',
+          entityId: rideId,
+          paymentId: cashPaymentSettled.id,
+          status: 'COMPLETED',
+          mpesaReceiptNumber: null,
+          completedAt: cashPaymentSettled.completedAt.toISOString(),
+        });
+        this.trackingGateway.emitTripPaymentUpdate(accountId, {
+          kind: 'ride',
+          entityId: rideId,
+          paymentId: cashPaymentSettled.id,
+          status: 'COMPLETED',
+          mpesaReceiptNumber: null,
+          completedAt: cashPaymentSettled.completedAt.toISOString(),
+        });
+      }
 
       // Update rider's total rides count and earnings on completion
       if (newStatus === RideStatus.COMPLETED) {
@@ -743,6 +820,71 @@ export class RidesService {
       )
         throw error;
       this.logger.error(`rateRide failed: ${rideId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Allows the assigned rider to rate the passenger after a completed ride.
+   */
+  async ratePassenger(rideId: string, accountId: string, dto: RateRideDto) {
+    try {
+      const rider = await this.prisma.rider.findUnique({
+        where: { accountId },
+      });
+      if (!rider) throw new ForbiddenException('Rider profile not found');
+
+      const ride = await this.prisma.ride.findUnique({
+        where: { id: rideId },
+        include: { passengerRating: true },
+      });
+
+      if (!ride) throw new NotFoundException('Ride not found');
+      if (ride.riderId !== rider.id) {
+        throw new ForbiddenException('Access denied');
+      }
+      if (ride.status !== RideStatus.COMPLETED) {
+        throw new BadRequestException(
+          'You can only rate passengers after the ride is completed',
+        );
+      }
+      if (ride.passengerRating) {
+        throw new BadRequestException('You have already rated this passenger');
+      }
+
+      await this.prisma.passengerRating.create({
+        data: {
+          rideId,
+          riderId: rider.id,
+          passengerAccountId: ride.userId,
+          score: dto.score,
+          comment: dto.comment,
+        },
+      });
+
+      const allScores = await this.prisma.passengerRating.findMany({
+        where: { passengerAccountId: ride.userId },
+        select: { score: true },
+      });
+      const average =
+        allScores.reduce((sum, r) => sum + r.score, 0) / allScores.length;
+
+      await this.prisma.account.update({
+        where: { id: ride.userId },
+        data: {
+          passengerRatingAverage: parseFloat(average.toFixed(1)),
+        },
+      });
+
+      return { score: dto.score };
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      )
+        throw error;
+      this.logger.error(`ratePassenger failed: ${rideId}`, error);
       throw error;
     }
   }

@@ -93,4 +93,12 @@ export class RideService {
       throw error;
     }
   }
+
+  async ratePassenger(id: string, score: number, comment?: string): Promise<void> {
+    try {
+      return await this.api.ratePassenger(id, score, comment);
+    } catch (error) {
+      throw error;
+    }
+  }
 }

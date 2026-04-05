@@ -21,6 +21,7 @@ const USER_CHART_COPY = {
   avgLabel: 'Avg. per booking',
   rideShareLabel: 'Ride share',
   dailyAmountTitle: 'Daily spend',
+  dailyAmountHint: 'M-Pesa trips use the paid amount and payment date; cash uses trip completion.',
 } as const;
 
 @Component({

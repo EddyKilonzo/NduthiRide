@@ -60,22 +60,53 @@ export function buildWeeklyChartBuckets(points: ActivityPoint[]): {
   return { current, prevWeekTotal };
 }
 
-/** Use completion/delivery timestamps when present so charts reflect real activity dates. */
-export function ridesAndParcelsToActivityPoints(rides: Ride[], parcels: Parcel[]): ActivityPoint[] {
-  const out: ActivityPoint[] = [];
-  for (const r of rides) {
-    out.push({
-      dateIso: r.completedAt ?? r.createdAt,
+/**
+ * One chart point for a ride. Uses completed M-Pesa payment amount + `completedAt` when present
+ * so dashboard charts match actual settlements; otherwise fare + trip completion time.
+ */
+export function activityPointFromRide(r: Ride): ActivityPoint {
+  const mpesaPaid =
+    r.paymentMethod === 'MPESA' &&
+    r.payment?.status === 'COMPLETED' &&
+    typeof r.payment.amount === 'number';
+  if (mpesaPaid) {
+    return {
+      dateIso: r.payment!.completedAt ?? r.completedAt ?? r.createdAt,
       kind: 'ride',
-      amount: r.estimatedFare,
-    });
+      amount: r.payment!.amount,
+    };
   }
-  for (const p of parcels) {
-    out.push({
-      dateIso: p.deliveredAt ?? p.createdAt,
+  return {
+    dateIso: r.completedAt ?? r.createdAt,
+    kind: 'ride',
+    amount: r.finalFare ?? r.estimatedFare,
+  };
+}
+
+/** Same as {@link activityPointFromRide} for parcel deliveries. */
+export function activityPointFromParcel(p: Parcel): ActivityPoint {
+  const mpesaPaid =
+    p.paymentMethod === 'MPESA' &&
+    p.payment?.status === 'COMPLETED' &&
+    typeof p.payment.amount === 'number';
+  if (mpesaPaid) {
+    return {
+      dateIso: p.payment!.completedAt ?? p.deliveredAt ?? p.createdAt,
       kind: 'parcel',
-      amount: p.deliveryFee,
-    });
+      amount: p.payment!.amount,
+    };
   }
-  return out;
+  return {
+    dateIso: p.deliveredAt ?? p.createdAt,
+    kind: 'parcel',
+    amount: p.deliveryFee,
+  };
+}
+
+/** Builds chart points from completed / delivered history lists. */
+export function ridesAndParcelsToActivityPoints(rides: Ride[], parcels: Parcel[]): ActivityPoint[] {
+  return [
+    ...rides.map((r) => activityPointFromRide(r)),
+    ...parcels.map((p) => activityPointFromParcel(p)),
+  ];
 }

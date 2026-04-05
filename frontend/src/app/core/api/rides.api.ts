@@ -61,4 +61,8 @@ export class RidesApi extends BaseApiService {
   async rate(id: string, score: number, comment?: string): Promise<void> {
     return this.post<void>(`${this.path}/${id}/rate`, { score, comment });
   }
+
+  async ratePassenger(id: string, score: number, comment?: string): Promise<void> {
+    return this.post<void>(`${this.path}/${id}/rate-passenger`, { score, comment });
+  }
 }
