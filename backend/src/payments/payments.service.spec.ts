@@ -379,6 +379,56 @@ describe('PaymentsService', () => {
       );
     });
 
+    it('marks COMPLETED on payment.success when data.status is processing (not stuck in pending branch)', async () => {
+      mockPrisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-1',
+        status: PaymentStatus.PROCESSING,
+      });
+      mockPrisma.payment.update.mockResolvedValue({});
+      mockWebhookService.parseWebhookPayload.mockReturnValue(
+        buildWebhookPayload('payment.success', 'processing'),
+      );
+
+      await service.handleLipanaWebhook(
+        Buffer.from(JSON.stringify({})),
+        'valid-signature',
+        buildWebhookPayload('payment.success', 'processing'),
+      );
+
+      expect(mockPrisma.payment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: PaymentStatus.COMPLETED,
+          }) as unknown,
+        }),
+      );
+    });
+
+    it('normalizes payment_success event name to payment.success', async () => {
+      mockPrisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-1',
+        status: PaymentStatus.PROCESSING,
+      });
+      mockPrisma.payment.update.mockResolvedValue({});
+      mockWebhookService.parseWebhookPayload.mockReturnValue(
+        buildWebhookPayload('payment_success', 'success'),
+      );
+
+      await service.handleLipanaWebhook(
+        Buffer.from(JSON.stringify({})),
+        'valid-signature',
+        buildWebhookPayload('payment_success', 'success'),
+      );
+
+      expect(mockPrisma.payment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: PaymentStatus.COMPLETED,
+          }) as unknown,
+        }),
+      );
+    });
+
     it('does not mark COMPLETED on transaction.success (STK dispatch, not customer paid)', async () => {
       mockPrisma.payment.findFirst.mockResolvedValue({
         id: 'pay-1',

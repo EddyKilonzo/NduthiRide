@@ -251,6 +251,18 @@ const ACTIVE_PARCEL_PAYMENT_STATUSES: ParcelStatus[] = [
                     }
                     @if (p.status === 'PROCESSING') {
                       <p class="payment-hint">Check your phone for the M-Pesa prompt. It may take up to 30 seconds to arrive.</p>
+                      <button
+                        type="button"
+                        class="btn btn--ghost btn--full"
+                        style="margin-top:10px"
+                        (click)="refreshMpesaPaymentStatus()"
+                        [disabled]="refreshingPaymentStatus()">
+                        @if (refreshingPaymentStatus()) {
+                          <app-spinner [size]="16" /> Checking…
+                        } @else {
+                          <lucide-icon name="rotate-cw" [size]="16"></lucide-icon> Already paid? Refresh status
+                        }
+                      </button>
                     }
                   </div>
                 </div>
@@ -525,6 +537,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
 
   protected readonly payment          = signal<RidePayment | null>(null);
   protected readonly payingNow        = signal(false);
+  protected readonly refreshingPaymentStatus = signal(false);
   protected readonly receiptDownloading = signal(false);
   /** Becomes true after the 30-second grace window while STK push is in-flight. */
   protected readonly showResendOption = signal(false);
@@ -841,6 +854,27 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
     }
     if (this.tripPaymentListening) {
       this.trackingService.offTripPayment(this.tripPaymentHandler);
+    }
+  }
+
+  protected async refreshMpesaPaymentStatus(): Promise<void> {
+    const parcel = this.parcel();
+    if (!parcel || parcel.paymentMethod !== 'MPESA') return;
+    this.refreshingPaymentStatus.set(true);
+    try {
+      const fresh = await this.parcelService.getById(parcel.id);
+      this.parcel.set(fresh);
+      const pay = fresh.payment as RidePayment | undefined;
+      if (!pay) return;
+      if (pay.status === 'COMPLETED' || pay.status === 'FAILED') {
+        this.reconcileMpesaTerminalFromServer(pay.status);
+      } else {
+        this.payment.set(pay);
+      }
+    } catch {
+      this.toast.error('Could not refresh status. Check your connection.');
+    } finally {
+      this.refreshingPaymentStatus.set(false);
     }
   }
 

@@ -649,24 +649,38 @@ export class PaymentsService implements OnModuleInit {
         return;
       }
 
-      const ev = event.trim().toLowerCase();
+      // Normalize event labels (dashboard / proxies may use spaces or underscores).
+      const ev = event
+        .trim()
+        .toLowerCase()
+        .replace(/_/g, '.')
+        .replace(/\s+/g, '.')
+        .replace(/\.+/g, '.');
       const st = status.trim().toLowerCase();
 
       // 7. Update payment status based on webhook event.
       //
-      // IMPORTANT: `data.status === "success"` is NOT sufficient — Lipana may send that when
-      // the STK request was accepted while `event` is still `payment.pending`. Only mark
-      // COMPLETED on explicit settlement events. `payment.pending` must be handled before
-      // success so we never complete early on pending + success-shaped payloads.
+      // IMPORTANT: `data.status === "success"` is NOT sufficient when `event` is still
+      // `payment.pending`. But `st === "processing"` MUST NOT force pending for
+      // `payment.success` — some gateways send payment.success with status "processing"
+      // after the customer pays, and we would never mark COMPLETED (UI stuck forever).
       const isFailed = ev === 'payment.failed' || st === 'failed';
       const isPending =
-        ev === 'payment.pending' || st === 'pending' || st === 'processing';
-      // Lipana documents only payment.success / .failed / .pending for money movement.
-      // transaction.success (SDK samples) and payment.completed have been observed to
-      // correlate with STK dispatch, not customer confirmation — do not mark paid on those.
+        ev === 'payment.pending' ||
+        (st === 'pending' && ev !== 'payment.success' && ev !== 'payment.failed');
+      // Lipana documents payment.success for settlement. Accept common status strings;
+      // `processing` here means "success path" labeling from the provider, not STK dispatch.
+      const settlementStatuses = new Set([
+        'success',
+        'completed',
+        'successful',
+        'paid',
+        'succeeded',
+        'complete',
+        'processing',
+      ]);
       const isSettled =
-        ev === 'payment.success' &&
-        (st === 'success' || st === 'completed' || st === 'successful');
+        ev === 'payment.success' && !isFailed && settlementStatuses.has(st);
 
       if (isFailed) {
         const updatedPayment = await this.prisma.payment.update({
