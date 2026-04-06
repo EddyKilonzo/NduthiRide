@@ -606,6 +606,9 @@ export class RideDetailComponent implements OnInit, OnDestroy {
   private locationCb: (() => void) | null = null;
   private tripPaymentListening = false;
   private paymentPollGeneration = 0;
+  /** When sockets return 504, periodic GET ride still picks up webhook-confirmed payment. */
+  private mpesaProcessingSyncTimer: ReturnType<typeof setInterval> | null = null;
+  private static readonly MPESA_PROCESSING_SYNC_MS = 7_000;
 
   private readonly tripPaymentHandler = (d: TripPaymentPayload) => {
     const r = this.ride();
@@ -654,6 +657,50 @@ export class RideDetailComponent implements OnInit, OnDestroy {
         pay.completedAt ?? null,
       );
     });
+  }
+
+  private clearMpesaProcessingHttpSync(): void {
+    if (this.mpesaProcessingSyncTimer !== null) {
+      clearInterval(this.mpesaProcessingSyncTimer);
+      this.mpesaProcessingSyncTimer = null;
+    }
+  }
+
+  /** Runs while M-Pesa is PROCESSING — does not rely on Socket.IO (Render timeouts). */
+  private startMpesaProcessingHttpSync(): void {
+    const r = this.ride();
+    const p = this.payment();
+    if (!r || !p || r.paymentMethod !== 'MPESA' || p.status !== 'PROCESSING') return;
+    this.clearMpesaProcessingHttpSync();
+    this.mpesaProcessingSyncTimer = setInterval(() => {
+      void this.tickMpesaProcessingHttpSync();
+    }, RideDetailComponent.MPESA_PROCESSING_SYNC_MS);
+  }
+
+  private async tickMpesaProcessingHttpSync(): Promise<void> {
+    const r = this.ride();
+    const p = this.payment();
+    if (!r || !p || r.paymentMethod !== 'MPESA' || p.status !== 'PROCESSING') {
+      this.clearMpesaProcessingHttpSync();
+      return;
+    }
+    try {
+      const fresh = await this.rideService.getById(r.id);
+      this.ride.set(fresh);
+      const fp = fresh.payment as RidePayment | undefined;
+      if (!fp) return;
+      this.payment.set(fp);
+      if (fp.status === 'COMPLETED' || fp.status === 'FAILED') {
+        this.clearMpesaProcessingHttpSync();
+        this.applyPaymentTerminal(
+          fp.status,
+          fp.mpesaReceiptNumber,
+          fp.completedAt ?? null,
+        );
+      }
+    } catch {
+      /* e.g. 504 — try again on next interval */
+    }
   }
 
   protected readonly pickupPoint = computed<RouteMapPoint | null>(() => {
@@ -868,6 +915,9 @@ export class RideDetailComponent implements OnInit, OnDestroy {
       if (r.payment?.status === 'PROCESSING') {
         this.trackingService.connect();
         this.subscribePaymentSocket(r.payment.id);
+        if (r.paymentMethod === 'MPESA') {
+          this.startMpesaProcessingHttpSync();
+        }
         if (r.payment.checkoutRequestId) {
           void this.startPaymentPollFallback(r.payment.checkoutRequestId);
         } else {
@@ -890,6 +940,7 @@ export class RideDetailComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.clearMpesaProcessingHttpSync();
     this.clearResendGrace();
     this.clearFailedDelay();
     this.clearRideStatusPoll();
@@ -946,6 +997,7 @@ export class RideDetailComponent implements OnInit, OnDestroy {
       this.startResendGrace();
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
+      this.startMpesaProcessingHttpSync();
       // Always poll by ID — works whether checkoutRequestId is populated or not
       void this.startPaymentPollFallbackById(result.paymentId);
     } catch (err) {
@@ -962,6 +1014,7 @@ export class RideDetailComponent implements OnInit, OnDestroy {
             this.startResendGrace();
             this.trackingService.connect();
             this.subscribePaymentSocket(pay.id);
+            this.startMpesaProcessingHttpSync();
             void this.startPaymentPollFallbackById(pay.id);
           } else {
             this.toast.error('Could not initiate payment. Try again.');
@@ -1016,6 +1069,7 @@ export class RideDetailComponent implements OnInit, OnDestroy {
       this.startResendGrace();
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
+      this.startMpesaProcessingHttpSync();
       // Always poll by ID — works whether checkoutRequestId is populated or not
       void this.startPaymentPollFallbackById(result.paymentId);
     } catch (err) {
@@ -1032,6 +1086,7 @@ export class RideDetailComponent implements OnInit, OnDestroy {
         this.startResendGrace();
         this.trackingService.connect();
         this.subscribePaymentSocket(p.id);
+        this.startMpesaProcessingHttpSync();
         void this.startPaymentPollFallbackById(p.id);
       } else {
         this.toast.error('Could not resend payment prompt. Try again.');

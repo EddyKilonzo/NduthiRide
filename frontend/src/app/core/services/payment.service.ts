@@ -220,7 +220,7 @@ export class PaymentService {
       }
 
       let attempts = 0;
-      const maxAttempts = 30; // ~120 seconds (30 * 4s) — extra buffer for slow M-Pesa
+      const maxAttempts = 60; // ~240s — Render cold starts / 504 retries during STK
       const pollIntervalMs = 4000;
 
       while (attempts < maxAttempts) {
@@ -249,7 +249,7 @@ export class PaymentService {
       }
 
       throw new Error(
-        'Payment polling timed out after 120 seconds. Please check your M-Pesa messages or contact support.'
+        'Payment polling timed out after several minutes. Please check your M-Pesa messages or contact support.'
       );
     } catch (error) {
       throw error;
@@ -271,7 +271,7 @@ export class PaymentService {
     if (!paymentId) throw new Error('paymentId is required for polling');
 
     let attempts = 0;
-    const maxAttempts = 30; // ~120 seconds
+    const maxAttempts = 60; // ~240s — tolerate Render 504s while M-Pesa completes
     const pollIntervalMs = 4000;
 
     while (attempts < maxAttempts) {
@@ -301,7 +301,7 @@ export class PaymentService {
     }
 
     throw new Error(
-      'Payment polling timed out after 120 seconds. Please check your M-Pesa messages or contact support.'
+      'Payment polling timed out after several minutes. Please check your M-Pesa messages or contact support.'
     );
   }
 

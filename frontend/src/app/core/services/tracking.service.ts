@@ -26,6 +26,9 @@ export class TrackingService implements OnDestroy {
   private readonly auth = inject(AuthService);
   private socket: Socket | null = null;
 
+  /** Last payment room — re-subscribe after reconnect (Render 504 / cold start drops emits). */
+  private subscribedPaymentId: string | null = null;
+
   readonly riderLocation = signal<RiderLocation | null>(null);
   readonly riderOnline   = signal<boolean>(false);
 
@@ -35,6 +38,16 @@ export class TrackingService implements OnDestroy {
     try {
       if (this.socket?.connected) return;
 
+      // Replace a stale half-open socket (common after 504 / server sleep) so we can reconnect.
+      if (this.socket) {
+        try {
+          this.socket.disconnect();
+        } catch {
+          /* ignore */
+        }
+        this.socket = null;
+      }
+
       this.socket = io(`${environment.wsUrl}/tracking`, {
         auth: { token: this.auth.getAccessToken() ?? '' },
         // Start with polling so the connection is established even when
@@ -43,10 +56,18 @@ export class TrackingService implements OnDestroy {
         transports: ['polling', 'websocket'],
         upgrade: true,
         reconnection: true,
-        reconnectionAttempts: 10,
+        reconnectionAttempts: 15,
         reconnectionDelay: 2000,
         reconnectionDelayMax: 30_000,
         timeout: 45_000,
+      });
+
+      this.socket.on('connect', () => {
+        if (this.subscribedPaymentId) {
+          this.socket?.emit('payment:subscribe', {
+            paymentId: this.subscribedPaymentId,
+          });
+        }
       });
 
       this.socket.on('connect_error', (err) => {
@@ -59,6 +80,7 @@ export class TrackingService implements OnDestroy {
 
   disconnect(): void {
     try {
+      this.subscribedPaymentId = null;
       this.socket?.disconnect();
       this.socket = null;
     } catch (error) {
@@ -118,10 +140,14 @@ export class TrackingService implements OnDestroy {
   // ─── Payment status updates ──────────────────────────────────
 
   subscribeToPayment(paymentId: string): void {
+    this.subscribedPaymentId = paymentId;
     this.socket?.emit('payment:subscribe', { paymentId });
   }
 
   unsubscribeFromPayment(paymentId: string): void {
+    if (this.subscribedPaymentId === paymentId) {
+      this.subscribedPaymentId = null;
+    }
     this.socket?.emit('payment:unsubscribe', { paymentId });
   }
 

@@ -543,6 +543,8 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
   private paymentUpdateCb: ((d: unknown) => void) | null = null;
   private tripPaymentListening = false;
   private paymentPollGeneration = 0;
+  private mpesaProcessingSyncTimer: ReturnType<typeof setInterval> | null = null;
+  private static readonly MPESA_PROCESSING_SYNC_MS = 7_000;
 
   protected readonly paymentSuccessKind = computed(():
     | 'mpesa-mid'
@@ -663,6 +665,51 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  private clearMpesaProcessingHttpSync(): void {
+    if (this.mpesaProcessingSyncTimer !== null) {
+      clearInterval(this.mpesaProcessingSyncTimer);
+      this.mpesaProcessingSyncTimer = null;
+    }
+  }
+
+  private startMpesaProcessingHttpSync(): void {
+    const parcel = this.parcel();
+    const p = this.payment();
+    if (!parcel || !p || parcel.paymentMethod !== 'MPESA' || p.status !== 'PROCESSING') {
+      return;
+    }
+    this.clearMpesaProcessingHttpSync();
+    this.mpesaProcessingSyncTimer = setInterval(() => {
+      void this.tickMpesaProcessingHttpSync();
+    }, ParcelDetailComponent.MPESA_PROCESSING_SYNC_MS);
+  }
+
+  private async tickMpesaProcessingHttpSync(): Promise<void> {
+    const parcel = this.parcel();
+    const p = this.payment();
+    if (!parcel || !p || parcel.paymentMethod !== 'MPESA' || p.status !== 'PROCESSING') {
+      this.clearMpesaProcessingHttpSync();
+      return;
+    }
+    try {
+      const fresh = await this.parcelService.getById(parcel.id);
+      this.parcel.set(fresh);
+      const fp = fresh.payment as RidePayment | undefined;
+      if (!fp) return;
+      this.payment.set(fp);
+      if (fp.status === 'COMPLETED' || fp.status === 'FAILED') {
+        this.clearMpesaProcessingHttpSync();
+        this.applyPaymentTerminal(
+          fp.status,
+          fp.mpesaReceiptNumber,
+          fp.completedAt ?? null,
+        );
+      }
+    } catch {
+      /* e.g. 504 */
+    }
+  }
+
   protected canPay(): boolean {
     const p = this.parcel();
     return !!p && p.paymentMethod === 'MPESA' && !this.payment()
@@ -755,6 +802,9 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       if (p.payment?.status === 'PROCESSING') {
         this.trackingService.connect();
         this.subscribePaymentSocket(p.payment.id);
+        if (p.paymentMethod === 'MPESA') {
+          this.startMpesaProcessingHttpSync();
+        }
         if (p.payment.checkoutRequestId) {
           void this.startPaymentPollFallback(p.payment.checkoutRequestId);
         } else {
@@ -778,6 +828,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.clearMpesaProcessingHttpSync();
     this.clearResendGrace();
     this.clearFailedDelay();
     this.clearParcelStatusPoll();
@@ -830,6 +881,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       this.startResendGrace();
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
+      this.startMpesaProcessingHttpSync();
       // Always poll by ID — works whether checkoutRequestId is populated or not
       void this.startPaymentPollFallbackById(result.paymentId);
     } catch (err) {
@@ -845,6 +897,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
             this.startResendGrace();
             this.trackingService.connect();
             this.subscribePaymentSocket(pay.id);
+            this.startMpesaProcessingHttpSync();
             void this.startPaymentPollFallbackById(pay.id);
           } else {
             this.toast.error('Could not initiate payment. Try again.');
@@ -899,6 +952,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       this.startResendGrace();
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
+      this.startMpesaProcessingHttpSync();
       // Always poll by ID — works whether checkoutRequestId is populated or not
       void this.startPaymentPollFallbackById(result.paymentId);
     } catch (err) {
@@ -913,6 +967,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
         this.startResendGrace();
         this.trackingService.connect();
         this.subscribePaymentSocket(p.id);
+        this.startMpesaProcessingHttpSync();
         void this.startPaymentPollFallbackById(p.id);
       } else {
         this.toast.error('Could not resend payment prompt. Try again.');
