@@ -222,6 +222,56 @@ describe('PaymentsService', () => {
       });
     });
 
+    it('accepts Lipana STK envelope with nested data object', async () => {
+      mockPrisma.ride.findUnique.mockResolvedValue({
+        id: 'ride-1',
+        userId,
+        estimatedFare: 100,
+      });
+      mockPrisma.payment.create.mockResolvedValue({ id: 'pay-1' });
+      mockPrisma.payment.update.mockResolvedValue({});
+
+      mockLipanaInstance.transactions.initiateStkPush.mockResolvedValue({
+        success: true,
+        message: 'STK push initiated',
+        data: {
+          transactionId: 'TXN_NESTED',
+          checkoutRequestID: 'ws_CO_NESTED',
+        },
+      });
+
+      const result = await service.initiatePayment(userId, rideDto);
+
+      expect(result.checkoutRequestId).toBe('ws_CO_NESTED');
+      expect(mockPrisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'pay-1' },
+        data: {
+          checkoutRequestId: 'ws_CO_NESTED',
+          mpesaReceiptNumber: 'TXN_NESTED',
+        },
+      });
+    });
+
+    it('accepts STK response using id as transactionId when transactionId absent', async () => {
+      mockPrisma.ride.findUnique.mockResolvedValue({
+        id: 'ride-1',
+        userId,
+        estimatedFare: 100,
+      });
+      mockPrisma.payment.create.mockResolvedValue({ id: 'pay-1' });
+      mockPrisma.payment.update.mockResolvedValue({});
+
+      mockLipanaInstance.transactions.initiateStkPush.mockResolvedValue({
+        id: 'txn_only_id',
+        checkoutRequestID: 'ws_CO_456',
+      });
+
+      const result = await service.initiatePayment(userId, rideDto);
+
+      expect(result.transactionId).toBe('txn_only_id');
+      expect(result.checkoutRequestId).toBe('ws_CO_456');
+    });
+
     it('throws InternalServerErrorException when Lipana STK push fails', async () => {
       mockPrisma.ride.findUnique.mockResolvedValue({
         id: 'ride-1',

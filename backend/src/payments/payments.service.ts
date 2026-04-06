@@ -94,30 +94,90 @@ export class PaymentsService implements OnModuleInit {
   }
 
   /**
-   * Lipana (and SDK unwrapping) may return checkoutRequestID or checkoutRequestId.
-   * Missing normalization caused 500 after STK had already been sent to the handset.
+   * Lipana POST /transactions/push-stk may return:
+   * - Flat object, or { data: { transactionId, checkoutRequestID } } (SDK sometimes returns full envelope)
+   * - checkoutRequestID vs checkoutRequestId; Safaricom-style MerchantRequestID
+   * - transactionId optional in rare shapes — duplicate checkout id for correlation until webhook fills receipt
    */
+  private unwrapStkResponsePayload(raw: unknown): Record<string, unknown> | null {
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+    const top = raw as Record<string, unknown>;
+    const nested = top.data;
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+      const d = nested as Record<string, unknown>;
+      if (
+        typeof d.transactionId === 'string' ||
+        typeof d.id === 'string' ||
+        typeof d.checkoutRequestID === 'string' ||
+        typeof d.checkoutRequestId === 'string'
+      ) {
+        return d;
+      }
+    }
+    return top;
+  }
+
   private normalizeStkInitResponse(raw: unknown): {
     transactionId: string;
     checkoutRequestId: string;
   } | null {
-    if (!raw || typeof raw !== 'object') {
+    const r = this.unwrapStkResponsePayload(raw);
+    if (!r) {
       return null;
     }
-    const r = raw as Record<string, unknown>;
-    const checkoutRaw =
-      r.checkoutRequestID ??
-      r.checkoutRequestId ??
-      r.checkout_request_id;
-    const transactionRaw = r.transactionId ?? r.transaction_id;
-    const checkoutRequestId =
-      typeof checkoutRaw === 'string' ? checkoutRaw.trim() : '';
-    const transactionId =
-      typeof transactionRaw === 'string' ? transactionRaw.trim() : '';
-    if (!checkoutRequestId || !transactionId) {
+
+    const nestedTxn =
+      r.transaction && typeof r.transaction === 'object'
+        ? (r.transaction as Record<string, unknown>)
+        : null;
+
+    const pickStr = (...vals: unknown[]): string => {
+      for (const v of vals) {
+        if (typeof v === 'string' && v.trim()) {
+          return v.trim();
+        }
+        if (typeof v === 'number' && Number.isFinite(v)) {
+          return String(v);
+        }
+      }
+      return '';
+    };
+
+    const checkoutRequestId = pickStr(
+      r.checkoutRequestID,
+      r.checkoutRequestId,
+      r.checkout_request_id,
+      r.CheckoutRequestID,
+      r.MerchantRequestID,
+      r.merchantRequestID,
+      r.MerchantRequestId,
+    );
+
+    const transactionId = pickStr(
+      r.transactionId,
+      r.transaction_id,
+      r.TransactionID,
+      r.id,
+      nestedTxn?.transactionId,
+      nestedTxn?.id,
+    );
+
+    let co = checkoutRequestId;
+    let tx = transactionId;
+
+    if (!co && tx) {
+      co = tx;
+    }
+    if (!tx && co) {
+      tx = co;
+    }
+
+    if (!co || !tx) {
       return null;
     }
-    return { transactionId, checkoutRequestId };
+    return { transactionId: tx, checkoutRequestId: co };
   }
 
   /**
