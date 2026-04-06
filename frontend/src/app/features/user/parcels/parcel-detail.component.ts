@@ -1,4 +1,5 @@
 import { Component, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -756,9 +757,8 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       this.startResendGrace();
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
-      if (result.checkoutRequestId) {
-        void this.startPaymentPollFallback(result.checkoutRequestId);
-      }
+      // Always poll by ID — works whether checkoutRequestId is populated or not
+      void this.startPaymentPollFallbackById(result.paymentId);
     } catch {
       this.toast.error('Could not initiate payment. Try again.');
     } finally {
@@ -796,11 +796,24 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       this.startResendGrace();
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
-      if (result.checkoutRequestId) {
-        void this.startPaymentPollFallback(result.checkoutRequestId);
+      // Always poll by ID — works whether checkoutRequestId is populated or not
+      void this.startPaymentPollFallbackById(result.paymentId);
+    } catch (err) {
+      const isServerError = err instanceof HttpErrorResponse && err.status >= 500;
+      if (isServerError) {
+        // STK push may still be in-flight despite the server error.
+        this.payment.update(prev => prev
+          ? { ...prev, status: 'PROCESSING', checkoutRequestId: null, mpesaReceiptNumber: null }
+          : prev,
+        );
+        this.toast.info('Check your phone — the M-Pesa prompt may have been sent.');
+        this.startResendGrace();
+        this.trackingService.connect();
+        this.subscribePaymentSocket(p.id);
+        void this.startPaymentPollFallbackById(p.id);
+      } else {
+        this.toast.error('Could not resend payment prompt. Try again.');
       }
-    } catch {
-      this.toast.error('Could not resend payment prompt. Try again.');
     } finally {
       this.payingNow.set(false);
     }
@@ -832,7 +845,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  private static readonly MIN_PROCESSING_MS = 8_000;
+  private static readonly MIN_PROCESSING_MS = 30_000;
 
   private applyPaymentTerminal(
     status: string,

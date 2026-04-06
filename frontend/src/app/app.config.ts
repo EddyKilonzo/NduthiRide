@@ -26,6 +26,11 @@ import {
   RotateCw, UserCog, FileSearch, ShieldOff, ShieldCheck, UserX, UserCheck,
   PieChart, Banknote, Gauge, ZoomIn, ImageOff, HelpCircle, ImagePlus,
   TriangleAlert, Info, Filter,
+  // Payment loading + map location icons
+  Loader, Locate,
+  // Additional confirmed icons
+  Search, CheckCheck, MessageCircle, Navigation2,
+  ArrowUpDown, Copy, ExternalLink, RefreshCw,
 } from 'lucide-angular';
 
 export const appConfig: ApplicationConfig = {
@@ -56,6 +61,9 @@ export const appConfig: ApplicationConfig = {
         RotateCw, UserCog, FileSearch, ShieldOff, ShieldCheck, UserX, UserCheck,
         PieChart, Banknote, Gauge, ZoomIn, ImageOff, HelpCircle, ImagePlus,
         TriangleAlert, Info, Filter,
+        Loader, Locate,
+        Search, CheckCheck, MessageCircle, Navigation2,
+        ArrowUpDown, Copy, ExternalLink, RefreshCw,
       }),
     },
   ]
