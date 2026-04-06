@@ -264,6 +264,10 @@ export class ChatService implements OnDestroy {
     await lastValueFrom(this.http.delete<void>(`${this.base}/messages/${messageId}`));
   }
 
+  async deleteConversation(conversationId: string): Promise<void> {
+    await lastValueFrom(this.http.delete<void>(`${this.base}/conversations/${conversationId}`));
+  }
+
   // ─── State helpers ───────────────────────────────────────────────
 
   loadHistory(messages: ChatMessage[]): void {

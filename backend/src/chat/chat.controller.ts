@@ -90,4 +90,14 @@ export class ChatController {
   ) {
     return this.chatService.deleteMessage(messageId, user.id);
   }
+
+  @Delete('conversations/:conversationId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Hide/delete a conversation from the current user\'s list' })
+  deleteConversation(
+    @Param('conversationId') conversationId: string,
+    @CurrentUser() user: Account,
+  ) {
+    return this.chatService.hideConversationForUser(conversationId, user.id);
+  }
 }

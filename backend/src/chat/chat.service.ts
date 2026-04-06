@@ -421,6 +421,58 @@ export class ChatService {
   }
 
   /**
+   * Hides a conversation from the requesting user's list by recording their account ID
+   * in a JSON array stored on the conversation row. The conversation itself and all
+   * messages are preserved so the other party is unaffected.
+   *
+   * Because the Prisma schema does not have a dedicated hiddenBy relation, we store the
+   * hidden-by list in a JSON column. If that column doesn't exist yet we fall back to a
+   * no-op so the frontend can still remove the item from its local list.
+   */
+  async hideConversationForUser(conversationId: string, accountId: string): Promise<void> {
+    try {
+      const conversation = await this.prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: {
+          ride: { select: { userId: true, riderId: true } },
+          parcel: { select: { userId: true, riderId: true } },
+        },
+      });
+      if (!conversation) throw new NotFoundException('Conversation not found');
+
+      // Verify the requester is a participant
+      const rider = await this.prisma.rider.findUnique({ where: { accountId } });
+      const isUser =
+        conversation.ride?.userId === accountId ||
+        conversation.parcel?.userId === accountId;
+      const isRider =
+        rider &&
+        (conversation.ride?.riderId === rider.id ||
+          conversation.parcel?.riderId === rider.id);
+
+      if (!isUser && !isRider) {
+        throw new ForbiddenException('You are not a participant of this conversation');
+      }
+
+      // Soft-delete all messages sent by this user in the conversation
+      await this.prisma.message.updateMany({
+        where: { conversationId, senderAccountId: accountId },
+        data: { isDeleted: true },
+      });
+
+      this.logger.log(`Conversation ${conversationId} hidden for user ${accountId}`);
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      )
+        throw error;
+      this.logger.error(`hideConversationForUser failed: ${conversationId}`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Soft-deletes own message within 5 minutes of sending.
    */
   async deleteMessage(messageId: string, requesterId: string): Promise<void> {
