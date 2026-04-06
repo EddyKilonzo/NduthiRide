@@ -633,21 +633,35 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       return;
     }
     if (d.status !== 'COMPLETED' && d.status !== 'FAILED') return;
-    this.applyPaymentTerminal(
-      d.status,
-      d.mpesaReceiptNumber,
-      d.completedAt ?? null,
-    );
-    if (d.status === 'COMPLETED') {
-      void this.parcelService.getById(parcel.id).then((fresh) => {
-        this.parcel.set(fresh);
-        if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
-        if (ACTIVE_PARCEL_PAYMENT_STATUSES.includes(fresh.status)) {
-          this.startParcelStatusPoll();
-        }
-      });
-    }
+    this.reconcileMpesaTerminalFromServer(d.status);
   };
+
+  /**
+   * M-Pesa success/failure UI only after the parcel API reflects the same payment status
+   * (persisted webhook/settlement). Used for sockets, trip payment events, and poll fallbacks.
+   */
+  private reconcileMpesaTerminalFromServer(claimedStatus: 'COMPLETED' | 'FAILED'): void {
+    const parcel = this.parcel();
+    if (!parcel || parcel.paymentMethod !== 'MPESA') return;
+    void this.parcelService.getById(parcel.id).then((fresh) => {
+      this.parcel.set(fresh);
+      const pay = fresh.payment as RidePayment | undefined;
+      if (!pay) return;
+      if (pay.status === 'COMPLETED' && claimedStatus === 'FAILED') {
+        this.payment.set(pay);
+        return;
+      }
+      if (pay.status !== claimedStatus) {
+        this.payment.set(pay);
+        return;
+      }
+      this.applyPaymentTerminal(
+        pay.status,
+        pay.mpesaReceiptNumber,
+        pay.completedAt ?? null,
+      );
+    });
+  }
 
   protected canPay(): boolean {
     const p = this.parcel();
@@ -914,7 +928,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       const res = await this.paymentService.pollStatus(checkoutRequestId);
       if (gen !== this.paymentPollGeneration) return;
       if (res.status === 'COMPLETED' || res.status === 'FAILED') {
-        this.applyPaymentTerminal(res.status, res.mpesaReceiptNumber, null);
+        this.reconcileMpesaTerminalFromServer(res.status);
       }
     } catch {
       /* timeout or network */
@@ -927,7 +941,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       const res = await this.paymentService.pollStatusById(paymentId);
       if (gen !== this.paymentPollGeneration) return;
       if (res.status === 'COMPLETED' || res.status === 'FAILED') {
-        this.applyPaymentTerminal(res.status, res.mpesaReceiptNumber, null);
+        this.reconcileMpesaTerminalFromServer(res.status);
       }
     } catch {
       /* timeout or network */
@@ -1012,7 +1026,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
     this.paymentUpdateCb = (data: unknown) => {
       const d = data as { status: string; mpesaReceiptNumber?: string | null; completedAt?: string };
       if (d.status === 'COMPLETED' || d.status === 'FAILED') {
-        this.applyPaymentTerminal(d.status, d.mpesaReceiptNumber, d.completedAt ?? null);
+        this.reconcileMpesaTerminalFromServer(d.status);
       } else {
         this.payment.update((p) =>
           p

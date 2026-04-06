@@ -194,6 +194,10 @@ describe('PaymentsService', () => {
         accountReference: expect.stringContaining('NduthiRide-ride-'),
         transactionDesc: 'Ride payment',
       });
+      expect(mockPrisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'pay-1' },
+        data: { checkoutRequestId: 'ws_CO_123' },
+      });
     });
 
     it('accepts Lipana STK response with checkoutRequestId (camelCase id)', async () => {
@@ -215,10 +219,7 @@ describe('PaymentsService', () => {
       expect(result.checkoutRequestId).toBe('ws_CO_123');
       expect(mockPrisma.payment.update).toHaveBeenCalledWith({
         where: { id: 'pay-1' },
-        data: {
-          checkoutRequestId: 'ws_CO_123',
-          mpesaReceiptNumber: 'TXN1234567890',
-        },
+        data: { checkoutRequestId: 'ws_CO_123' },
       });
     });
 
@@ -245,10 +246,7 @@ describe('PaymentsService', () => {
       expect(result.checkoutRequestId).toBe('ws_CO_NESTED');
       expect(mockPrisma.payment.update).toHaveBeenCalledWith({
         where: { id: 'pay-1' },
-        data: {
-          checkoutRequestId: 'ws_CO_NESTED',
-          mpesaReceiptNumber: 'TXN_NESTED',
-        },
+        data: { checkoutRequestId: 'ws_CO_NESTED' },
       });
     });
 
@@ -270,6 +268,10 @@ describe('PaymentsService', () => {
 
       expect(result.transactionId).toBe('txn_only_id');
       expect(result.checkoutRequestId).toBe('ws_CO_456');
+      expect(mockPrisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'pay-1' },
+        data: { checkoutRequestId: 'ws_CO_456' },
+      });
     });
 
     it('throws InternalServerErrorException when Lipana STK push fails', async () => {
@@ -375,6 +377,42 @@ describe('PaymentsService', () => {
           }) as unknown,
         }),
       );
+    });
+
+    it('does not mark COMPLETED on transaction.success (STK dispatch, not customer paid)', async () => {
+      mockPrisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-1',
+        status: PaymentStatus.PROCESSING,
+      });
+      mockWebhookService.parseWebhookPayload.mockReturnValue(
+        buildWebhookPayload('transaction.success', 'success'),
+      );
+
+      await service.handleLipanaWebhook(
+        Buffer.from(JSON.stringify({})),
+        'valid-signature',
+        buildWebhookPayload('transaction.success', 'success'),
+      );
+
+      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
+    });
+
+    it('does not mark COMPLETED on payment.completed without official payment.success event', async () => {
+      mockPrisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-1',
+        status: PaymentStatus.PROCESSING,
+      });
+      mockWebhookService.parseWebhookPayload.mockReturnValue(
+        buildWebhookPayload('payment.completed', 'success'),
+      );
+
+      await service.handleLipanaWebhook(
+        Buffer.from(JSON.stringify({})),
+        'valid-signature',
+        buildWebhookPayload('payment.completed', 'success'),
+      );
+
+      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
     });
 
     it('does not mark COMPLETED when event is payment.pending even if data.status is success', async () => {

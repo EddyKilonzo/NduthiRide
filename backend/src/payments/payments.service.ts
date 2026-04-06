@@ -217,11 +217,13 @@ export class PaymentsService implements OnModuleInit {
       );
     }
 
+    // Only persist checkout correlation ids here. Do NOT write STK transactionId into
+    // mpesaReceiptNumber — that made premature Lipana webhooks match this row by "receipt"
+    // and mark COMPLETED before the customer confirms on their handset.
     await this.prisma.payment.update({
       where: { id: paymentId },
       data: {
         checkoutRequestId: normalized.checkoutRequestId,
-        mpesaReceiptNumber: normalized.transactionId,
       },
     });
 
@@ -659,10 +661,12 @@ export class PaymentsService implements OnModuleInit {
       const isFailed = ev === 'payment.failed' || st === 'failed';
       const isPending =
         ev === 'payment.pending' || st === 'pending' || st === 'processing';
+      // Lipana documents only payment.success / .failed / .pending for money movement.
+      // transaction.success (SDK samples) and payment.completed have been observed to
+      // correlate with STK dispatch, not customer confirmation — do not mark paid on those.
       const isSettled =
-        ev === 'payment.success' ||
-        ev === 'payment.completed' ||
-        ev === 'transaction.success';
+        ev === 'payment.success' &&
+        (st === 'success' || st === 'completed' || st === 'successful');
 
       if (isFailed) {
         const updatedPayment = await this.prisma.payment.update({
@@ -705,7 +709,7 @@ export class PaymentsService implements OnModuleInit {
         this.trackingGateway.emitPaymentUpdate(payment.id, {
           status: 'PROCESSING',
         });
-      } else if (isSettled && st !== 'pending' && st !== 'processing') {
+      } else if (isSettled) {
         const mpesaReceipt =
           rawData &&
           typeof rawData.mpesaReceiptNumber === 'string' &&
