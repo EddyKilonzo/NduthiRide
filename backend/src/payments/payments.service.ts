@@ -910,16 +910,27 @@ export class PaymentsService implements OnModuleInit {
    */
   async getPaymentStatus(checkoutRequestId: string) {
     try {
-      const payment = await this.prisma.payment.findUnique({
+      const select = {
+        id: true,
+        status: true,
+        amount: true,
+        mpesaReceiptNumber: true,
+        completedAt: true,
+      } as const;
+
+      let payment = await this.prisma.payment.findUnique({
         where: { checkoutRequestId },
-        select: {
-          id: true,
-          status: true,
-          amount: true,
-          mpesaReceiptNumber: true,
-          completedAt: true,
-        },
+        select,
       });
+
+      // STK/Lipana sometimes expose a TXN id that matches mpesaReceiptNumber (receipt or txn)
+      // but not the Safaricom checkoutRequestID stored on the row — avoid 404 for pollers.
+      if (!payment) {
+        payment = await this.prisma.payment.findFirst({
+          where: { mpesaReceiptNumber: checkoutRequestId },
+          select,
+        });
+      }
 
       if (!payment) throw new NotFoundException('Payment not found');
       return payment;

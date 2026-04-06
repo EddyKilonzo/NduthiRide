@@ -578,12 +578,33 @@ describe('PaymentsService', () => {
       expect(result).toEqual(payment);
     });
 
-    it('throws NotFoundException for unknown checkoutRequestId', async () => {
+    it('throws NotFoundException when neither checkout nor mpesaReceiptNumber matches', async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(null);
+      mockPrisma.payment.findFirst.mockResolvedValue(null);
 
       await expect(service.getPaymentStatus('unknown')).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('finds payment by mpesaReceiptNumber when checkoutRequestId lookup misses', async () => {
+      const payment = {
+        id: 'pay-1',
+        status: PaymentStatus.COMPLETED,
+        amount: 100,
+        mpesaReceiptNumber: 'TXN177549301332469AE2E',
+        completedAt: new Date(),
+      };
+      mockPrisma.payment.findUnique.mockResolvedValue(null);
+      mockPrisma.payment.findFirst.mockResolvedValue(payment);
+
+      const result = await service.getPaymentStatus('TXN177549301332469AE2E');
+
+      expect(result).toEqual(payment);
+      expect(mockPrisma.payment.findFirst).toHaveBeenCalledWith({
+        where: { mpesaReceiptNumber: 'TXN177549301332469AE2E' },
+        select: expect.any(Object),
+      });
     });
   });
 });

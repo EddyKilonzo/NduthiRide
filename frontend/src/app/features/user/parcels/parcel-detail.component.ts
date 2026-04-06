@@ -818,11 +818,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
         if (p.paymentMethod === 'MPESA') {
           this.startMpesaProcessingHttpSync();
         }
-        if (p.payment.checkoutRequestId) {
-          void this.startPaymentPollFallback(p.payment.checkoutRequestId);
-        } else {
-          void this.startPaymentPollFallbackById(p.payment.id);
-        }
+        void this.startPaymentPollFallbackById(p.payment.id);
       }
 
       if (
@@ -988,11 +984,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
       this.startMpesaProcessingHttpSync();
-      if (result.checkoutRequestId) {
-        void this.startPaymentPollFallback(result.checkoutRequestId);
-      } else {
-        void this.startPaymentPollFallbackById(result.paymentId);
-      }
+      void this.startPaymentPollFallbackById(result.paymentId);
     } catch (err) {
       const isServerError = err instanceof HttpErrorResponse && err.status >= 500;
       if (isServerError) {
@@ -1007,11 +999,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
             this.trackingService.connect();
             this.subscribePaymentSocket(pay.id);
             this.startMpesaProcessingHttpSync();
-            if (pay.checkoutRequestId) {
-              void this.startPaymentPollFallback(pay.checkoutRequestId);
-            } else {
-              void this.startPaymentPollFallbackById(pay.id);
-            }
+            void this.startPaymentPollFallbackById(pay.id);
           } else {
             this.toast.error('Could not resend payment prompt. Try again.');
           }
@@ -1023,19 +1011,6 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       }
     } finally {
       this.payingNow.set(false);
-    }
-  }
-
-  private async startPaymentPollFallback(checkoutRequestId: string): Promise<void> {
-    const gen = ++this.paymentPollGeneration;
-    try {
-      const res = await this.paymentService.pollStatus(checkoutRequestId);
-      if (gen !== this.paymentPollGeneration) return;
-      if (res.status === 'COMPLETED' || res.status === 'FAILED') {
-        this.reconcileMpesaTerminalFromServer(res.status);
-      }
-    } catch {
-      /* timeout or network */
     }
   }
 

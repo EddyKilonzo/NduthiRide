@@ -923,19 +923,15 @@ export class RideDetailComponent implements OnInit, OnDestroy {
       }
 
       // Subscribe to existing payment WebSocket room.
-      // Also handle the case where checkoutRequestId is not yet set because the
-      // STK push is still being processed in the background after a timeout.
+      // Poll by payment id only — GET /payments/status/:checkoutRequestId 404s when the client
+      // still holds an old TXN after resend while the DB row has a new ws_CO checkout id.
       if (r.payment?.status === 'PROCESSING') {
         this.trackingService.connect();
         this.subscribePaymentSocket(r.payment.id);
         if (r.paymentMethod === 'MPESA') {
           this.startMpesaProcessingHttpSync();
         }
-        if (r.payment.checkoutRequestId) {
-          void this.startPaymentPollFallback(r.payment.checkoutRequestId);
-        } else {
-          void this.startPaymentPollFallbackById(r.payment.id);
-        }
+        void this.startPaymentPollFallbackById(r.payment.id);
       }
 
       if (
@@ -1106,11 +1102,7 @@ export class RideDetailComponent implements OnInit, OnDestroy {
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
       this.startMpesaProcessingHttpSync();
-      if (result.checkoutRequestId) {
-        void this.startPaymentPollFallback(result.checkoutRequestId);
-      } else {
-        void this.startPaymentPollFallbackById(result.paymentId);
-      }
+      void this.startPaymentPollFallbackById(result.paymentId);
     } catch (err) {
       const isServerError = err instanceof HttpErrorResponse && err.status >= 500;
       if (isServerError) {
@@ -1126,11 +1118,7 @@ export class RideDetailComponent implements OnInit, OnDestroy {
             this.trackingService.connect();
             this.subscribePaymentSocket(pay.id);
             this.startMpesaProcessingHttpSync();
-            if (pay.checkoutRequestId) {
-              void this.startPaymentPollFallback(pay.checkoutRequestId);
-            } else {
-              void this.startPaymentPollFallbackById(pay.id);
-            }
+            void this.startPaymentPollFallbackById(pay.id);
           } else {
             this.toast.error('Could not resend payment prompt. Try again.');
           }
@@ -1145,23 +1133,8 @@ export class RideDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** When webhook/socket is slow, polling still updates payment + refreshes ride. */
-  private async startPaymentPollFallback(checkoutRequestId: string): Promise<void> {
-    const gen = ++this.paymentPollGeneration;
-    try {
-      const res = await this.paymentService.pollStatus(checkoutRequestId);
-      if (gen !== this.paymentPollGeneration) return;
-      if (res.status === 'COMPLETED' || res.status === 'FAILED') {
-        this.reconcileMpesaTerminalFromServer(res.status);
-      }
-    } catch {
-      /* timeout or network — user can refresh */
-    }
-  }
-
   /**
-   * Fallback polling by paymentId when checkoutRequestId is not yet available
-   * (STK push timed out on Render and is still running in the background).
+   * Poll payment status by primary id (avoids 404 when checkoutRequestId in DB !== TXN client used).
    */
   private async startPaymentPollFallbackById(paymentId: string): Promise<void> {
     const gen = ++this.paymentPollGeneration;
