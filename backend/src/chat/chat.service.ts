@@ -227,7 +227,9 @@ export class ChatService {
           } : null,
           otherPartyName,
           otherPartyAvatar,
-          context: conv.ride ? `Ride: ${conv.ride.pickupAddress.slice(0, 20)}...` : `Parcel: ${conv.parcel?.itemDescription}`,
+          context: conv.ride
+            ? `${conv.ride.pickupAddress.split(',')[0]} → ${conv.ride.dropoffAddress.split(',')[0]}`
+            : `Parcel: ${(conv.parcel?.itemDescription ?? '').slice(0, 30)}`,
           rideId: conv.rideId,
           parcelId: conv.parcelId,
           unreadCount: (conv as any)._count?.messages ?? 0,

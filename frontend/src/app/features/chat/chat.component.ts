@@ -22,7 +22,9 @@ import type { ChatMessage, Conversation, ConversationPreview, MessageSenderRole 
         <aside class="chat-sidebar" [class.sidebar--hidden]="!!conversationId">
           <div class="sidebar-header">
             <h2>Messages</h2>
-            <span class="conv-count" *ngIf="conversations().length > 0">{{ conversations().length }}</span>
+            @if (conversations().length > 0) {
+              <span class="conv-count">{{ conversations().length }}</span>
+            }
           </div>
 
           <div class="conversations-list">
@@ -891,13 +893,12 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     try {
       this.loadingList.set(true);
       const list = await this.chatService.getMyConversations();
-      // Deduplicate: keep only one entry per unique other-party name (most recent)
-      const seen = new Map<string, ConversationPreview>();
-      for (const conv of list) {
-        const key = conv.otherPartyName + '|' + (conv.rideId ? 'ride' : 'parcel');
-        if (!seen.has(key)) seen.set(key, conv);
-      }
-      this.conversations.set([...seen.values()]);
+      // Sort: conversations with unread messages first, then by most recent activity
+      const sorted = [...list].sort((a, b) => {
+        if (b.unreadCount !== a.unreadCount) return b.unreadCount - a.unreadCount;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
+      this.conversations.set(sorted);
     } catch (error) {
       console.error('Failed to load chat list', error);
     } finally {
