@@ -156,6 +156,10 @@ export class PaymentsController {
    * Public endpoint — called by Lipana's servers, not the frontend.
    * Receives webhook notifications for payment status changes.
    *
+   * Configure in Lipana dashboard (exact URL, include global prefix):
+   * `https://<your-host>/api/v1/payments/lipana/webhook`
+   * Example: `https://nduthiride.onrender.com/api/v1/payments/lipana/webhook`
+   *
    * Security:
    * - Verifies X-Lipana-Signature header using HMAC-SHA256
    * - Validates payload structure

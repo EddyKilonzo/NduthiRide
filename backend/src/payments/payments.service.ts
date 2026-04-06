@@ -455,8 +455,11 @@ export class PaymentsService implements OnModuleInit {
         }
       }
       if (!signatureValid) {
-        this.logger.warn('Webhook signature verification failed — request ignored');
-        // Return 200 to prevent Lipana from retrying with the same bad request
+        this.logger.warn(
+          'Lipana webhook ignored: HMAC signature did not verify. ' +
+            'Confirm LIPANA_WEBHOOK_SECRET on Render matches the webhook secret in the Lipana dashboard (live vs sandbox).',
+        );
+        // Still return 200 so Lipana does not endlessly retry the same payload.
         return;
       }
 
@@ -477,21 +480,95 @@ export class PaymentsService implements OnModuleInit {
         `Received verified Lipana webhook: ${event} for ${transactionId}`,
       );
 
-      // 4. Find payment by Lipana / M-Pesa transaction id or checkout request id
-      const payment = await this.prisma.payment.findFirst({
+      // 4. Collect every id Lipana might send (STK txn id, checkout id, M-Pesa receipt, etc.)
+      const lookupIds = new Set<string>([transactionId]);
+      if (checkoutRequestID) lookupIds.add(checkoutRequestID);
+      const rawRoot =
+        parsedBody && typeof parsedBody === 'object'
+          ? (parsedBody as Record<string, unknown>)
+          : null;
+      const rawData =
+        rawRoot?.data && typeof rawRoot.data === 'object'
+          ? (rawRoot.data as Record<string, unknown>)
+          : null;
+      if (rawData) {
+        for (const key of [
+          'mpesaReceiptNumber',
+          'MpesaReceiptNumber',
+          'receiptNumber',
+          'receipt',
+          'checkoutRequestID',
+          'checkoutRequestId',
+          'checkout_request_id',
+        ] as const) {
+          const v = rawData[key];
+          if (typeof v === 'string' && v.trim()) lookupIds.add(v.trim());
+        }
+        const nest = rawData.transaction;
+        if (nest && typeof nest === 'object') {
+          const t = nest as Record<string, unknown>;
+          for (const v of [t.id, t.transactionId]) {
+            if (typeof v === 'string' && v.trim()) lookupIds.add(v.trim());
+          }
+        }
+      }
+      const idList = [...lookupIds].filter(Boolean);
+
+      // 5. Find payment by any known correlation id
+      let payment = await this.prisma.payment.findFirst({
         where: {
           OR: [
-            { mpesaReceiptNumber: transactionId },
-            ...(checkoutRequestID != null && checkoutRequestID !== ''
-              ? [{ checkoutRequestId: checkoutRequestID }]
-              : []),
+            { mpesaReceiptNumber: { in: idList } },
+            { checkoutRequestId: { in: idList } },
           ],
         },
       });
 
+      // STK sends accountReference NduthiRide-{ride|parcel}-{first 8 of entity id}.
+      // Lipana may use different id fields in the webhook than we stored from STK — match by that stable reference.
+      if (!payment && rawData) {
+        const acctRef =
+          typeof rawData.accountReference === 'string'
+            ? rawData.accountReference.trim()
+            : '';
+        const refMatch = acctRef.match(
+          /^NduthiRide-(ride|parcel)-([a-z0-9]{8})$/i,
+        );
+        if (refMatch) {
+          const entityKind = refMatch[1].toLowerCase();
+          const idPrefix = refMatch[2].toLowerCase();
+          if (entityKind === 'ride') {
+            payment = await this.prisma.payment.findFirst({
+              where: {
+                status: PaymentStatus.PROCESSING,
+                method: PaymentMethod.MPESA,
+                ride: { id: { startsWith: idPrefix } },
+              },
+              orderBy: { createdAt: 'desc' },
+            });
+          } else {
+            payment = await this.prisma.payment.findFirst({
+              where: {
+                status: PaymentStatus.PROCESSING,
+                method: PaymentMethod.MPESA,
+                parcel: { id: { startsWith: idPrefix } },
+              },
+              orderBy: { createdAt: 'desc' },
+            });
+          }
+          if (payment) {
+            this.logger.warn(
+              `Lipana webhook: matched payment ${payment.id} via accountReference=${acctRef}`,
+            );
+          }
+        }
+      }
+
       if (!payment) {
         this.logger.warn(
-          `Webhook received for unknown transaction: ${transactionId}`,
+          `Lipana webhook: no payment row for ids [${idList.join(
+            ', ',
+          )}] event=${event} — UI will stay on PROCESSING until ids align or this fallback can be extended`,
         );
         return;
       }
@@ -504,20 +581,38 @@ export class PaymentsService implements OnModuleInit {
         );
       }
 
-      // 5. Prevent duplicate processing
+      // 6. Prevent duplicate processing
       if (payment.status === PaymentStatus.COMPLETED) {
         this.logger.debug(`Payment ${payment.id} already completed, skipping`);
         return;
       }
 
-      // 6. Update payment status based on webhook event
-      if (event === 'payment.success' || status === 'success') {
+      const ev = event.trim().toLowerCase();
+      const st = status.trim().toLowerCase();
+
+      // 7. Update payment status based on webhook event
+      if (
+        ev === 'payment.success' ||
+        st === 'success' ||
+        st === 'completed'
+      ) {
+        const mpesaReceipt =
+          rawData &&
+          typeof rawData.mpesaReceiptNumber === 'string' &&
+          rawData.mpesaReceiptNumber.trim()
+            ? rawData.mpesaReceiptNumber.trim()
+            : rawData &&
+                typeof rawData.MpesaReceiptNumber === 'string' &&
+                rawData.MpesaReceiptNumber.trim()
+              ? rawData.MpesaReceiptNumber.trim()
+              : transactionId;
+
         const updatedPayment = await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
             status: PaymentStatus.COMPLETED,
             completedAt: new Date(),
-            mpesaReceiptNumber: transactionId,
+            mpesaReceiptNumber: mpesaReceipt,
             ...(checkoutRequestID
               ? { checkoutRequestId: checkoutRequestID }
               : {}),
@@ -561,7 +656,7 @@ export class PaymentsService implements OnModuleInit {
           payment.id,
           { transactionId, amount: payment.amount },
         );
-      } else if (event === 'payment.failed' || status === 'failed') {
+      } else if (ev === 'payment.failed' || st === 'failed') {
         const updatedPayment = await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
@@ -595,7 +690,7 @@ export class PaymentsService implements OnModuleInit {
         });
 
         this.emitTripPaymentAccountNotifications(updatedPayment, 'FAILED');
-      } else if (event === 'payment.pending' || status === 'pending') {
+      } else if (ev === 'payment.pending' || st === 'pending') {
         // Already in PROCESSING state, no update needed
         this.logger.debug(
           `Payment ${payment.id} still pending — Transaction: ${transactionId}`,

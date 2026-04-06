@@ -16,10 +16,6 @@ export class LipanaWebhookService {
   private readonly logger = new Logger(LipanaWebhookService.name);
   private readonly webhookSecret: string;
 
-  // Store processed webhook IDs to prevent replay attacks
-  private readonly processedWebhooks = new Map<string, number>();
-  private readonly REPLAY_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
-
   constructor(private readonly config: ConfigService) {
     this.webhookSecret = this.config.getOrThrow<string>('lipana.webhookSecret');
   }
@@ -87,12 +83,10 @@ export class LipanaWebhookService {
 
   /**
    * Parses and validates a Lipana webhook payload.
-   * Also checks for replay attacks using transactionId + timestamp.
    *
-   * @param body - The parsed JSON body from the webhook request
-   * @returns The validated payload with proper typing
-   *
-   * @throws BadRequestException if payload structure is invalid or replay detected
+   * Note: Do not mark webhooks as "processed" here. If payment lookup fails (e.g. ID
+   * mismatch), Lipana will retry — recording replays during parse would block retries.
+   * Idempotency is enforced in PaymentsService via payment.status === COMPLETED.
    */
   parseWebhookPayload(body: unknown): {
     event: string;
@@ -122,7 +116,16 @@ export class LipanaWebhookService {
 
     const data = payload.data as Record<string, unknown>;
 
-    if (typeof data.transactionId !== 'string' || !data.transactionId.trim()) {
+    const nestedTxn =
+      data.transaction && typeof data.transaction === 'object'
+        ? (data.transaction as Record<string, unknown>)
+        : null;
+    const transactionIdRaw =
+      data.transactionId ??
+      data.id ??
+      nestedTxn?.id ??
+      nestedTxn?.transactionId;
+    if (typeof transactionIdRaw !== 'string' || !transactionIdRaw.trim()) {
       throw new BadRequestException('Missing transactionId');
     }
 
@@ -146,69 +149,34 @@ export class LipanaWebhookService {
       throw new BadRequestException('Missing status');
     }
 
-    if (typeof data.phone !== 'string') {
-      throw new BadRequestException('Missing phone');
-    }
+    const phone =
+      typeof data.phone === 'string'
+        ? data.phone
+        : typeof data.phoneNumber === 'string'
+          ? data.phoneNumber
+          : '';
 
-    const checkoutRaw = data.checkoutRequestID ?? data.checkoutRequestId;
+    const checkoutRaw =
+      data.checkoutRequestID ??
+      data.checkoutRequestId ??
+      data.checkout_request_id;
     const checkoutRequestID =
       typeof checkoutRaw === 'string' && checkoutRaw.trim()
         ? checkoutRaw.trim()
         : undefined;
 
-    // Check for replay attacks
-    const webhookId = `${data.transactionId}:${data.timestamp || ''}`;
-    if (this.isReplayAttack(webhookId)) {
-      this.logger.warn(`Replay attack detected for webhook: ${webhookId}`);
-      throw new BadRequestException(
-        'Webhook already processed (replay attack prevented)',
-      );
-    }
-    this.recordProcessedWebhook(webhookId);
-
     return {
       event: payload.event,
       data: {
-        transactionId: data.transactionId.trim(),
+        transactionId: transactionIdRaw.trim(),
         amount,
         status: data.status,
-        phone: data.phone,
+        phone,
         checkoutRequestID,
         timestamp:
           typeof data.timestamp === 'string' ? data.timestamp : undefined,
       },
     };
-  }
-
-  /**
-   * Checks if a webhook has already been processed (replay attack prevention).
-   */
-  private isReplayAttack(webhookId: string): boolean {
-    try {
-      return this.processedWebhooks.has(webhookId);
-    } catch (error) {
-      this.logger.error('Replay attack check failed', error);
-      return false;
-    }
-  }
-
-  /**
-   * Records a processed webhook to prevent replay attacks.
-   */
-  private recordProcessedWebhook(webhookId: string): void {
-    try {
-      this.processedWebhooks.set(webhookId, Date.now());
-
-      // Cleanup old entries (older than replay window)
-      const now = Date.now();
-      for (const [id, timestamp] of this.processedWebhooks.entries()) {
-        if (now - timestamp > this.REPLAY_WINDOW_MS) {
-          this.processedWebhooks.delete(id);
-        }
-      }
-    } catch (error) {
-      this.logger.error('Failed to record processed webhook', error);
-    }
   }
 
   /**
@@ -227,21 +195,25 @@ export class LipanaWebhookService {
   }
 
   /**
-   * Validates webhook timestamp is within acceptable window (5 minutes).
-   * Prevents old webhooks from being processed.
+   * Validates webhook timestamp is within a reasonable window (24 hours).
+   * Lipana retries and clock skew made the old 5-minute window too aggressive.
    */
   isTimestampValid(timestamp?: string): boolean {
     try {
-      if (!timestamp) return true; // Skip if no timestamp provided
+      if (!timestamp) return true;
 
       const webhookTime = new Date(timestamp).getTime();
+      if (Number.isNaN(webhookTime)) {
+        this.logger.warn(`Webhook timestamp not parseable: ${timestamp}`);
+        return true;
+      }
       const now = Date.now();
-      const maxAge = 5 * 60 * 1000; // 5 minutes
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
 
       return Math.abs(now - webhookTime) <= maxAge;
     } catch (error) {
       this.logger.error('Timestamp validation failed', error);
-      return false;
+      return true;
     }
   }
 }
