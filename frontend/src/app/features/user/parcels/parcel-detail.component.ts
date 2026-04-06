@@ -927,6 +927,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
     // Drop any in-flight poll from the previous STK attempt so a late FAILED/COMPLETED
     // result cannot overwrite state after this resend starts.
     this.paymentPollGeneration++;
+    this.clearMpesaProcessingHttpSync();
     try {
       // Clean up the old socket room before subscribing to the new payment
       if (this.subscribedPaymentId) {
@@ -953,22 +954,36 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       this.trackingService.connect();
       this.subscribePaymentSocket(result.paymentId);
       this.startMpesaProcessingHttpSync();
-      // Always poll by ID — works whether checkoutRequestId is populated or not
-      void this.startPaymentPollFallbackById(result.paymentId);
+      if (result.checkoutRequestId) {
+        void this.startPaymentPollFallback(result.checkoutRequestId);
+      } else {
+        void this.startPaymentPollFallbackById(result.paymentId);
+      }
     } catch (err) {
       const isServerError = err instanceof HttpErrorResponse && err.status >= 500;
       if (isServerError) {
-        // STK push may still be in-flight despite the server error.
-        this.payment.update(prev => prev
-          ? { ...prev, status: 'PROCESSING', checkoutRequestId: null, mpesaReceiptNumber: null }
-          : prev,
-        );
-        this.toast.info('Check your phone — the M-Pesa prompt may have been sent.');
-        this.startResendGrace();
-        this.trackingService.connect();
-        this.subscribePaymentSocket(p.id);
-        this.startMpesaProcessingHttpSync();
-        void this.startPaymentPollFallbackById(p.id);
+        try {
+          const fresh = await this.parcelService.getById(parcel.id);
+          this.parcel.set(fresh);
+          const pay = fresh.payment as RidePayment | undefined;
+          if (pay?.status === 'PROCESSING') {
+            this.payment.set(pay);
+            this.toast.info('Check your phone — the M-Pesa prompt may have been sent.');
+            this.startResendGrace();
+            this.trackingService.connect();
+            this.subscribePaymentSocket(pay.id);
+            this.startMpesaProcessingHttpSync();
+            if (pay.checkoutRequestId) {
+              void this.startPaymentPollFallback(pay.checkoutRequestId);
+            } else {
+              void this.startPaymentPollFallbackById(pay.id);
+            }
+          } else {
+            this.toast.error('Could not resend payment prompt. Try again.');
+          }
+        } catch {
+          this.toast.error('Could not resend payment prompt. Try again.');
+        }
       } else {
         this.toast.error('Could not resend payment prompt. Try again.');
       }
