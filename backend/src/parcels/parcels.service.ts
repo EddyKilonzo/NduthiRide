@@ -508,14 +508,7 @@ export class ParcelsService {
           mpesaReceiptNumber: null,
           completedAt: cashPaymentSettled.completedAt.toISOString(),
         });
-        this.trackingGateway.emitTripPaymentUpdate(accountId, {
-          kind: 'parcel',
-          entityId: parcelId,
-          paymentId: cashPaymentSettled.id,
-          status: 'COMPLETED',
-          mpesaReceiptNumber: null,
-          completedAt: cashPaymentSettled.completedAt.toISOString(),
-        });
+        // Sender only — rider settled cash by marking delivered.
       }
 
       // Update rider's total earnings on delivery

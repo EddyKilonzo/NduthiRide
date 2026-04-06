@@ -196,6 +196,32 @@ describe('PaymentsService', () => {
       });
     });
 
+    it('accepts Lipana STK response with checkoutRequestId (camelCase id)', async () => {
+      mockPrisma.ride.findUnique.mockResolvedValue({
+        id: 'ride-1',
+        userId,
+        estimatedFare: 100,
+      });
+      mockPrisma.payment.create.mockResolvedValue({ id: 'pay-1' });
+      mockPrisma.payment.update.mockResolvedValue({});
+
+      mockLipanaInstance.transactions.initiateStkPush.mockResolvedValue({
+        transactionId: 'TXN1234567890',
+        checkoutRequestId: 'ws_CO_123',
+      });
+
+      const result = await service.initiatePayment(userId, rideDto);
+
+      expect(result.checkoutRequestId).toBe('ws_CO_123');
+      expect(mockPrisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'pay-1' },
+        data: {
+          checkoutRequestId: 'ws_CO_123',
+          mpesaReceiptNumber: 'TXN1234567890',
+        },
+      });
+    });
+
     it('throws InternalServerErrorException when Lipana STK push fails', async () => {
       mockPrisma.ride.findUnique.mockResolvedValue({
         id: 'ride-1',

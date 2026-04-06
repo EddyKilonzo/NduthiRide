@@ -37,7 +37,7 @@ export type RouteMapPoint = { lng: number; lat: number };
       <!-- Map controls -->
       <div class="map-controls">
         <button type="button" class="control-btn" (click)="centerOnUser()" title="Center on my location">
-          <lucide-icon name="locate" [size]="18"></lucide-icon>
+          <lucide-icon name="map-pin" [size]="18"></lucide-icon>
         </button>
       </div>
     </div>

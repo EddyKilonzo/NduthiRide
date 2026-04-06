@@ -618,6 +618,20 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
   private readonly tripPaymentHandler = (d: TripPaymentPayload) => {
     const parcel = this.parcel();
     if (!parcel || d.kind !== 'parcel' || d.entityId !== parcel.id) return;
+    if (parcel.paymentMethod === 'CASH') {
+      if (d.status !== 'COMPLETED') return;
+      void this.parcelService.getById(parcel.id).then((fresh) => {
+        this.parcel.set(fresh);
+        if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
+        if (
+          ACTIVE_PARCEL_PAYMENT_STATUSES.includes(fresh.status) &&
+          fresh.payment?.status === 'COMPLETED'
+        ) {
+          this.startParcelStatusPoll();
+        }
+      });
+      return;
+    }
     if (d.status !== 'COMPLETED' && d.status !== 'FAILED') return;
     this.applyPaymentTerminal(
       d.status,
@@ -736,7 +750,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
 
       if (
         ACTIVE_PARCEL_PAYMENT_STATUSES.includes(p.status) &&
-        p.paymentMethod === 'MPESA'
+        (p.paymentMethod === 'MPESA' || p.paymentMethod === 'CASH')
       ) {
         this.trackingService.connect();
         this.trackingService.onTripPayment(this.tripPaymentHandler);
@@ -804,8 +818,35 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       this.subscribePaymentSocket(result.paymentId);
       // Always poll by ID — works whether checkoutRequestId is populated or not
       void this.startPaymentPollFallbackById(result.paymentId);
-    } catch {
-      this.toast.error('Could not initiate payment. Try again.');
+    } catch (err) {
+      const isServerError = err instanceof HttpErrorResponse && err.status >= 500;
+      if (isServerError) {
+        try {
+          const fresh = await this.parcelService.getById(p.id);
+          this.parcel.set(fresh);
+          const pay = fresh.payment as RidePayment | undefined;
+          if (pay?.status === 'PROCESSING') {
+            this.payment.set(pay);
+            this.toast.info('Check your phone — the M-Pesa prompt may have been sent.');
+            this.startResendGrace();
+            this.trackingService.connect();
+            this.subscribePaymentSocket(pay.id);
+            void this.startPaymentPollFallbackById(pay.id);
+          } else {
+            this.toast.error('Could not initiate payment. Try again.');
+          }
+        } catch {
+          this.toast.error('Could not initiate payment. Try again.');
+        }
+      } else {
+        const msg =
+          err instanceof HttpErrorResponse &&
+          err.error &&
+          typeof err.error.message === 'string'
+            ? err.error.message
+            : null;
+        this.toast.error(msg ?? 'Could not initiate payment. Try again.');
+      }
     } finally {
       this.payingNow.set(false);
     }

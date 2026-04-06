@@ -578,14 +578,7 @@ export class RidesService {
           mpesaReceiptNumber: null,
           completedAt: cashPaymentSettled.completedAt.toISOString(),
         });
-        this.trackingGateway.emitTripPaymentUpdate(accountId, {
-          kind: 'ride',
-          entityId: rideId,
-          paymentId: cashPaymentSettled.id,
-          status: 'COMPLETED',
-          mpesaReceiptNumber: null,
-          completedAt: cashPaymentSettled.completedAt.toISOString(),
-        });
+        // Passenger only — rider triggered this by completing the trip; M-Pesa-style toast is misleading.
       }
 
       // Update rider's total rides count and earnings on completion

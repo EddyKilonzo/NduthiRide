@@ -26,8 +26,8 @@ import {
   RotateCw, UserCog, FileSearch, ShieldOff, ShieldCheck, UserX, UserCheck,
   PieChart, Banknote, Gauge, ZoomIn, ImageOff, HelpCircle, ImagePlus,
   TriangleAlert, Info, Filter,
-  // Payment loading + map location icons
-  Loader, Locate,
+  // Payment loading icon
+  Loader,
   // Additional confirmed icons
   Search, CheckCheck, MessageCircle, Navigation2,
   ArrowUpDown, Copy, ExternalLink, RefreshCw,
@@ -61,7 +61,7 @@ export const appConfig: ApplicationConfig = {
         RotateCw, UserCog, FileSearch, ShieldOff, ShieldCheck, UserX, UserCheck,
         PieChart, Banknote, Gauge, ZoomIn, ImageOff, HelpCircle, ImagePlus,
         TriangleAlert, Info, Filter,
-        Loader, Locate,
+        Loader,
         Search, CheckCheck, MessageCircle, Navigation2,
         ArrowUpDown, Copy, ExternalLink, RefreshCw,
       }),

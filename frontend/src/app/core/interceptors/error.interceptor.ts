@@ -32,6 +32,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         const isSilent =
           req.url.includes('/payments/status/') ||
           req.url.includes('/payments/status-by-id/') ||
+          req.url.includes('/payments/initiate') ||
           /\/payments\/[^/]+\/resend$/.test(req.url);
         if (isSilent) {
           return throwError(() => error);

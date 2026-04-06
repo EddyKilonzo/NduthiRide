@@ -610,6 +610,21 @@ export class RideDetailComponent implements OnInit, OnDestroy {
   private readonly tripPaymentHandler = (d: TripPaymentPayload) => {
     const r = this.ride();
     if (!r || d.kind !== 'ride' || d.entityId !== r.id) return;
+    // Cash is completed when the rider finishes the trip — no STK overlay; refresh entity state only.
+    if (r.paymentMethod === 'CASH') {
+      if (d.status !== 'COMPLETED') return;
+      void this.rideService.getById(r.id).then((fresh) => {
+        this.ride.set(fresh);
+        if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
+        if (
+          ACTIVE_STATUSES.includes(fresh.status as Ride['status']) &&
+          fresh.payment?.status === 'COMPLETED'
+        ) {
+          this.startRideStatusPoll();
+        }
+      });
+      return;
+    }
     if (d.status !== 'COMPLETED' && d.status !== 'FAILED') return;
     this.applyPaymentTerminal(
       d.status,
@@ -847,7 +862,11 @@ export class RideDetailComponent implements OnInit, OnDestroy {
         }
       }
 
-      if (r.paymentMethod === 'MPESA') {
+      if (
+        r.paymentMethod === 'MPESA' ||
+        (r.paymentMethod === 'CASH' &&
+          ACTIVE_STATUSES.includes(r.status as Ride['status']))
+      ) {
         this.trackingService.connect();
         if (!this.tripPaymentListening) {
           this.trackingService.onTripPayment(this.tripPaymentHandler);
@@ -916,8 +935,36 @@ export class RideDetailComponent implements OnInit, OnDestroy {
       this.subscribePaymentSocket(result.paymentId);
       // Always poll by ID — works whether checkoutRequestId is populated or not
       void this.startPaymentPollFallbackById(result.paymentId);
-    } catch {
-      this.toast.error('Could not initiate payment. Try again.');
+    } catch (err) {
+      const isServerError = err instanceof HttpErrorResponse && err.status >= 500;
+      if (isServerError) {
+        // Same as resend: server can return 500 after Lipana accepted STK but response parsing failed.
+        try {
+          const fresh = await this.rideService.getById(r.id);
+          this.ride.set(fresh);
+          const pay = fresh.payment as RidePayment | undefined;
+          if (pay?.status === 'PROCESSING') {
+            this.payment.set(pay);
+            this.toast.info('Check your phone — the M-Pesa prompt may have been sent.');
+            this.startResendGrace();
+            this.trackingService.connect();
+            this.subscribePaymentSocket(pay.id);
+            void this.startPaymentPollFallbackById(pay.id);
+          } else {
+            this.toast.error('Could not initiate payment. Try again.');
+          }
+        } catch {
+          this.toast.error('Could not initiate payment. Try again.');
+        }
+      } else {
+        const msg =
+          err instanceof HttpErrorResponse &&
+          err.error &&
+          typeof err.error.message === 'string'
+            ? err.error.message
+            : null;
+        this.toast.error(msg ?? 'Could not initiate payment. Try again.');
+      }
     } finally {
       this.payingNow.set(false);
     }

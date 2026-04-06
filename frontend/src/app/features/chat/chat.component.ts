@@ -42,6 +42,9 @@ import type { ChatMessage, Conversation, ConversationPreview, MessageSenderRole 
                     } @else {
                       <div class="avatar-placeholder">{{ conv.otherPartyName.charAt(0) }}</div>
                     }
+                    @if (conv.unreadCount > 0) {
+                      <span class="conv-avatar-unread" aria-label="Unread messages">{{ conv.unreadCount > 99 ? '99+' : conv.unreadCount }}</span>
+                    }
                     @if (conv.status === 'ACTIVE') {
                       <span class="online-status"></span>
                     }
@@ -54,9 +57,6 @@ import type { ChatMessage, Conversation, ConversationPreview, MessageSenderRole 
                     <div class="context-tag">{{ conv.context }}</div>
                     <div class="conv-footer">
                       <div class="last-msg">{{ conv.lastMessage?.content || 'No messages yet' }}</div>
-                      @if (conv.unreadCount > 0) {
-                        <span class="unread-badge">{{ conv.unreadCount > 99 ? '99+' : conv.unreadCount }}</span>
-                      }
                     </div>
                   </div>
                 </a>
@@ -208,11 +208,22 @@ import type { ChatMessage, Conversation, ConversationPreview, MessageSenderRole 
     .conversation-item:hover { background: rgba(var(--clr-primary-rgb), 0.05); }
     .conversation-item.active-chat { background: rgba(var(--clr-primary-rgb), 0.1); border-left: 4px solid var(--clr-primary); }
     
-    .conv-avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--clr-bg-card); position: relative; flex-shrink: 0; }
+    .conv-avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--clr-bg-card); position: relative; flex-shrink: 0; overflow: visible; }
     .conv-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
     .avatar-placeholder { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--clr-primary); font-size: 18px; }
+    .conv-avatar-unread {
+      position: absolute; top: -4px; right: -4px; z-index: 2;
+      min-width: 18px; height: 18px; border-radius: 99px;
+      background: #dc2626; color: #fff;
+      font-size: 10px; font-weight: 700; line-height: 1;
+      padding: 0 5px;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid var(--clr-bg-elevated);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
     .online-status {
-      position: absolute; bottom: 2px; right: 2px; width: 10px; height: 10px;
+      position: absolute; bottom: 2px; right: 2px; z-index: 1;
+      width: 10px; height: 10px;
       border-radius: 50%; background: var(--clr-success); border: 2px solid var(--clr-bg-elevated);
       animation: dot-appear 0.3s ease;
     }
@@ -223,14 +234,8 @@ import type { ChatMessage, Conversation, ConversationPreview, MessageSenderRole 
     .conv-header .name { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .conv-header .time { font-size: 11px; color: var(--clr-text-dim); flex-shrink: 0; margin-left: 6px; }
     .context-tag { font-size: 10px; font-weight: 600; color: var(--clr-primary); text-transform: uppercase; margin-bottom: 2px; }
-    .conv-footer { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .conv-footer { display: flex; align-items: center; gap: 6px; }
     .last-msg { font-size: 13px; color: var(--clr-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
-    .unread-badge {
-      flex-shrink: 0; min-width: 18px; height: 18px; border-radius: 99px;
-      background: var(--clr-primary); color: #fff;
-      font-size: 10px; font-weight: 700; padding: 0 5px;
-      display: flex; align-items: center; justify-content: center;
-    }
 
     /* Main Chat Area Styles */
     .chat-main { display: flex; flex-direction: column; height: 100%; position: relative; }

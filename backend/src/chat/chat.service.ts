@@ -167,6 +167,8 @@ export class ChatService {
           },
           ride: {
             select: {
+              userId: true,
+              riderId: true,
               pickupAddress: true,
               dropoffAddress: true,
               user: { select: { fullName: true, avatarUrl: true } },
@@ -175,6 +177,8 @@ export class ChatService {
           },
           parcel: {
             select: {
+              userId: true,
+              riderId: true,
               itemDescription: true,
               user: { select: { fullName: true, avatarUrl: true } },
               rider: { include: { account: { select: { fullName: true, avatarUrl: true } } } },
@@ -186,18 +190,30 @@ export class ChatService {
 
       return (conversations as any[]).map((conv) => {
         const lastMsg = conv.messages[0];
-        const isRiderConv = riderId && (conv.ride?.riderId === riderId || conv.parcel?.riderId === riderId);
-        
-        // Determine the "other party" name and avatar
+        const ride = conv.ride;
+        const parcel = conv.parcel;
+
+        // Determine the "other party" name and avatar — must use ride.userId / parcel.userId
+        // (riderId was omitted from selects before, so riders always saw their own profile).
         let otherPartyName = 'System';
         let otherPartyAvatar = null;
 
-        if (isRiderConv) {
-          otherPartyName = conv.ride?.user?.fullName || conv.parcel?.user?.fullName || 'User';
-          otherPartyAvatar = conv.ride?.user?.avatarUrl || conv.parcel?.user?.avatarUrl;
-        } else {
-          otherPartyName = conv.ride?.rider?.account?.fullName || conv.parcel?.rider?.account?.fullName || 'Rider';
-          otherPartyAvatar = conv.ride?.rider?.account?.avatarUrl || conv.parcel?.rider?.account?.avatarUrl;
+        if (ride) {
+          if (ride.userId === accountId) {
+            otherPartyName = ride.rider?.account?.fullName || 'Rider';
+            otherPartyAvatar = ride.rider?.account?.avatarUrl ?? null;
+          } else {
+            otherPartyName = ride.user?.fullName || 'User';
+            otherPartyAvatar = ride.user?.avatarUrl ?? null;
+          }
+        } else if (parcel) {
+          if (parcel.userId === accountId) {
+            otherPartyName = parcel.rider?.account?.fullName || 'Rider';
+            otherPartyAvatar = parcel.rider?.account?.avatarUrl ?? null;
+          } else {
+            otherPartyName = parcel.user?.fullName || 'User';
+            otherPartyAvatar = parcel.user?.avatarUrl ?? null;
+          }
         }
 
         return {

@@ -81,6 +81,12 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
                         <span>Passenger paid via M-Pesa — you can complete the ride after drop-off.</span>
                       </div>
                     }
+                    @if (ride.paymentMethod === 'CASH' && ride.status === 'IN_PROGRESS') {
+                      <div class="cash-collect-strip" role="status">
+                        <lucide-icon name="wallet" [size]="18"></lucide-icon>
+                        <span>Cash trip — collect KES {{ ride.estimatedFare | number:'1.0-0' }} from the passenger at drop-off, then tap Complete ride to record it.</span>
+                      </div>
+                    }
                   </div>
 
                   <div class="route-display">
@@ -163,6 +169,12 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
                   <div class="fare-section">
                     <span class="label">Delivery Fee</span>
                     <h2 class="fare-value">KES {{ parcel.deliveryFee | number:'1.0-0' }}</h2>
+                    @if (parcel.paymentMethod === 'CASH' && parcel.status === 'IN_TRANSIT') {
+                      <div class="cash-collect-strip" role="status">
+                        <lucide-icon name="wallet" [size]="18"></lucide-icon>
+                        <span>Cash delivery — collect KES {{ parcel.deliveryFee | number:'1.0-0' }} from the sender, then upload proof and mark delivered.</span>
+                      </div>
+                    }
                   </div>
 
                   <div class="route-display">
@@ -400,6 +412,12 @@ const PARCEL_NEXT: Partial<Record<ParcelStatus, { status: ParcelStatus; label: s
       background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.28); color: var(--clr-success);
     }
     .mpesa-paid-strip lucide-icon { flex-shrink: 0; margin-top: 1px; }
+    .cash-collect-strip {
+      display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; padding: 12px 14px;
+      border-radius: var(--radius-md); font-size: 13px; font-weight: 600; line-height: 1.4;
+      background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); color: var(--clr-warning);
+    }
+    .cash-collect-strip lucide-icon { flex-shrink: 0; margin-top: 1px; }
 
     .route-display {
       background: var(--clr-bg-elevated); border-radius: var(--radius-lg); padding: 20px;

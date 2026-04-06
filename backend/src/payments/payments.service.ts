@@ -94,6 +94,33 @@ export class PaymentsService implements OnModuleInit {
   }
 
   /**
+   * Lipana (and SDK unwrapping) may return checkoutRequestID or checkoutRequestId.
+   * Missing normalization caused 500 after STK had already been sent to the handset.
+   */
+  private normalizeStkInitResponse(raw: unknown): {
+    transactionId: string;
+    checkoutRequestId: string;
+  } | null {
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+    const r = raw as Record<string, unknown>;
+    const checkoutRaw =
+      r.checkoutRequestID ??
+      r.checkoutRequestId ??
+      r.checkout_request_id;
+    const transactionRaw = r.transactionId ?? r.transaction_id;
+    const checkoutRequestId =
+      typeof checkoutRaw === 'string' ? checkoutRaw.trim() : '';
+    const transactionId =
+      typeof transactionRaw === 'string' ? transactionRaw.trim() : '';
+    if (!checkoutRequestId || !transactionId) {
+      return null;
+    }
+    return { transactionId, checkoutRequestId };
+  }
+
+  /**
    * Calls Lipana STK and stores checkout / transaction ids on the payment row.
    */
   private async performStkPushAndPersistIds(
@@ -118,7 +145,12 @@ export class PaymentsService implements OnModuleInit {
       transactionDesc: `${entityType === 'ride' ? 'Ride' : 'Parcel'} payment`,
     });
 
-    if (!stkResponse.transactionId || !stkResponse.checkoutRequestID) {
+    const normalized = this.normalizeStkInitResponse(stkResponse);
+    if (!normalized) {
+      this.logger.error(
+        'Lipana STK response missing transactionId/checkoutRequestId',
+        stkResponse,
+      );
       this.recordCircuitFailure();
       throw new InternalServerErrorException(
         'Invalid response from payment provider',
@@ -128,8 +160,8 @@ export class PaymentsService implements OnModuleInit {
     await this.prisma.payment.update({
       where: { id: paymentId },
       data: {
-        checkoutRequestId: stkResponse.checkoutRequestID,
-        mpesaReceiptNumber: stkResponse.transactionId,
+        checkoutRequestId: normalized.checkoutRequestId,
+        mpesaReceiptNumber: normalized.transactionId,
       },
     });
 
@@ -137,12 +169,12 @@ export class PaymentsService implements OnModuleInit {
     this.clearFailedAttempts(userId);
 
     this.logger.log(
-      `STK push initiated: ${stkResponse.transactionId} for payment ${paymentId}`,
+      `STK push initiated: ${normalized.transactionId} for payment ${paymentId}`,
     );
 
     return {
-      transactionId: stkResponse.transactionId,
-      checkoutRequestId: stkResponse.checkoutRequestID,
+      transactionId: normalized.transactionId,
+      checkoutRequestId: normalized.checkoutRequestId,
     };
   }
 

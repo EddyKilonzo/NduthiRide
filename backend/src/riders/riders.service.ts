@@ -370,8 +370,9 @@ export class RidersService {
         }),
       ]);
 
+      const detail = msg.trim().replace(/\.+$/, '');
       throw new BadRequestException(
-        `${msg} Your balance has been restored. You can try again in a moment.`,
+        `${detail}. Your balance has been restored. You can try again in a moment.`,
       );
     }
   }

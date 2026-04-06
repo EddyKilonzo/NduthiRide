@@ -60,6 +60,25 @@ export class LipanaPayoutService {
     return /^254(7|1)\d{8}$/.test(d);
   }
 
+  private extractLipanaErrorMessage(data: unknown): string {
+    if (!data || typeof data !== 'object') {
+      return '';
+    }
+    const d = data as Record<string, unknown>;
+    const m = d.message;
+    if (typeof m === 'string') {
+      return m;
+    }
+    if (Array.isArray(m)) {
+      return m.filter((x): x is string => typeof x === 'string').join('; ');
+    }
+    const err = d.error;
+    if (typeof err === 'string') {
+      return err;
+    }
+    return '';
+  }
+
   /**
    * @param phone254 — digits only, e.g. 254712345678 (Lipana docs)
    * @param amountKes — whole shillings, min 10 per Lipana
@@ -90,11 +109,22 @@ export class LipanaPayoutService {
       return { id: payout.id, status: payout.status };
     } catch (err) {
       if (isAxiosError(err)) {
-        const msg =
-          (err.response?.data as { message?: string })?.message ||
-          err.message ||
-          'Lipana payout request failed';
-        this.logger.warn(`Lipana sendToPhone failed: ${msg}`);
+        const status = err.response?.status;
+        const raw = this.extractLipanaErrorMessage(err.response?.data);
+        const fallback = err.message || 'Lipana payout request failed';
+        const msg = raw || fallback;
+        this.logger.warn(
+          `Lipana sendToPhone failed status=${status ?? 'n/a'} message=${msg} body=${JSON.stringify(err.response?.data)}`,
+        );
+
+        if (status === 401 || status === 403) {
+          this.logger.warn(
+            `Lipana payout unauthorized (401/403). Check LIPANA_SECRET_KEY is a secret key (lip_sk_test_* / lip_sk_live_*), not lip_pk_*, env matches Lipana, and phone payouts are enabled. Raw message: ${raw || fallback}`,
+          );
+          throw new Error(
+            'M-Pesa payout could not be completed (payment provider rejected the request).',
+          );
+        }
         throw new Error(msg);
       }
       throw err;
