@@ -526,7 +526,18 @@ export class PaymentsService implements OnModuleInit {
       }
 
       // 2. Parse and validate payload structure (includes replay attack check)
-      const payload = this.webhookService.parseWebhookPayload(parsedBody);
+      let payload: ReturnType<typeof this.webhookService.parseWebhookPayload>;
+      try {
+        payload = this.webhookService.parseWebhookPayload(parsedBody);
+      } catch (parseErr) {
+        // Log the full body so we can see the exact shape Lipana sent.
+        this.logger.error(
+          `Lipana webhook parse error — raw body: ${typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8')}`,
+          parseErr,
+        );
+        // Return without throwing so Lipana receives 200 and doesn't retry forever.
+        return;
+      }
       const { event, data } = payload;
       const { transactionId, status, checkoutRequestID, timestamp } = data;
 

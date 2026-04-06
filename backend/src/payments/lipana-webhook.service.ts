@@ -105,76 +105,145 @@ export class LipanaWebhookService {
 
     const payload = body as Record<string, unknown>;
 
-    // Validate required fields
+    // Log the raw payload shape (redacted) to help diagnose field-name mismatches.
+    this.logger.debug(
+      `Lipana webhook raw keys: ${JSON.stringify(Object.keys(payload))} / data keys: ${
+        payload.data && typeof payload.data === 'object'
+          ? JSON.stringify(Object.keys(payload.data as object))
+          : 'n/a'
+      }`,
+    );
+
     if (typeof payload.event !== 'string') {
       throw new BadRequestException('Missing or invalid event field');
     }
 
-    if (!payload.data || typeof payload.data !== 'object') {
-      throw new BadRequestException('Missing or invalid data field');
-    }
+    // Lipana may send the payload flat (no wrapper `data` key) or nested under `data`.
+    // Accept both shapes.
+    const rawData =
+      payload.data && typeof payload.data === 'object'
+        ? (payload.data as Record<string, unknown>)
+        : payload;
 
-    const data = payload.data as Record<string, unknown>;
+    const pickStr = (...vals: unknown[]): string => {
+      for (const v of vals) {
+        if (typeof v === 'string' && v.trim()) return v.trim();
+        if (typeof v === 'number' && Number.isFinite(v)) return String(v);
+      }
+      return '';
+    };
 
+    // Nested transaction object (some SDK shapes)
     const nestedTxn =
-      data.transaction && typeof data.transaction === 'object'
-        ? (data.transaction as Record<string, unknown>)
+      rawData.transaction && typeof rawData.transaction === 'object'
+        ? (rawData.transaction as Record<string, unknown>)
         : null;
-    const transactionIdRaw =
-      data.transactionId ??
-      data.id ??
-      nestedTxn?.id ??
-      nestedTxn?.transactionId;
-    if (typeof transactionIdRaw !== 'string' || !transactionIdRaw.trim()) {
+
+    // ── transactionId ────────────────────────────────────────
+    // Accept every known field name Lipana / Safaricom use.
+    const transactionId = pickStr(
+      rawData.transactionId,
+      rawData.transaction_id,
+      rawData.TransactionID,
+      rawData.mpesaReceiptNumber,
+      rawData.MpesaReceiptNumber,
+      rawData.receiptNumber,
+      rawData.receipt,
+      rawData.id,
+      nestedTxn?.transactionId,
+      nestedTxn?.id,
+      rawData.checkoutRequestID,
+      rawData.checkoutRequestId,
+      rawData.checkout_request_id,
+      rawData.CheckoutRequestID,
+      rawData.MerchantRequestID,
+      rawData.merchantRequestId,
+    );
+
+    if (!transactionId) {
+      // Log the full payload (safe — no PII beyond phone) so we can see what Lipana sent.
+      this.logger.error(
+        `Lipana webhook: cannot extract transactionId. Full payload: ${JSON.stringify(body)}`,
+      );
       throw new BadRequestException('Missing transactionId');
     }
 
-    let amount: number;
-    if (typeof data.amount === 'number' && Number.isFinite(data.amount)) {
-      amount = data.amount;
-    } else if (typeof data.amount === 'string') {
-      const n = Number(data.amount.trim());
-      if (!Number.isFinite(n)) {
-        throw new BadRequestException('Invalid amount');
-      }
-      amount = n;
+    // ── amount ───────────────────────────────────────────────
+    let amount = 0;
+    const rawAmount = rawData.amount ?? rawData.Amount ?? rawData.TransAmount;
+    if (typeof rawAmount === 'number' && Number.isFinite(rawAmount)) {
+      amount = rawAmount;
+    } else if (typeof rawAmount === 'string') {
+      const n = Number(rawAmount.trim());
+      if (Number.isFinite(n)) amount = n;
+    }
+    // Treat 0 / missing amount as non-fatal — we still want to update payment status.
+    if (amount < 0) {
+      throw new BadRequestException('Invalid amount');
+    }
+
+    // ── status ───────────────────────────────────────────────
+    // Derive status from event name if the field is absent.
+    const rawStatus =
+      rawData.status ??
+      rawData.Status ??
+      rawData.ResultCode ??
+      rawData.resultCode;
+    let status: string;
+    if (typeof rawStatus === 'string' && rawStatus.trim()) {
+      status = rawStatus.trim();
+    } else if (typeof rawStatus === 'number') {
+      // Safaricom ResultCode: 0 = success, anything else = failure
+      status = rawStatus === 0 ? 'success' : 'failed';
     } else {
-      throw new BadRequestException('Invalid amount');
-    }
-    if (amount <= 0) {
-      throw new BadRequestException('Invalid amount');
+      // Derive from event name as last resort
+      const ev = (payload.event as string).toLowerCase();
+      if (ev.includes('success') || ev.includes('completed')) {
+        status = 'success';
+      } else if (ev.includes('fail') || ev.includes('cancel')) {
+        status = 'failed';
+      } else {
+        status = 'pending';
+      }
     }
 
-    if (typeof data.status !== 'string') {
-      throw new BadRequestException('Missing status');
-    }
+    // ── phone ────────────────────────────────────────────────
+    const phone = pickStr(
+      rawData.phone,
+      rawData.phoneNumber,
+      rawData.Phone,
+      rawData.PhoneNumber,
+      rawData.msisdn,
+    );
 
-    const phone =
-      typeof data.phone === 'string'
-        ? data.phone
-        : typeof data.phoneNumber === 'string'
-          ? data.phoneNumber
-          : '';
+    // ── checkoutRequestID ────────────────────────────────────
+    const checkoutRaw = pickStr(
+      rawData.checkoutRequestID,
+      rawData.checkoutRequestId,
+      rawData.checkout_request_id,
+      rawData.CheckoutRequestID,
+      rawData.MerchantRequestID,
+      rawData.merchantRequestId,
+    );
+    const checkoutRequestID = checkoutRaw || undefined;
 
-    const checkoutRaw =
-      data.checkoutRequestID ??
-      data.checkoutRequestId ??
-      data.checkout_request_id;
-    const checkoutRequestID =
-      typeof checkoutRaw === 'string' && checkoutRaw.trim()
-        ? checkoutRaw.trim()
-        : undefined;
+    // ── timestamp ────────────────────────────────────────────
+    const timestamp =
+      typeof rawData.timestamp === 'string'
+        ? rawData.timestamp
+        : typeof rawData.TransTime === 'string'
+          ? rawData.TransTime
+          : undefined;
 
     return {
-      event: payload.event,
+      event: payload.event as string,
       data: {
-        transactionId: transactionIdRaw.trim(),
+        transactionId,
         amount,
-        status: data.status,
+        status,
         phone,
         checkoutRequestID,
-        timestamp:
-          typeof data.timestamp === 'string' ? data.timestamp : undefined,
+        timestamp,
       },
     };
   }
