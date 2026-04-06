@@ -650,12 +650,62 @@ export class PaymentsService implements OnModuleInit {
       const ev = event.trim().toLowerCase();
       const st = status.trim().toLowerCase();
 
-      // 7. Update payment status based on webhook event
-      if (
+      // 7. Update payment status based on webhook event.
+      //
+      // IMPORTANT: `data.status === "success"` is NOT sufficient — Lipana may send that when
+      // the STK request was accepted while `event` is still `payment.pending`. Only mark
+      // COMPLETED on explicit settlement events. `payment.pending` must be handled before
+      // success so we never complete early on pending + success-shaped payloads.
+      const isFailed = ev === 'payment.failed' || st === 'failed';
+      const isPending =
+        ev === 'payment.pending' || st === 'pending' || st === 'processing';
+      const isSettled =
         ev === 'payment.success' ||
-        st === 'success' ||
-        st === 'completed'
-      ) {
+        ev === 'payment.completed' ||
+        ev === 'transaction.success';
+
+      if (isFailed) {
+        const updatedPayment = await this.prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.FAILED,
+          },
+          include: {
+            ride: {
+              select: {
+                id: true,
+                userId: true,
+                rider: { select: { accountId: true } },
+              },
+            },
+            parcel: {
+              select: {
+                id: true,
+                userId: true,
+                rider: { select: { accountId: true } },
+              },
+            },
+          },
+        });
+
+        this.logger.warn(
+          `Payment ${payment.id} failed — Transaction: ${transactionId}`,
+        );
+
+        this.trackingGateway.emitPaymentUpdate(payment.id, {
+          status: 'FAILED',
+        });
+
+        this.emitTripPaymentAccountNotifications(updatedPayment, 'FAILED');
+      } else if (isPending) {
+        this.logger.debug(
+          `Payment ${payment.id} still pending — Transaction: ${transactionId}`,
+        );
+
+        this.trackingGateway.emitPaymentUpdate(payment.id, {
+          status: 'PROCESSING',
+        });
+      } else if (isSettled && st !== 'pending' && st !== 'processing') {
         const mpesaReceipt =
           rawData &&
           typeof rawData.mpesaReceiptNumber === 'string' &&
@@ -699,7 +749,6 @@ export class PaymentsService implements OnModuleInit {
           `Payment ${payment.id} completed — Transaction: ${transactionId}`,
         );
 
-        // Emit WebSocket update to subscribed clients
         this.trackingGateway.emitPaymentUpdate(payment.id, {
           status: 'COMPLETED',
           amount: updatedPayment.amount,
@@ -708,60 +757,17 @@ export class PaymentsService implements OnModuleInit {
         });
 
         this.emitTripPaymentAccountNotifications(updatedPayment, 'COMPLETED');
-        
-        // SECURITY: Audit log for completed payment
+
         await this.createAuditLog(
           payment.rideId ? 'SYSTEM' : 'SYSTEM',
           'PAYMENT_COMPLETED_WEBHOOK',
           payment.id,
           { transactionId, amount: payment.amount },
         );
-      } else if (ev === 'payment.failed' || st === 'failed') {
-        const updatedPayment = await this.prisma.payment.update({
-          where: { id: payment.id },
-          data: {
-            status: PaymentStatus.FAILED,
-          },
-          include: {
-            ride: {
-              select: {
-                id: true,
-                userId: true,
-                rider: { select: { accountId: true } },
-              },
-            },
-            parcel: {
-              select: {
-                id: true,
-                userId: true,
-                rider: { select: { accountId: true } },
-              },
-            },
-          },
-        });
-
-        this.logger.warn(
-          `Payment ${payment.id} failed — Transaction: ${transactionId}`,
-        );
-
-        // Emit WebSocket update to subscribed clients
-        this.trackingGateway.emitPaymentUpdate(payment.id, {
-          status: 'FAILED',
-        });
-
-        this.emitTripPaymentAccountNotifications(updatedPayment, 'FAILED');
-      } else if (ev === 'payment.pending' || st === 'pending') {
-        // Already in PROCESSING state, no update needed
-        this.logger.debug(
-          `Payment ${payment.id} still pending — Transaction: ${transactionId}`,
-        );
-
-        // Emit WebSocket update to subscribed clients
-        this.trackingGateway.emitPaymentUpdate(payment.id, {
-          status: 'PROCESSING',
-        });
       } else {
-        this.logger.warn(`Unknown webhook event: ${event}`);
+        this.logger.warn(
+          `Unknown or ignored Lipana webhook: event=${event} status=${status}`,
+        );
       }
     } catch (error) {
       // Log but don't throw - webhook should always return 200

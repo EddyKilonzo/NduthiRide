@@ -377,6 +377,28 @@ describe('PaymentsService', () => {
       );
     });
 
+    it('does not mark COMPLETED when event is payment.pending even if data.status is success', async () => {
+      mockPrisma.payment.findFirst.mockResolvedValue({
+        id: 'pay-1',
+        status: PaymentStatus.PROCESSING,
+      });
+      mockWebhookService.parseWebhookPayload.mockReturnValue(
+        buildWebhookPayload('payment.pending', 'success'),
+      );
+
+      await service.handleLipanaWebhook(
+        Buffer.from(JSON.stringify({})),
+        'valid-signature',
+        buildWebhookPayload('payment.pending', 'success'),
+      );
+
+      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
+      expect(mockTrackingGateway.emitPaymentUpdate).toHaveBeenCalledWith(
+        'pay-1',
+        expect.objectContaining({ status: 'PROCESSING' }),
+      );
+    });
+
     it('marks payment FAILED on payment.failed event', async () => {
       mockPrisma.payment.findFirst.mockResolvedValue({
         id: 'pay-1',
