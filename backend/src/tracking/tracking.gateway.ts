@@ -39,6 +39,13 @@ const connectedClients = new Map<string, string>();
     credentials: true,
   },
   namespace: '/tracking',
+  // Allow polling fallback so WebSocket upgrades aren't mandatory.
+  // Render's proxy can drop WebSocket upgrades; polling ensures a reliable
+  // baseline transport. pingTimeout/pingInterval keep idle connections alive.
+  transports: ['polling', 'websocket'],
+  pingTimeout: 60_000,
+  pingInterval: 25_000,
+  connectTimeout: 45_000,
 })
 export class TrackingGateway
   implements OnGatewayConnection, OnGatewayDisconnect

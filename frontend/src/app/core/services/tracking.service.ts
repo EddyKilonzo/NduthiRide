@@ -37,7 +37,16 @@ export class TrackingService implements OnDestroy {
 
       this.socket = io(`${environment.wsUrl}/tracking`, {
         auth: { token: this.auth.getAccessToken() ?? '' },
-        transports: ['websocket'],
+        // Start with polling so the connection is established even when
+        // WebSocket upgrade is unavailable (e.g. Render proxy cold-start),
+        // then upgrade to WebSocket automatically.
+        transports: ['polling', 'websocket'],
+        upgrade: true,
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 2000,
+        reconnectionDelayMax: 30_000,
+        timeout: 45_000,
       });
 
       this.socket.on('connect_error', (err) => {

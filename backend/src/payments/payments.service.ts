@@ -135,6 +135,73 @@ export class PaymentsService implements OnModuleInit {
     };
   }
 
+  /**
+   * Races the STK push against a 20-second timeout so the HTTP handler always
+   * returns well within Render's 30-second request limit.
+   *
+   * - Resolves with STK ids when Lipana responds quickly (< 20 s).
+   * - Resolves with null when the timeout fires first; the push continues in
+   *   the background and a catch handler marks the payment FAILED on error.
+   * - Rejects immediately on synchronous validation errors (bad phone, etc.)
+   *   so callers can still surface those to the user.
+   */
+  private async launchStkPushWithTimeout(
+    paymentId: string,
+    amount: number,
+    entityType: 'ride' | 'parcel',
+    entityId: string,
+    phone: string,
+    userId: string,
+  ): Promise<{ transactionId: string; checkoutRequestId: string } | null> {
+    const STK_TIMEOUT_MS = 20_000;
+
+    const stkPromise = this.performStkPushAndPersistIds(
+      paymentId,
+      amount,
+      entityType,
+      entityId,
+      phone,
+      userId,
+    );
+
+    const timeoutPromise = new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), STK_TIMEOUT_MS),
+    );
+
+    const result = await Promise.race([stkPromise, timeoutPromise]);
+
+    if (result === null) {
+      // Timeout fired — STK push still running in the background
+      this.logger.warn(
+        `STK push for payment ${paymentId} exceeded ${STK_TIMEOUT_MS}ms; ` +
+          'returning early — background task continues',
+      );
+      void stkPromise.catch(async (err) => {
+        this.logger.error(
+          `Background STK push failed for payment ${paymentId}`,
+          err,
+        );
+        try {
+          await this.prisma.payment.update({
+            where: { id: paymentId },
+            data: { status: PaymentStatus.FAILED },
+          });
+          this.trackingGateway.emitPaymentUpdate(paymentId, {
+            status: 'FAILED',
+          });
+        } catch (dbErr) {
+          this.logger.error(
+            `Failed to mark payment ${paymentId} as FAILED after background STK error`,
+            dbErr,
+          );
+        }
+        this.recordCircuitFailure();
+      });
+    }
+
+    return result;
+  }
+
   // ─── Initiate payment ─────────────────────────────────────
 
   /**
@@ -276,7 +343,7 @@ export class PaymentsService implements OnModuleInit {
         );
       }
 
-      const stk = await this.performStkPushAndPersistIds(
+      const stk = await this.launchStkPushWithTimeout(
         payment.id,
         amount,
         entityType,
@@ -287,8 +354,8 @@ export class PaymentsService implements OnModuleInit {
 
       return {
         paymentId: payment.id,
-        transactionId: stk.transactionId,
-        checkoutRequestId: stk.checkoutRequestId,
+        transactionId: stk?.transactionId,
+        checkoutRequestId: stk?.checkoutRequestId,
         message: 'Check your phone for the M-Pesa prompt',
       };
     } catch (error) {
@@ -554,7 +621,7 @@ export class PaymentsService implements OnModuleInit {
 
       this.trackingGateway.emitPaymentUpdate(paymentId, { status: 'PROCESSING' });
 
-      const stk = await this.performStkPushAndPersistIds(
+      const stk = await this.launchStkPushWithTimeout(
         paymentId,
         payment.amount,
         entityType,
@@ -565,8 +632,8 @@ export class PaymentsService implements OnModuleInit {
 
       return {
         paymentId,
-        transactionId: stk.transactionId,
-        checkoutRequestId: stk.checkoutRequestId,
+        transactionId: stk?.transactionId,
+        checkoutRequestId: stk?.checkoutRequestId,
         message: 'Check your phone for the M-Pesa prompt',
       };
     } catch (error) {
@@ -607,6 +674,34 @@ export class PaymentsService implements OnModuleInit {
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
       this.logger.error(`getPaymentStatus failed: ${checkoutRequestId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Returns the current status of a payment by its primary ID.
+   * Used as a polling fallback when checkoutRequestId is not yet available
+   * (e.g. the STK push timed out and is still running in the background).
+   */
+  async getPaymentStatusById(paymentId: string) {
+    try {
+      const payment = await this.prisma.payment.findUnique({
+        where: { id: paymentId },
+        select: {
+          id: true,
+          status: true,
+          amount: true,
+          mpesaReceiptNumber: true,
+          completedAt: true,
+          checkoutRequestId: true,
+        },
+      });
+
+      if (!payment) throw new NotFoundException('Payment not found');
+      return payment;
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      this.logger.error(`getPaymentStatusById failed: ${paymentId}`, error);
       throw error;
     }
   }

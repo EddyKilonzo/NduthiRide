@@ -1,5 +1,4 @@
-import type { AuthUser } from './auth.models';
-import type { PaymentMethod, RiderSummary, RidePayment } from './ride.models';
+import type { PaymentMethod, RiderSummary, RidePayment, UserSummary } from './ride.models';
 
 export type ParcelStatus =
   | 'PENDING'
@@ -12,7 +11,7 @@ export type ParcelStatus =
 export interface Parcel {
   id: string;
   userId: string;
-  user: Pick<AuthUser, 'fullName' | 'phone' | 'avatarUrl'>;
+  user: UserSummary;
   riderId: string | null;
   rider: RiderSummary | null;
   itemDescription: string;

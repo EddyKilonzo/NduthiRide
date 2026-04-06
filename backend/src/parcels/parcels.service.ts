@@ -250,7 +250,7 @@ export class ParcelsService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          user: { select: { fullName: true, avatarUrl: true } },
+          user: { select: { fullName: true, avatarUrl: true, passengerRatingAverage: true } },
         },
       });
     }
@@ -267,7 +267,7 @@ export class ParcelsService {
         },
         take: limit * 2, // Take more for manual Haversine filtering
         include: {
-          user: { select: { fullName: true, avatarUrl: true } },
+          user: { select: { fullName: true, avatarUrl: true, passengerRatingAverage: true } },
         },
       });
 

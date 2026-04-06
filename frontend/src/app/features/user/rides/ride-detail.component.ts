@@ -1,5 +1,6 @@
 import { Component, inject, OnInit, OnDestroy, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { RideService }     from '../../../core/services/ride.service';
@@ -17,8 +18,33 @@ const ACTIVE_STATUSES: Ride['status'][] = [
 @Component({
   selector: 'app-ride-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, SpinnerComponent, LucideAngularModule, RoutePickerMapComponent],
+  imports: [CommonModule, FormsModule, RouterLink, SpinnerComponent, LucideAngularModule, RoutePickerMapComponent],
   template: `
+    @if (showPaymentSuccessOverlay()) {
+      <div class="pay-overlay" (click)="dismissPaymentOverlay()" role="dialog" aria-modal="true" aria-label="Payment confirmed">
+        <div class="confetti-wrap" aria-hidden="true">
+          @for (i of confettiItems; track i) {
+            <span class="confetti-piece" [style.--ci]="i"></span>
+          }
+        </div>
+        <div class="pay-overlay-card" (click)="$event.stopPropagation()">
+          <div class="check-wrap">
+            <svg class="check-svg" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle class="check-circle" cx="40" cy="40" r="36" stroke="#22C55E" stroke-width="5" fill="none"/>
+              <polyline class="check-mark" points="24,42 35,53 56,30" stroke="#22C55E" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
+          </div>
+          <h2 class="pay-overlay-title">Payment Confirmed!</h2>
+          @if (paymentSuccessAmount()) {
+            <p class="pay-overlay-amount">KES {{ paymentSuccessAmount()! | number:'1.0-0' }}</p>
+          }
+          @if (paymentSuccessReceipt()) {
+            <p class="pay-overlay-receipt">{{ paymentSuccessReceipt() }}</p>
+          }
+          <p class="pay-overlay-hint">Tap anywhere to continue</p>
+        </div>
+      </div>
+    }
     <div class="page app-page">
       @if (loading()) {
         <app-spinner [overlay]="true" />
@@ -92,19 +118,42 @@ const ACTIVE_STATUSES: Ride['status'][] = [
             </div>
           }
           @if (showRatingPrompt()) {
-            <div class="card card--rating-prompt grid-full">
-              <h3 class="rating-prompt-title">How was your ride?</h3>
-              <p class="rating-prompt-sub">Trip complete — rate your rider. It helps everyone on NduthiRide.</p>
-              <div class="stars" role="group" aria-label="Rating">
+            <div class="card card--rating-prompt grid-full rating-prompt-animate">
+              <div class="rating-header">
+                <lucide-icon name="star" [size]="36" class="rating-icon"></lucide-icon>
+                <div>
+                  <h3 class="rating-prompt-title">How was your ride?</h3>
+                  <p class="rating-prompt-sub">Trip complete — rate your rider. It helps everyone on NduthiRide.</p>
+                </div>
+              </div>
+              <div class="stars" role="group" aria-label="Star rating">
                 @for (star of [1,2,3,4,5]; track star) {
-                  <button type="button" class="star-btn" [class.star-btn--active]="selectedRating() >= star"
-                    (click)="selectedRating.set(star)" [attr.aria-pressed]="selectedRating() >= star">
-                    <lucide-icon name="star" [size]="28"></lucide-icon>
+                  <button type="button" class="star-btn"
+                    [class.star-btn--active]="selectedRating() >= star"
+                    [class.star-btn--hover]="hoverRating() >= star"
+                    (mouseenter)="hoverRating.set(star)"
+                    (mouseleave)="hoverRating.set(0)"
+                    (click)="selectedRating.set(star)"
+                    [attr.aria-pressed]="selectedRating() >= star"
+                    [attr.aria-label]="star + ' star' + (star > 1 ? 's' : '')">
+                    <lucide-icon name="star" [size]="34"></lucide-icon>
                   </button>
                 }
               </div>
-              <button class="btn btn--primary btn--full" [disabled]="selectedRating() === 0"
-                (click)="submitRating()">Submit rating</button>
+              @if (selectedRating() > 0) {
+                <p class="rating-label">{{ ratingLabel() }}</p>
+              }
+              <textarea class="review-textarea" rows="3"
+                placeholder="Leave a comment (optional)"
+                [(ngModel)]="reviewCommentValue"
+                maxlength="300">
+              </textarea>
+              <button class="btn btn--primary btn--full"
+                [disabled]="selectedRating() === 0 || submittingRating()"
+                (click)="submitRating()">
+                @if (submittingRating()) { <app-spinner [size]="16" /> Submitting... }
+                @else { Submit Rating }
+              </button>
             </div>
           }
 
@@ -392,6 +441,99 @@ const ACTIVE_STATUSES: Ride['status'][] = [
     .rated-banner-title { font-weight: 700; margin: 0 0 4px; font-size: 15px; }
     .rated-banner-sub { margin: 0; font-size: 14px; color: var(--clr-text-muted); }
 
+    /* ── Payment success overlay ─────────────────────────────── */
+    .pay-overlay {
+      position: fixed; inset: 0; z-index: 9000;
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(5px);
+      display: flex; align-items: center; justify-content: center;
+      animation: overlay-in 0.28s ease-out;
+      cursor: pointer;
+    }
+    @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+
+    .pay-overlay-card {
+      background: var(--clr-surface);
+      border-radius: 24px;
+      padding: 44px 32px 36px;
+      text-align: center;
+      max-width: 300px; width: 88%;
+      animation: card-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 30px 70px rgba(0,0,0,0.4);
+      cursor: default;
+      position: relative;
+    }
+    @keyframes card-pop {
+      from { transform: scale(0.55) translateY(20px); opacity: 0; }
+      to   { transform: scale(1)    translateY(0);    opacity: 1; }
+    }
+
+    /* SVG animated checkmark */
+    .check-wrap { width: 84px; height: 84px; margin: 0 auto 22px; }
+    .check-svg  { width: 84px; height: 84px; }
+    .check-circle {
+      stroke-dasharray: 226; stroke-dashoffset: 226;
+      animation: draw-circle 0.55s cubic-bezier(0.4,0,0.2,1) 0.12s forwards;
+    }
+    @keyframes draw-circle { to { stroke-dashoffset: 0; } }
+    .check-mark {
+      stroke-dasharray: 52; stroke-dashoffset: 52;
+      animation: draw-check 0.38s ease-out 0.62s forwards;
+    }
+    @keyframes draw-check { to { stroke-dashoffset: 0; } }
+
+    .pay-overlay-title  { font-size: 1.45rem; font-weight: 800; margin: 0 0 10px; color: var(--clr-text); }
+    .pay-overlay-amount { font-size: 2rem; font-weight: 900; color: var(--clr-success); margin: 0 0 6px; letter-spacing: -0.5px; }
+    .pay-overlay-receipt { font-size: 12px; color: var(--clr-text-muted); margin: 0 0 18px; font-family: monospace; }
+    .pay-overlay-hint   { font-size: 12px; color: var(--clr-text-dim); margin: 16px 0 0; }
+
+    /* Confetti */
+    .confetti-wrap { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+    .confetti-piece {
+      position: absolute;
+      width: 9px; height: 12px;
+      top: -14px;
+      left: calc(var(--ci) * 5.5% + 2%);
+      border-radius: 2px;
+      background: hsl(calc(var(--ci) * 20deg), 85%, 58%);
+      animation: confetti-fall 2.4s ease-in calc(var(--ci) * 0.06s) both;
+    }
+    @keyframes confetti-fall {
+      0%   { transform: translateY(0)    rotate(0deg)   scaleX(1);   opacity: 1; }
+      80%  { opacity: 1; }
+      100% { transform: translateY(108vh) rotate(calc(var(--ci) * 35deg)) scaleX(0.7); opacity: 0; }
+    }
+
+    /* ── Enhanced review card ────────────────────────────────── */
+    .rating-prompt-animate {
+      animation: slide-in 0.45s cubic-bezier(0.34, 1.3, 0.64, 1);
+    }
+    @keyframes slide-in {
+      from { transform: translateY(18px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    .rating-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 20px; }
+    .rating-icon   { color: var(--clr-warning); flex-shrink: 0; margin-top: 2px; }
+    .star-btn { padding: 5px; color: var(--clr-text-dim); cursor: pointer; transition: color 0.15s, transform 0.15s; border-radius: 8px; }
+    .star-btn:hover, .star-btn--hover { color: var(--clr-warning); transform: scale(1.18); }
+    .star-btn--active { color: var(--clr-warning); }
+    .rating-label {
+      text-align: center; font-size: 13px; font-weight: 600;
+      color: var(--clr-text-muted); margin: 6px 0 14px; min-height: 20px;
+    }
+    .review-textarea {
+      width: 100%; min-height: 76px; resize: vertical;
+      border: 1px solid var(--clr-border); border-radius: var(--radius-md);
+      padding: 10px 12px; font-size: 14px; color: var(--clr-text);
+      background: var(--clr-surface); font-family: inherit;
+      margin-bottom: 14px; transition: border-color 0.2s, box-shadow 0.2s;
+      box-sizing: border-box;
+    }
+    .review-textarea:focus {
+      outline: none; border-color: var(--clr-primary);
+      box-shadow: 0 0 0 3px rgba(var(--clr-primary-rgb), 0.15);
+    }
+    .review-textarea::placeholder { color: var(--clr-text-dim); }
+
     @media (max-width: 640px) {
       .detail-grid { grid-template-columns: 1fr; }
       .map-card { height: 240px; }
@@ -409,6 +551,16 @@ export class RideDetailComponent implements OnInit, OnDestroy {
   protected readonly loading        = signal(true);
   protected readonly cancelling     = signal(false);
   protected readonly selectedRating = signal(0);
+  protected readonly hoverRating    = signal(0);
+  protected readonly submittingRating = signal(false);
+  protected reviewCommentValue = '';
+
+  // Payment success overlay
+  protected readonly showPaymentSuccessOverlay = signal(false);
+  protected readonly paymentSuccessAmount      = signal<number | null>(null);
+  protected readonly paymentSuccessReceipt     = signal<string | null>(null);
+  protected readonly confettiItems = Array.from({ length: 18 }, (_, i) => i);
+  private overlayDismissTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Payment
   protected readonly payment          = signal<RidePayment | null>(null);
@@ -512,6 +664,16 @@ export class RideDetailComponent implements OnInit, OnDestroy {
     const r = this.ride();
     return r?.status === 'COMPLETED' && !!r.rating;
   });
+
+  protected readonly ratingLabel = computed(() => {
+    const labels = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent!'];
+    return labels[this.selectedRating()] ?? '';
+  });
+
+  protected dismissPaymentOverlay(): void {
+    if (this.overlayDismissTimer) clearTimeout(this.overlayDismissTimer);
+    this.showPaymentSuccessOverlay.set(false);
+  }
 
   protected readonly farePaymentSummary = computed((): {
     text: string;
@@ -649,10 +811,17 @@ export class RideDetailComponent implements OnInit, OnDestroy {
         this.trackingService.watchRiderLocation();
       }
 
-      // Subscribe to existing payment WebSocket room
-      if (r.payment?.checkoutRequestId && r.payment.status === 'PROCESSING') {
+      // Subscribe to existing payment WebSocket room.
+      // Also handle the case where checkoutRequestId is not yet set because the
+      // STK push is still being processed in the background after a timeout.
+      if (r.payment?.status === 'PROCESSING') {
+        this.trackingService.connect();
         this.subscribePaymentSocket(r.payment.id);
-        void this.startPaymentPollFallback(r.payment.checkoutRequestId);
+        if (r.payment.checkoutRequestId) {
+          void this.startPaymentPollFallback(r.payment.checkoutRequestId);
+        } else {
+          void this.startPaymentPollFallbackById(r.payment.id);
+        }
       }
 
       if (r.paymentMethod === 'MPESA') {
@@ -669,6 +838,7 @@ export class RideDetailComponent implements OnInit, OnDestroy {
     this.clearResendGrace();
     this.clearFailedDelay();
     this.clearRideStatusPoll();
+    if (this.overlayDismissTimer) clearTimeout(this.overlayDismissTimer);
     if (this.subscribedPaymentId) {
       this.trackingService.unsubscribeFromPayment(this.subscribedPaymentId);
     }
@@ -768,6 +938,23 @@ export class RideDetailComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Fallback polling by paymentId when checkoutRequestId is not yet available
+   * (STK push timed out on Render and is still running in the background).
+   */
+  private async startPaymentPollFallbackById(paymentId: string): Promise<void> {
+    const gen = ++this.paymentPollGeneration;
+    try {
+      const res = await this.paymentService.pollStatusById(paymentId);
+      if (gen !== this.paymentPollGeneration) return;
+      if (res.status === 'COMPLETED' || res.status === 'FAILED') {
+        this.applyPaymentTerminal(res.status, res.mpesaReceiptNumber, null);
+      }
+    } catch {
+      /* timeout or network — user can refresh */
+    }
+  }
+
+  /**
    * Minimum time (ms) the PROCESSING state is shown before a FAILED event can
    * flip the UI to the error state. Prevents instant red flicker when the Lipana
    * sandbox (or a slow network) delivers a failure webhook before the user has
@@ -819,7 +1006,15 @@ export class RideDetailComponent implements OnInit, OnDestroy {
       this.clearResendGrace();
       this.clearFailedDelay();
       this.showResendOption.set(false);
-      this.toast.success('Payment successful — your fare is paid.');
+
+      // Show full-screen animated success overlay
+      const p = this.payment();
+      this.paymentSuccessAmount.set(p?.amount ?? null);
+      this.paymentSuccessReceipt.set(mpesaReceiptNumber ?? p?.mpesaReceiptNumber ?? null);
+      this.showPaymentSuccessOverlay.set(true);
+      if (this.overlayDismissTimer) clearTimeout(this.overlayDismissTimer);
+      this.overlayDismissTimer = setTimeout(() => this.showPaymentSuccessOverlay.set(false), 4000);
+
       const rid = this.ride()?.id;
       if (rid) {
         void this.rideService.getById(rid).then((fresh) => {
@@ -880,18 +1075,22 @@ export class RideDetailComponent implements OnInit, OnDestroy {
 
   protected submitRating(): void {
     const id = this.ride()?.id;
-    if (!id || this.selectedRating() === 0) return;
+    if (!id || this.selectedRating() === 0 || this.submittingRating()) return;
     const score = this.selectedRating();
+    const comment = this.reviewCommentValue.trim() || undefined;
+    this.submittingRating.set(true);
     void this.rideService
-      .rate(id, score)
+      .rate(id, score, comment)
       .then(async () => {
         this.selectedRating.set(0);
+        this.reviewCommentValue = '';
         const fresh = await this.rideService.getById(id);
         this.ride.set(fresh);
         if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
         this.toast.success('Thank you for your feedback!');
       })
-      .catch(() => this.toast.error('Rating failed'));
+      .catch(() => this.toast.error('Rating failed'))
+      .finally(() => this.submittingRating.set(false));
   }
 
   protected badge(status: string): string {

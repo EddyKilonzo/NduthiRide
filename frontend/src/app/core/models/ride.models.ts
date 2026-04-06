@@ -2,6 +2,10 @@ import type { AuthUser } from './auth.models';
 
 export type PaymentStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
+export interface UserSummary extends Pick<AuthUser, 'fullName' | 'phone' | 'avatarUrl'> {
+  passengerRatingAverage?: number;
+}
+
 export interface RidePayment {
   id: string;
   status: PaymentStatus;
@@ -37,7 +41,7 @@ export interface RiderSummary {
 export interface Ride {
   id: string;
   userId: string;
-  user: Pick<AuthUser, 'fullName' | 'phone' | 'avatarUrl'>;
+  user: UserSummary;
   riderId: string | null;
   rider: RiderSummary | null;
   pickupLat: number;

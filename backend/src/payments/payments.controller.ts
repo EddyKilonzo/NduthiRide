@@ -99,6 +99,21 @@ export class PaymentsController {
     return this.paymentsService.getPaymentStatus(checkoutRequestId);
   }
 
+  @Get(':paymentId/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Poll payment status by paymentId',
+    description:
+      'Fallback polling endpoint used when checkoutRequestId is not yet ' +
+      'available (e.g. STK push is still being processed in the background).',
+  })
+  @ApiResponse({ status: 200, description: 'Returns current payment status' })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  getStatusById(@Param('paymentId') paymentId: string) {
+    return this.paymentsService.getPaymentStatusById(paymentId);
+  }
+
   /**
    * Resend STK push for an existing PROCESSING or FAILED payment.
    * Marks the old payment FAILED and creates a fresh one so the user

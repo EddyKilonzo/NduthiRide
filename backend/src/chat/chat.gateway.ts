@@ -29,6 +29,10 @@ import { SendMessageDto } from './dto/send-message.dto';
     },
     credentials: true,
   },
+  transports: ['polling', 'websocket'],
+  pingTimeout: 60_000,
+  pingInterval: 25_000,
+  connectTimeout: 45_000,
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()

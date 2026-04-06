@@ -89,6 +89,22 @@ export class PaymentsApi extends BaseApiService {
     return this.get(`${this.path}/status/${checkoutRequestId}`);
   }
 
+  /**
+   * Get payment status by paymentId.
+   * Fallback used when checkoutRequestId is not yet available
+   * (STK push still running in the background after a timeout).
+   */
+  async getStatusById(paymentId: string): Promise<{
+    id: string;
+    status: PaymentStatus;
+    amount: number;
+    mpesaReceiptNumber: string | null;
+    completedAt: string | null;
+    checkoutRequestId: string | null;
+  }> {
+    return this.get(`${this.path}/${paymentId}/status`);
+  }
+
   // ────────────────────────────────────────────────────────────
   // Audit Log Endpoints (Admin Only)
   // ────────────────────────────────────────────────────────────

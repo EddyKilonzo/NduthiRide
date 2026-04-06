@@ -56,6 +56,7 @@ import { AdminPayoutsComponent }    from './features/admin/payouts/admin-payouts
 import { AdminSettingsComponent }   from './features/admin/settings/admin-settings.component';
 import { AdminAuditLogsComponent }  from './features/admin/audit-logs/admin-audit-logs.component';
 import { AdminProfileComponent }    from './features/admin/profile/admin-profile.component';
+import { AdminSupportComponent }    from './features/admin/support/admin-support.component';
 
 
 export const routes: Routes = [
@@ -154,7 +155,7 @@ export const routes: Routes = [
       { path: 'audit-logs', component: AdminAuditLogsComponent },
       { path: 'profile',   component: AdminProfileComponent },
       { path: 'notifications', component: NotificationsComponent },
-      { path: 'support',       component: SupportComponent },
+      { path: 'support',       component: AdminSupportComponent },
     ],
   },
 

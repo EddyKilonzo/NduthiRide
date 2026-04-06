@@ -87,11 +87,15 @@ export class ChatService {
           ...(rideId ? { rideId } : {}),
           ...(parcelId ? { parcelId } : {}),
         },
+        // Always return the most recent conversation so that if stale rows
+        // exist (e.g. before the @unique constraint was applied) we get the
+        // one that actually has messages.
+        orderBy: { createdAt: 'desc' },
         include: {
           messages: {
             where: { isDeleted: false },
             orderBy: { createdAt: 'asc' },
-            take: 30,
+            take: 50,
             include: {
               senderAccount: {
                 select: { fullName: true, avatarUrl: true, role: true },

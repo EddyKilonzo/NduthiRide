@@ -210,6 +210,18 @@ const RIDER_CHART_COPY: ActivityChartsCopy = {
                       <span class="req-time">{{ relativeTime(req.arrivedAt) }}</span>
                     </div>
                     <div class="req-body">
+                      <div class="req-user">
+                        <div class="req-user-avatar">{{ req.user?.fullName?.charAt(0) ?? '?' }}</div>
+                        <span class="req-user-name">{{ req.user?.fullName }}</span>
+                        @if ((req.user?.passengerRatingAverage ?? 0) > 0) {
+                          <span class="req-user-rating">
+                            <lucide-icon name="star" [size]="11"></lucide-icon>
+                            {{ req.user?.passengerRatingAverage | number:'1.1-1' }}
+                          </span>
+                        } @else {
+                          <span class="req-user-rating req-user-rating--new">New</span>
+                        }
+                      </div>
                       <div class="req-loc">
                         <lucide-icon name="map-pin" [size]="12"></lucide-icon>
                         <p>{{ req.pickupAddress }}</p>
@@ -321,6 +333,11 @@ const RIDER_CHART_COPY: ActivityChartsCopy = {
     .req-type { display: flex; align-items: center; gap: 6px; color: var(--clr-primary); font-size: 11px; font-weight: 700; text-transform: uppercase; }
     .req-time { font-size: 11px; color: var(--clr-primary); font-weight: 600; }
     .req-body { margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .req-user { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--clr-border-subtle); }
+    .req-user-avatar { width: 24px; height: 24px; border-radius: 50%; background: rgba(var(--clr-primary-rgb), 0.15); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--clr-primary); flex-shrink: 0; }
+    .req-user-name { font-size: 12px; font-weight: 600; color: var(--clr-text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .req-user-rating { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; color: var(--clr-warning, #f59e0b); flex-shrink: 0; background: rgba(245, 158, 11, 0.12); padding: 2px 6px; border-radius: 10px; }
+    .req-user-rating--new { color: var(--clr-text-muted); background: var(--clr-bg-elevated); font-size: 10px; }
     .req-loc { display: flex; gap: 8px; }
     .req-loc p { font-size: 13px; color: var(--clr-text); line-height: 1.4; }
     .req-loc lucide-icon { margin-top: 2px; color: var(--clr-text-muted); }

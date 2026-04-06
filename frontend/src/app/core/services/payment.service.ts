@@ -220,14 +220,13 @@ export class PaymentService {
       }
 
       let attempts = 0;
-      const maxAttempts = 20; // ~80 seconds (20 * 4s)
-      const pollIntervalMs = 4000; // 4 seconds
+      const maxAttempts = 30; // ~120 seconds (30 * 4s) — extra buffer for slow M-Pesa
+      const pollIntervalMs = 4000;
 
       while (attempts < maxAttempts) {
         try {
           const result = await this.getStatus(checkoutRequestId);
 
-          // Check for terminal states
           if (result.status === 'COMPLETED' || result.status === 'FAILED') {
             return {
               id: result.id,
@@ -236,32 +235,74 @@ export class PaymentService {
             };
           }
 
-          // Continue polling for PROCESSING or PENDING
           attempts++;
-          
-          // Wait before next poll (except on last attempt)
           if (attempts < maxAttempts) {
             await lastValueFrom(timer(pollIntervalMs));
           }
         } catch (error) {
-          // Log but continue polling - transient errors are expected
           console.warn(`Payment poll attempt ${attempts + 1} failed, retrying...`, error);
           attempts++;
-          
           if (attempts < maxAttempts) {
             await lastValueFrom(timer(pollIntervalMs));
           }
         }
       }
 
-      // Polling exhausted without terminal state
       throw new Error(
-        'Payment polling timed out after 80 seconds. Please check your M-Pesa messages or contact support.'
+        'Payment polling timed out after 120 seconds. Please check your M-Pesa messages or contact support.'
       );
     } catch (error) {
-      // Re-throw for component handling
       throw error;
     }
+  }
+
+  /**
+   * Polls by paymentId instead of checkoutRequestId.
+   * Used when the STK push timed out on Render and checkoutRequestId is not
+   * yet in the response — the background task will populate it in the DB.
+   * Once it appears in the DB, switches to normal terminal-state detection.
+   */
+  async pollStatusById(paymentId: string): Promise<{
+    id: string;
+    status: PaymentStatus;
+    mpesaReceiptNumber: string | null;
+    checkoutRequestId: string | null;
+  }> {
+    if (!paymentId) throw new Error('paymentId is required for polling');
+
+    let attempts = 0;
+    const maxAttempts = 30; // ~120 seconds
+    const pollIntervalMs = 4000;
+
+    while (attempts < maxAttempts) {
+      try {
+        const result = await this.api.getStatusById(paymentId);
+
+        if (result.status === 'COMPLETED' || result.status === 'FAILED') {
+          return {
+            id: result.id,
+            status: result.status,
+            mpesaReceiptNumber: result.mpesaReceiptNumber,
+            checkoutRequestId: result.checkoutRequestId,
+          };
+        }
+
+        attempts++;
+        if (attempts < maxAttempts) {
+          await lastValueFrom(timer(pollIntervalMs));
+        }
+      } catch (error) {
+        console.warn(`Payment poll-by-id attempt ${attempts + 1} failed, retrying...`, error);
+        attempts++;
+        if (attempts < maxAttempts) {
+          await lastValueFrom(timer(pollIntervalMs));
+        }
+      }
+    }
+
+    throw new Error(
+      'Payment polling timed out after 120 seconds. Please check your M-Pesa messages or contact support.'
+    );
   }
 
   // ────────────────────────────────────────────────────────────
