@@ -573,6 +573,12 @@ export class PaymentsService implements OnModuleInit {
           'checkoutRequestID',
           'checkoutRequestId',
           'checkout_request_id',
+          'CheckoutRequestID',
+          // Lipana also sends a `reference` field that maps to our checkoutRequestId
+          'reference',
+          'Reference',
+          'transaction_id',
+          'TransactionID',
         ] as const) {
           const v = rawData[key];
           if (typeof v === 'string' && v.trim()) lookupIds.add(v.trim());
@@ -580,7 +586,7 @@ export class PaymentsService implements OnModuleInit {
         const nest = rawData.transaction;
         if (nest && typeof nest === 'object') {
           const t = nest as Record<string, unknown>;
-          for (const v of [t.id, t.transactionId]) {
+          for (const v of [t.id, t.transactionId, t.transaction_id]) {
             if (typeof v === 'string' && v.trim()) lookupIds.add(v.trim());
           }
         }
@@ -671,16 +677,29 @@ export class PaymentsService implements OnModuleInit {
 
       // 7. Update payment status based on webhook event.
       //
-      // IMPORTANT: `data.status === "success"` is NOT sufficient when `event` is still
-      // `payment.pending`. But `st === "processing"` MUST NOT force pending for
-      // `payment.success` — some gateways send payment.success with status "processing"
-      // after the customer pays, and we would never mark COMPLETED (UI stuck forever).
-      const isFailed = ev === 'payment.failed' || st === 'failed';
-      const isPending =
-        ev === 'payment.pending' ||
-        (st === 'pending' && ev !== 'payment.success' && ev !== 'payment.failed');
-      // Lipana documents payment.success for settlement. Accept common status strings;
-      // `processing` here means "success path" labeling from the provider, not STK dispatch.
+      // Lipana sends `transaction.success` (not `payment.success`) as the real
+      // customer-confirmed payment event.  Accept both, plus any other success-
+      // flavoured event names the gateway may use.
+      const settlementEvents = new Set([
+        'payment.success',
+        'transaction.success',
+        'payment.completed',
+        'transaction.completed',
+        'payment.paid',
+        'transaction.paid',
+      ]);
+      const failureEvents = new Set([
+        'payment.failed',
+        'transaction.failed',
+        'payment.cancelled',
+        'transaction.cancelled',
+      ]);
+      const pendingEvents = new Set([
+        'payment.pending',
+        'transaction.pending',
+        'payout.initiated',
+      ]);
+
       const settlementStatuses = new Set([
         'success',
         'completed',
@@ -690,8 +709,16 @@ export class PaymentsService implements OnModuleInit {
         'complete',
         'processing',
       ]);
+
+      const isFailed =
+        failureEvents.has(ev) ||
+        (st === 'failed' && !settlementEvents.has(ev));
+      const isPending =
+        pendingEvents.has(ev) ||
+        (st === 'pending' && !settlementEvents.has(ev) && !failureEvents.has(ev));
+      // Settle when the event is a known success event AND status is not a failure.
       const isSettled =
-        ev === 'payment.success' && !isFailed && settlementStatuses.has(st);
+        settlementEvents.has(ev) && !isFailed && settlementStatuses.has(st);
 
       if (isFailed) {
         const updatedPayment = await this.prisma.payment.update({

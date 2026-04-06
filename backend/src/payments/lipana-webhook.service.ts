@@ -158,6 +158,9 @@ export class LipanaWebhookService {
       rawData.CheckoutRequestID,
       rawData.MerchantRequestID,
       rawData.merchantRequestId,
+      // Lipana `transaction.success` uses `reference` for the checkout/correlation id
+      rawData.reference,
+      rawData.Reference,
     );
 
     if (!transactionId) {
@@ -224,6 +227,9 @@ export class LipanaWebhookService {
       rawData.CheckoutRequestID,
       rawData.MerchantRequestID,
       rawData.merchantRequestId,
+      // Lipana `transaction.success` sends `reference` which maps to our checkoutRequestId
+      rawData.reference,
+      rawData.Reference,
     );
     const checkoutRequestID = checkoutRaw || undefined;
 
