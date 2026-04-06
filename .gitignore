@@ -28,5 +28,10 @@ Thumbs.db
 # Prisma generated client
 generated/
 
+# Accidental tsc output beside prisma/seed.ts (use ts-node / prisma seed, not committed JS)
+backend/prisma/seed.js
+backend/prisma/seed.js.map
+backend/prisma/seed.d.ts
+
 # Test coverage
 coverage/

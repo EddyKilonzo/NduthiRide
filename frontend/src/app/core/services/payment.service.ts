@@ -147,11 +147,11 @@ export class PaymentService {
 
   /**
    * Resends the STK push for a PROCESSING or FAILED payment.
-   * The backend marks the old payment FAILED, then creates a new one —
-   * so this works even when the old payment is still PROCESSING.
+   * The backend reuses the same Payment row (rideId/parcelId are unique) and sets
+   * status back to PROCESSING before launching a new STK.
    *
    * @param paymentId - The existing payment ID to resend
-   * @returns New payment details for UI + socket subscription
+   * @returns Same paymentId (and checkout metadata) for UI + socket subscription
    */
   async resend(paymentId: string): Promise<{
     paymentId: string;

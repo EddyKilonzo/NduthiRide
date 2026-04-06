@@ -16,7 +16,7 @@ import type { Payment } from '../../../core/models/payment.models';
           <div class="header-icon">
             <lucide-icon name="credit-card" [size]="24"></lucide-icon>
           </div>
-          <div><h1>Payments</h1><p>M-Pesa and Cash transaction log</p></div>
+          <div><h1>Payments</h1><p>Cash and M-Pesa transaction log</p></div>
         </div>
         <button class="btn btn--ghost btn--sm" (click)="load()" [disabled]="loading()">
           <lucide-icon name="rotate-cw" [size]="15"></lucide-icon> Refresh
@@ -42,9 +42,9 @@ import type { Payment } from '../../../core/models/payment.models';
           <div class="select-wrapper">
             <lucide-icon name="wallet" [size]="15" class="select-icon"></lucide-icon>
             <select [(ngModel)]="methodFilter" (change)="load()">
-              <option value="">All Methods</option>
-              <option value="MPESA">M-Pesa</option>
-              <option value="CASH">Cash</option>
+              <option value="">All — Cash &amp; M-Pesa</option>
+              <option value="CASH">Cash only</option>
+              <option value="MPESA">M-Pesa only</option>
             </select>
           </div>
         </div>
@@ -76,8 +76,8 @@ import type { Payment } from '../../../core/models/payment.models';
               <!-- Head: method icon + status badge -->
               <div class="pc-head">
                 <div class="method-icon-wrap" [class.method-mpesa]="p.method === 'MPESA'" [class.method-cash]="p.method === 'CASH'">
-                  <lucide-icon [name]="p.method === 'MPESA' ? 'smartphone' : 'banknote'" [size]="18"></lucide-icon>
-                  <span>{{ p.method === 'MPESA' ? 'M-Pesa' : 'Cash' }}</span>
+                  <lucide-icon [name]="methodIcon(p.method)" [size]="18"></lucide-icon>
+                  <span>{{ methodLabel(p.method) }}</span>
                 </div>
                 <span class="badge badge--{{ badge(p.status) }}">{{ p.status | titlecase }}</span>
               </div>
@@ -88,8 +88,15 @@ import type { Payment } from '../../../core/models/payment.models';
                 <strong class="amount-value">KES {{ p.amount | number:'1.0-0' }}</strong>
               </div>
 
-              <!-- M-Pesa details (if applicable) -->
-              @if (p.mpesaReceiptNumber || p.mpesaPhone) {
+              <!-- Method details: M-Pesa receipt/phone or cash note -->
+              @if (p.method === 'CASH') {
+                <div class="pc-meta">
+                  <div class="meta-row meta-row--cash">
+                    <lucide-icon name="banknote" [size]="13"></lucide-icon>
+                    <span>Paid in cash — no M-Pesa receipt</span>
+                  </div>
+                </div>
+              } @else if (p.mpesaReceiptNumber || p.mpesaPhone) {
                 <div class="pc-meta">
                   @if (p.mpesaReceiptNumber) {
                     <div class="meta-row">
@@ -103,6 +110,13 @@ import type { Payment } from '../../../core/models/payment.models';
                       <span>{{ p.mpesaPhone }}</span>
                     </div>
                   }
+                </div>
+              } @else if (p.method === 'MPESA') {
+                <div class="pc-meta">
+                  <div class="meta-row">
+                    <lucide-icon name="smartphone" [size]="13"></lucide-icon>
+                    <span>M-Pesa — receipt or phone pending</span>
+                  </div>
                 </div>
               }
 
@@ -191,6 +205,7 @@ import type { Payment } from '../../../core/models/payment.models';
     /* Meta */
     .pc-meta { display: flex; flex-direction: column; gap: 5px; padding: 8px 0; border-top: 1px solid var(--clr-border); border-bottom: 1px solid var(--clr-border); }
     .meta-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--clr-text-muted); }
+    .meta-row--cash { color: var(--clr-primary); font-weight: 500; }
     .meta-row lucide-icon { flex-shrink: 0; }
     .mono { font-family: var(--font-mono, monospace); font-size: 12px; }
 
@@ -249,5 +264,17 @@ export class AdminPaymentsComponent implements OnInit {
   protected badge(status: string): string {
     const m: Record<string, string> = { COMPLETED: 'active', FAILED: 'closed', PROCESSING: 'info', PENDING: 'pending' };
     return m[status] ?? 'info';
+  }
+
+  protected methodLabel(method: string): string {
+    if (method === 'MPESA') return 'M-Pesa';
+    if (method === 'CASH')  return 'Cash';
+    return method || 'Payment';
+  }
+
+  protected methodIcon(method: string): string {
+    if (method === 'MPESA') return 'smartphone';
+    if (method === 'CASH')  return 'banknote';
+    return 'credit-card';
   }
 }

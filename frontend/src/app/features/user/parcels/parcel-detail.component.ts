@@ -254,6 +254,22 @@ const ACTIVE_PARCEL_PAYMENT_STATUSES: ParcelStatus[] = [
                     }
                   </div>
                 </div>
+                @if (p.status === 'COMPLETED') {
+                  <button
+                    type="button"
+                    class="btn btn--primary btn--full receipt-download-btn"
+                    style="margin-top:12px"
+                    (click)="downloadPaymentReceipt(p.id)"
+                    [disabled]="receiptDownloading()">
+                    @if (receiptDownloading()) {
+                      <app-spinner [size]="16" />
+                      Preparing PDF…
+                    } @else {
+                      <lucide-icon name="download" [size]="16"></lucide-icon>
+                      Download PDF receipt
+                    }
+                  </button>
+                }
                 @if (p.status === 'FAILED' || (p.status === 'PROCESSING' && showResendOption())) {
                   <p class="payment-hint" style="margin-top:10px">
                     @if (p.status === 'FAILED') { The prompt was not completed. }
@@ -363,6 +379,7 @@ const ACTIVE_PARCEL_PAYMENT_STATUSES: ParcelStatus[] = [
     }
     .payment-status-label { font-weight: 700; font-size: 14px; }
     .payment-receipt { font-size: 12px; margin-top: 4px; opacity: 0.85; }
+    .receipt-download-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 
     .fare-pay-line--success { color: var(--clr-success); }
     .fare-pay-line--warning { color: var(--clr-warning); }
@@ -508,6 +525,7 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
 
   protected readonly payment          = signal<RidePayment | null>(null);
   protected readonly payingNow        = signal(false);
+  protected readonly receiptDownloading = signal(false);
   /** Becomes true after the 30-second grace window while STK push is in-flight. */
   protected readonly showResendOption = signal(false);
   private resendGraceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -606,6 +624,15 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
       d.mpesaReceiptNumber,
       d.completedAt ?? null,
     );
+    if (d.status === 'COMPLETED') {
+      void this.parcelService.getById(parcel.id).then((fresh) => {
+        this.parcel.set(fresh);
+        if (fresh.payment) this.payment.set(fresh.payment as RidePayment);
+        if (ACTIVE_PARCEL_PAYMENT_STATUSES.includes(fresh.status)) {
+          this.startParcelStatusPoll();
+        }
+      });
+    }
   };
 
   protected canPay(): boolean {
@@ -738,6 +765,24 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  protected async downloadPaymentReceipt(paymentId: string): Promise<void> {
+    this.receiptDownloading.set(true);
+    try {
+      const blob = await this.paymentService.downloadReceipt(paymentId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nduthiride-receipt-${paymentId.slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      this.toast.success('Receipt downloaded');
+    } catch {
+      this.toast.error('Could not download receipt');
+    } finally {
+      this.receiptDownloading.set(false);
+    }
+  }
+
   protected async initiatePayment(): Promise<void> {
     const p = this.parcel();
     if (!p || !p.mpesaPhone) return;
@@ -771,6 +816,9 @@ export class ParcelDetailComponent implements OnInit, OnDestroy {
     const parcel = this.parcel();
     if (!p || !parcel) return;
     this.payingNow.set(true);
+    // Drop any in-flight poll from the previous STK attempt so a late FAILED/COMPLETED
+    // result cannot overwrite state after this resend starts.
+    this.paymentPollGeneration++;
     try {
       // Clean up the old socket room before subscribing to the new payment
       if (this.subscribedPaymentId) {

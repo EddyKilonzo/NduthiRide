@@ -33,24 +33,38 @@ export class LipanaWebhookService {
    *
    * @throws BadRequestException if signature header is missing
    */
+  /**
+   * Strips optional `sha256=` prefix and lowercases hex (matches @lipana/sdk behavior).
+   */
+  private normalizeSignatureHeader(signature: string): string {
+    let s = signature.trim();
+    if (s.toLowerCase().startsWith('sha256=')) {
+      s = s.slice('sha256='.length).trim();
+    }
+    return s.toLowerCase();
+  }
+
   verifySignature(payload: string | Buffer, signature?: string): boolean {
-    if (!signature) {
+    if (!signature?.trim()) {
       this.logger.warn('Webhook request missing X-Lipana-Signature header');
       throw new BadRequestException('Missing webhook signature');
     }
 
     try {
       // Convert payload to Buffer if it's a string
-      const body = typeof payload === 'string' ? Buffer.from(payload) : payload;
+      const body = typeof payload === 'string' ? Buffer.from(payload, 'utf8') : payload;
 
-      // Compute expected signature using HMAC-SHA256
+      // Compute expected signature using HMAC-SHA256 (same as @lipana/sdk Webhooks.verify)
       const expectedSignature = createHmac('sha256', this.webhookSecret)
         .update(body)
-        .digest('hex');
+        .digest('hex')
+        .toLowerCase();
+
+      const normalizedSig = this.normalizeSignatureHeader(signature);
 
       // Use constant-time comparison to prevent timing attacks
-      const signatureBuffer = Buffer.from(signature);
-      const expectedBuffer = Buffer.from(expectedSignature);
+      const signatureBuffer = Buffer.from(normalizedSig, 'utf8');
+      const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
 
       if (signatureBuffer.length !== expectedBuffer.length) {
         this.logger.warn('Webhook signature length mismatch');
@@ -65,6 +79,7 @@ export class LipanaWebhookService {
 
       return isValid;
     } catch (error) {
+      if (error instanceof BadRequestException) throw error;
       this.logger.error('Webhook signature verification failed', error);
       return false;
     }
@@ -107,11 +122,23 @@ export class LipanaWebhookService {
 
     const data = payload.data as Record<string, unknown>;
 
-    if (typeof data.transactionId !== 'string') {
+    if (typeof data.transactionId !== 'string' || !data.transactionId.trim()) {
       throw new BadRequestException('Missing transactionId');
     }
 
-    if (typeof data.amount !== 'number' || data.amount <= 0) {
+    let amount: number;
+    if (typeof data.amount === 'number' && Number.isFinite(data.amount)) {
+      amount = data.amount;
+    } else if (typeof data.amount === 'string') {
+      const n = Number(data.amount.trim());
+      if (!Number.isFinite(n)) {
+        throw new BadRequestException('Invalid amount');
+      }
+      amount = n;
+    } else {
+      throw new BadRequestException('Invalid amount');
+    }
+    if (amount <= 0) {
       throw new BadRequestException('Invalid amount');
     }
 
@@ -122,6 +149,12 @@ export class LipanaWebhookService {
     if (typeof data.phone !== 'string') {
       throw new BadRequestException('Missing phone');
     }
+
+    const checkoutRaw = data.checkoutRequestID ?? data.checkoutRequestId;
+    const checkoutRequestID =
+      typeof checkoutRaw === 'string' && checkoutRaw.trim()
+        ? checkoutRaw.trim()
+        : undefined;
 
     // Check for replay attacks
     const webhookId = `${data.transactionId}:${data.timestamp || ''}`;
@@ -136,12 +169,13 @@ export class LipanaWebhookService {
     return {
       event: payload.event,
       data: {
-        transactionId: data.transactionId,
-        amount: data.amount,
+        transactionId: data.transactionId.trim(),
+        amount,
         status: data.status,
         phone: data.phone,
-        checkoutRequestID: data.checkoutRequestID as string | undefined,
-        timestamp: data.timestamp as string | undefined,
+        checkoutRequestID,
+        timestamp:
+          typeof data.timestamp === 'string' ? data.timestamp : undefined,
       },
     };
   }

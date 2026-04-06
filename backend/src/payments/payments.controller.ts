@@ -20,6 +20,7 @@ import {
   ApiBearerAuth,
   ApiBody,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import type { Account } from '@prisma/client';
 import type { Request } from 'express';
@@ -56,7 +57,12 @@ export class PaymentsController {
     @Body() dto: InitiatePaymentDto,
     @Req() req: Request,
   ) {
-    return this.paymentsService.initiatePayment(user.id, dto, req.ip, req.headers['user-agent'] as string);
+    return this.paymentsService.initiatePayment(
+      user.id,
+      dto,
+      req.ip,
+      req.headers['user-agent'] as string,
+    );
   }
 
   @Post('ride/:rideId')
@@ -116,18 +122,22 @@ export class PaymentsController {
 
   /**
    * Resend STK push for an existing PROCESSING or FAILED payment.
-   * Marks the old payment FAILED and creates a fresh one so the user
-   * gets a new M-Pesa prompt — even if the old payment is still PROCESSING.
+   * Reuses the same Payment row (rideId/parcelId are unique) and sets status
+   * back to PROCESSING before launching a new STK.
    */
   @Post(':paymentId/resend')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Resend STK push for a PROCESSING or FAILED payment',
-    description: 'Marks the existing payment as FAILED and initiates a new STK push.',
+    description:
+      'Re-fires STK on the existing payment record after resetting it to PROCESSING.',
   })
-  @ApiResponse({ status: 201, description: 'New STK push sent' })
-  @ApiResponse({ status: 400, description: 'Payment not resendable (e.g., already COMPLETED)' })
+  @ApiResponse({ status: 201, description: 'STK push sent (same paymentId)' })
+  @ApiResponse({
+    status: 400,
+    description: 'Payment not resendable (e.g., already COMPLETED)',
+  })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   resendPayment(
     @CurrentUser() user: Account,
@@ -152,6 +162,7 @@ export class PaymentsController {
    * - Returns 200 even on errors to prevent retry loops
    */
   @Post('lipana/webhook')
+  @SkipThrottle()
   @HttpCode(HttpStatus.OK)
   @Header('Content-Type', 'application/json')
   @ApiBody({
@@ -212,7 +223,9 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get audit logs for a specific payment (Admin only)' })
+  @ApiOperation({
+    summary: 'Get audit logs for a specific payment (Admin only)',
+  })
   @ApiResponse({ status: 200, description: 'Returns array of audit logs' })
   async getAuditLogsForPayment(@Param('paymentId') paymentId: string) {
     return this.paymentsService.getAuditLogsForPayment(paymentId);
@@ -236,7 +249,10 @@ export class PaymentsController {
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get suspicious activity report (Admin only)' })
-  @ApiResponse({ status: 200, description: 'Returns suspicious activity reports' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns suspicious activity reports',
+  })
   async getSuspiciousActivity(@Query('windowHours') windowHours: number = 24) {
     return this.paymentsService.getSuspiciousActivity(windowHours);
   }
@@ -249,7 +265,9 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Reconcile payments with Lipana records (Admin only)' })
+  @ApiOperation({
+    summary: 'Reconcile payments with Lipana records (Admin only)',
+  })
   @ApiResponse({ status: 200, description: 'Returns reconciliation results' })
   async reconcilePayments(@Query('date') date: string) {
     return this.paymentsService.reconcilePayments(date);
@@ -275,11 +293,16 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Download payment receipt as PDF' })
   @ApiResponse({ status: 200, description: 'Returns PDF receipt' })
   async downloadReceipt(
+    @CurrentUser() user: Account,
     @Param('paymentId') paymentId: string,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.paymentsService.generateReceiptPDF(paymentId);
-    
+    const pdfBuffer = await this.paymentsService.generateReceiptPDF(
+      paymentId,
+      user.id,
+      user.role,
+    );
+
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="receipt-${paymentId}.pdf"`,

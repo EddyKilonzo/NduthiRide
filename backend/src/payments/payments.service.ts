@@ -8,7 +8,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PaymentMethod, PaymentStatus } from '@prisma/client';
+import { PaymentMethod, PaymentStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { Lipana } from '@lipana/sdk';
@@ -16,6 +16,17 @@ import { LipanaWebhookService } from './lipana-webhook.service';
 import { PaymentAuditService } from './payment-audit.service';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import PDFDocument from 'pdfkit';
+
+/** NduthiRide brand palette — aligned with frontend `styles.scss` */
+const RECEIPT_BRAND = {
+  primary: '#408A71',
+  primaryDark: '#285A48',
+  primaryLight: '#B0E4CC',
+  ink: '#091413',
+  muted: '#4D6B5F',
+  paper: '#F8FCFA',
+  line: '#C5E5D8',
+} as const;
 
 @Injectable()
 export class PaymentsService implements OnModuleInit {
@@ -388,12 +399,28 @@ export class PaymentsService implements OnModuleInit {
     parsedBody: unknown,
   ): Promise<void> {
     try {
-      // 1. Verify webhook signature (SECURITY CRITICAL)
-      let signatureValid: boolean;
+      // 1. Verify webhook signature (SECURITY CRITICAL).
+      // Prefer raw request bytes (Nest `rawBody: true`); fall back to JSON.stringify
+      // of the parsed body so verification matches @lipana/sdk Webhooks.verify().
+      let signatureValid = false;
       try {
         signatureValid = this.webhookService.verifySignature(rawBody, signature);
       } catch {
         signatureValid = false;
+      }
+      if (
+        !signatureValid &&
+        parsedBody !== null &&
+        typeof parsedBody === 'object'
+      ) {
+        try {
+          signatureValid = this.webhookService.verifySignature(
+            Buffer.from(JSON.stringify(parsedBody), 'utf8'),
+            signature,
+          );
+        } catch {
+          signatureValid = false;
+        }
       }
       if (!signatureValid) {
         this.logger.warn('Webhook signature verification failed — request ignored');
@@ -418,12 +445,14 @@ export class PaymentsService implements OnModuleInit {
         `Received verified Lipana webhook: ${event} for ${transactionId}`,
       );
 
-      // 4. Find payment by Lipana transaction ID
+      // 4. Find payment by Lipana / M-Pesa transaction id or checkout request id
       const payment = await this.prisma.payment.findFirst({
         where: {
           OR: [
             { mpesaReceiptNumber: transactionId },
-            { checkoutRequestId: checkoutRequestID },
+            ...(checkoutRequestID != null && checkoutRequestID !== ''
+              ? [{ checkoutRequestId: checkoutRequestID }]
+              : []),
           ],
         },
       });
@@ -433,6 +462,14 @@ export class PaymentsService implements OnModuleInit {
           `Webhook received for unknown transaction: ${transactionId}`,
         );
         return;
+      }
+
+      if (
+        Math.round(data.amount * 100) !== Math.round(Number(payment.amount) * 100)
+      ) {
+        this.logger.warn(
+          `Webhook amount ${data.amount} differs from stored payment amount ${payment.amount} for payment ${payment.id} — proceeding after signature verification`,
+        );
       }
 
       // 5. Prevent duplicate processing
@@ -448,6 +485,10 @@ export class PaymentsService implements OnModuleInit {
           data: {
             status: PaymentStatus.COMPLETED,
             completedAt: new Date(),
+            mpesaReceiptNumber: transactionId,
+            ...(checkoutRequestID
+              ? { checkoutRequestId: checkoutRequestID }
+              : {}),
           },
           include: {
             ride: {
@@ -1181,9 +1222,14 @@ export class PaymentsService implements OnModuleInit {
   // ────────────────────────────────────────────────────────────
 
   /**
-   * Generate PDF receipt for a payment
+   * Generate a branded PDF receipt (M-Pesa transaction details + trip/parcel summary).
+   * Only the account that owns the ride/parcel may download.
    */
-  async generateReceiptPDF(paymentId: string): Promise<Buffer> {
+  async generateReceiptPDF(
+    paymentId: string,
+    requesterAccountId: string,
+    requesterRole: Role,
+  ): Promise<Buffer> {
     try {
       const payment = await this.prisma.payment.findUnique({
         where: { id: paymentId },
@@ -1205,93 +1251,237 @@ export class PaymentsService implements OnModuleInit {
         throw new NotFoundException('Payment not found');
       }
 
+      const ownerId = payment.ride?.userId ?? payment.parcel?.userId;
+      const isAdmin = requesterRole === Role.ADMIN;
+      if (
+        !isAdmin &&
+        (!ownerId || ownerId !== requesterAccountId)
+      ) {
+        throw new ForbiddenException(
+          'You can only download receipts for your own payments',
+        );
+      }
+
       const user = payment.ride?.user || payment.parcel?.user;
       const entityType = payment.ride ? 'Ride' : 'Parcel';
       const entityId = payment.rideId || payment.parcelId;
 
-      // Create PDF
-      return new Promise<Buffer>((resolve, reject) => {
-        const doc = new PDFDocument({ size: 'A4', margin: 50 });
-        const chunks: Buffer[] = [];
+      const fmtKe = (d: Date) =>
+        d.toLocaleString('en-KE', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        });
 
-        doc.on('data', chunk => chunks.push(chunk));
+      return new Promise<Buffer>((resolve, reject) => {
+        const doc = new PDFDocument({ size: 'A4', margin: 0 });
+        const chunks: Buffer[] = [];
+        const pageW = 595.28;
+        const margin = 48;
+        const contentW = pageW - margin * 2;
+        let y = 0;
+
+        doc.on('data', (chunk) => chunks.push(chunk));
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
 
-        // Header
+        const row = (
+          label: string,
+          value: string,
+          opts?: { mono?: boolean; emphasize?: boolean },
+        ) => {
+          const labelW = 150;
+          doc
+            .fontSize(9)
+            .fillColor(RECEIPT_BRAND.muted)
+            .font('Helvetica')
+            .text(label, margin, y, { width: labelW, continued: false });
+          doc
+            .font(opts?.emphasize ? 'Helvetica-Bold' : 'Helvetica')
+            .fontSize(opts?.emphasize ? 10 : 9)
+            .fillColor(RECEIPT_BRAND.ink)
+            .text(value, margin + labelW, y, {
+              width: contentW - labelW,
+              ...(opts?.mono ? { lineGap: 1 } : {}),
+            });
+          y = doc.y + 6;
+        };
+
+        // ── Brand header band ─────────────────────────────────
+        const headerH = 108;
+        doc.save();
+        doc.rect(0, 0, pageW, headerH).fill(RECEIPT_BRAND.primaryDark);
         doc
-          .fontSize(24)
+          .fontSize(26)
+          .fillColor('#FFFFFF')
           .font('Helvetica-Bold')
-          .text('NduthiRide', { align: 'center' })
-          .fontSize(12)
-          .text('Payment Receipt', { align: 'center' })
-          .moveDown(0.5);
+          .text('NduthiRide', margin, 32, { width: contentW });
+        doc
+          .fontSize(11)
+          .fillColor(RECEIPT_BRAND.primaryLight)
+          .font('Helvetica')
+          .text('Payment receipt', margin, 66, { width: contentW });
+        doc.restore();
+        y = headerH + 28;
 
-        // Divider
-        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-        doc.moveDown(0.5);
+        // ── Amount card ──────────────────────────────────────
+        const cardH = 78;
+        doc.save();
+        doc
+          .roundedRect(margin, y, contentW, cardH, 10)
+          .fill(RECEIPT_BRAND.primaryLight);
+        doc
+          .fontSize(9)
+          .fillColor(RECEIPT_BRAND.primaryDark)
+          .font('Helvetica-Bold')
+          .text('Amount paid', margin + 16, y + 14);
+        doc
+          .fontSize(22)
+          .fillColor(RECEIPT_BRAND.primary)
+          .font('Helvetica-Bold')
+          .text(
+            `KES ${Math.round(payment.amount).toLocaleString('en-KE')}`,
+            margin + 16,
+            y + 34,
+          );
+        doc
+          .fontSize(8)
+          .fillColor(RECEIPT_BRAND.muted)
+          .font('Helvetica')
+          .text(`Status: ${payment.status}`, margin + 16, y + 58);
+        doc.restore();
+        y += cardH + 24;
 
-        // Receipt details
-        doc.fontSize(10).font('Helvetica-Bold').text('Receipt Details:', { underline: true });
-        doc.font('Helvetica').fontSize(9);
-        doc.text(`Receipt ID: ${payment.id}`);
-        doc.text(`Date: ${new Date(payment.createdAt).toLocaleDateString('en-KE')}`);
-        doc.text(`Time: ${new Date(payment.createdAt).toLocaleTimeString('en-KE')}`);
-        doc.moveDown(0.5);
+        // ── M-Pesa transaction (when applicable) ─────────────
+        if (payment.method === PaymentMethod.MPESA) {
+          doc
+            .fontSize(11)
+            .fillColor(RECEIPT_BRAND.primaryDark)
+            .font('Helvetica-Bold')
+            .text('M-Pesa transaction', margin, y);
+          y = doc.y + 10;
 
-        // Payment details
-        doc.fontSize(10).font('Helvetica-Bold').text('Payment Details:', { underline: true });
-        doc.font('Helvetica').fontSize(9);
-        doc.text(`Amount: KES ${payment.amount.toLocaleString()}`);
-        doc.text(`Method: ${payment.method}`);
-        doc.text(`Status: ${payment.status}`);
-        if (payment.mpesaReceiptNumber) {
-          doc.text(`M-Pesa Receipt: ${payment.mpesaReceiptNumber}`);
+          doc
+            .moveTo(margin, y)
+            .lineTo(margin + contentW, y)
+            .strokeColor(RECEIPT_BRAND.primary)
+            .lineWidth(2)
+            .stroke();
+          y += 14;
+
+          row(
+            'Confirmation / receipt no.',
+            payment.mpesaReceiptNumber ?? '—',
+            { mono: true, emphasize: true },
+          );
+          row(
+            'STK checkout request ID',
+            payment.checkoutRequestId ?? '—',
+            { mono: true },
+          );
+          row('Paid from (phone)', payment.mpesaPhone ?? '—');
+          row(
+            'Settlement time',
+            payment.completedAt ? fmtKe(payment.completedAt) : '—',
+          );
+          row('Provider', 'M-Pesa (via Lipana)');
+          y += 8;
+        } else {
+          doc
+            .fontSize(11)
+            .fillColor(RECEIPT_BRAND.primaryDark)
+            .font('Helvetica-Bold')
+            .text('Payment method', margin, y);
+          y = doc.y + 8;
+          doc
+            .fontSize(9)
+            .fillColor(RECEIPT_BRAND.ink)
+            .font('Helvetica')
+            .text(
+              'Paid in cash to the rider at the end of the trip. No M-Pesa transaction reference applies.',
+              margin,
+              y,
+              { width: contentW },
+            );
+          y = doc.y + 16;
         }
-        doc.moveDown(0.5);
 
-        // Customer details
+        // ── Record & customer ─────────────────────────────────
+        doc
+          .fontSize(11)
+          .fillColor(RECEIPT_BRAND.primaryDark)
+          .font('Helvetica-Bold')
+          .text('Receipt record', margin, y);
+        y = doc.y + 10;
+
+        row('NduthiRide payment ID', payment.id, { mono: true });
+        row('Created', fmtKe(payment.createdAt));
+        if (payment.completedAt) {
+          row('Completed', fmtKe(payment.completedAt));
+        }
+
         if (user) {
-          doc.fontSize(10).font('Helvetica-Bold').text('Customer Details:', { underline: true });
-          doc.font('Helvetica').fontSize(9);
-          doc.text(`Name: ${user.fullName}`);
-          doc.text(`Phone: ${user.phone}`);
+          y += 6;
+          doc
+            .fontSize(11)
+            .fillColor(RECEIPT_BRAND.primaryDark)
+            .font('Helvetica-Bold')
+            .text('Customer', margin, y);
+          y = doc.y + 10;
+          row('Name', user.fullName);
+          row('Phone', user.phone);
           if (user.email) {
-            doc.text(`Email: ${user.email}`);
+            row('Email', user.email);
           }
-          doc.moveDown(0.5);
         }
 
-        // Entity details
-        doc.fontSize(10).font('Helvetica-Bold').text(`${entityType} Details:`, { underline: true });
-        doc.font('Helvetica').fontSize(9);
-        doc.text(`${entityType} ID: ${entityId}`);
-        
+        // ── Trip / parcel ─────────────────────────────────────
+        y += 8;
+        doc
+          .fontSize(11)
+          .fillColor(RECEIPT_BRAND.primaryDark)
+          .font('Helvetica-Bold')
+          .text(`${entityType} summary`, margin, y);
+        y = doc.y + 10;
+
+        row(`${entityType} ID`, entityId ?? '—');
         if (payment.ride) {
-          doc.text(`Pickup: ${payment.ride.pickupAddress}`);
-          doc.text(`Dropoff: ${payment.ride.dropoffAddress}`);
+          row('Pickup', payment.ride.pickupAddress);
+          row('Drop-off', payment.ride.dropoffAddress);
         } else if (payment.parcel) {
-          doc.text(`Pickup: ${payment.parcel.pickupAddress}`);
-          doc.text(`Dropoff: ${payment.parcel.dropoffAddress}`);
+          row('Pickup', payment.parcel.pickupAddress);
+          row('Drop-off', payment.parcel.dropoffAddress);
         }
 
-        // Footer
-        doc.moveDown(1);
-        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-        doc.moveDown(0.5);
-        doc.fontSize(8).font('Helvetica').text('Thank you for using NduthiRide!', { align: 'center' });
-        doc.text('For support, contact: support@nduthiride.co.ke', { align: 'center' });
-
-        // QR Code placeholder (in production, generate actual QR)
-        doc.moveDown(0.5);
-        doc.fontSize(8).font('Helvetica-Oblique').text('Scan to verify receipt', { align: 'center' });
-        doc.rect(275, doc.y, 50, 50).stroke();
-        doc.fontSize(6).text('QR Code', { align: 'center' });
+        // ── Footer bar (bottom of page — keep content concise so it stays above) ──
+        const footerH = 56;
+        const footY = doc.page.height - footerH;
+        doc.rect(0, footY, pageW, footerH).fill(RECEIPT_BRAND.ink);
+        doc
+          .fontSize(8)
+          .fillColor(RECEIPT_BRAND.primaryLight)
+          .font('Helvetica')
+          .text('Thank you for riding with NduthiRide.', margin, footY + 14, {
+            width: contentW,
+            align: 'center',
+          });
+        doc
+          .fillColor('#8BA89E')
+          .fontSize(7)
+          .font('Helvetica')
+          .text('Questions? support@nduthiride.co.ke', margin, footY + 30, {
+            width: contentW,
+            align: 'center',
+          });
 
         doc.end();
       });
     } catch (error) {
-      if (error instanceof NotFoundException) throw error;
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
       this.logger.error('generateReceiptPDF failed', error);
       throw new InternalServerErrorException('Failed to generate receipt');
     }

@@ -18,7 +18,7 @@ const ADMIN_CHART_COPY = {
   avgLabel: 'Avg. per trip',
   rideShareLabel: 'Ride vs Parcel',
   dailyAmountTitle: 'Daily revenue',
-  dailyAmountHint: 'From completed M-Pesa payments where applicable; otherwise booked fare on completion.',
+  dailyAmountHint: 'From completed payments (Cash and M-Pesa) where recorded; otherwise booked fare on completion.',
 } as const;
 
 @Component({
@@ -159,7 +159,7 @@ const ADMIN_CHART_COPY = {
             <span class="quick-icon" aria-hidden="true"><lucide-icon name="credit-card" [size]="28"></lucide-icon></span>
             <div>
               <p class="quick-title">Payments</p>
-              <p class="quick-sub">Track M-Pesa transactions</p>
+              <p class="quick-sub">Cash and M-Pesa transaction log</p>
             </div>
           </a>
           <a [routerLink]="['/admin/payouts']" class="card quick-card">
