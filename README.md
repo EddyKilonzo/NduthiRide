@@ -10,14 +10,19 @@ It includes:
 
 ## Stack Logos
 
-[![Core Stack](https://skillicons.dev/icons?i=nestjs,angular,ts,nodejs,postgres)](https://skillicons.dev)
-[![Infra Stack](https://skillicons.dev/icons?i=firebase,cloudinary)](https://skillicons.dev)
-<p>
-  <img src="https://cdn.simpleicons.org/prisma/2D3748" alt="Prisma" width="44" height="44" />
-  <img src="https://cdn.simpleicons.org/socketdotio/010101" alt="Socket.IO" width="44" height="44" />
-  <img src="https://cdn.simpleicons.org/render/46E3B7" alt="Render" width="44" height="44" />
-  <img src="https://cdn.simpleicons.org/vercel/000000" alt="Vercel" width="44" height="44" />
-</p>
+| Logo | Name |
+| --- | --- |
+| <img src="https://cdn.simpleicons.org/nestjs/E0234E" alt="NestJS" width="28" height="28" /> | NestJS |
+| <img src="https://cdn.simpleicons.org/angular/DD0031" alt="Angular" width="28" height="28" /> | Angular |
+| <img src="https://cdn.simpleicons.org/typescript/3178C6" alt="TypeScript" width="28" height="28" /> | TypeScript |
+| <img src="https://cdn.simpleicons.org/nodedotjs/5FA04E" alt="Node.js" width="28" height="28" /> | Node.js |
+| <img src="https://cdn.simpleicons.org/prisma/2D3748" alt="Prisma" width="28" height="28" /> | Prisma |
+| <img src="https://cdn.simpleicons.org/postgresql/4169E1" alt="PostgreSQL" width="28" height="28" /> | PostgreSQL |
+| <img src="https://cdn.simpleicons.org/socketdotio/010101" alt="Socket.IO" width="28" height="28" /> | Socket.IO |
+| <img src="https://cdn.simpleicons.org/firebase/DD2C00" alt="Firebase" width="28" height="28" /> | Firebase |
+| <img src="https://cdn.simpleicons.org/cloudinary/3448C5" alt="Cloudinary" width="28" height="28" /> | Cloudinary |
+| <img src="https://cdn.simpleicons.org/render/46E3B7" alt="Render" width="28" height="28" /> | Render |
+| <img src="https://cdn.simpleicons.org/vercel/000000" alt="Vercel" width="28" height="28" /> | Vercel |
 
 ## What The Platform Supports
 
